@@ -262,6 +262,10 @@ Signals v1의 온체인 설계 목표는 다음과 같다.
   - `settlementOracleState`
   - `_nextMarketId`
   - 각종 mapping (포지션/마켓 인덱스, 설정값 등)
+- `Market` struct에는 정산 스냅샷 메타데이터도 포함한다.
+  - `openPositionCount`: settle 직전까지 quantity>0인 포지션 수
+  - `snapshotChunkCursor`: `SettlementChunkRequested`를 몇 번째 `chunkIndex`까지 emit했는지
+  - `snapshotChunksDone`: 모든 청크 emit 완료 여부
 
 - 실험적/임시/사용하지 않는 필드는 제거
 - 향후 확장을 위한 `__gap` 재설계
@@ -321,6 +325,24 @@ Signals v1에서 Mechanism Layer(0-4에서 정의한 immutable semantics)는 가
   - MarketLifecycleModule은 이 라이브러리를 통해서만 상태 전이를 수행한다.
 
 이 기준에 따라 **모듈은 “스토리지 + 플로우 오케스트레이션”**, **라이브러리는 “CLMSR/Vault/Settlement 메커니즘 엔진”**으로 역할을 분리한다. 모듈은 tick/bin 변환, 파라미터 수집, 토큰 이동, 이벤트, 검증에 집중하고 계산은 라이브러리에 위임한다.
+
+### 1-4. 정산 스냅샷 / 인덱싱 전략 (서브그래프 구동)
+
+Signals V1에서는 whitepaper 6.5의 “포지션별 정산 스냅샷” 요구를 만족하되, v0처럼 포지션 수만큼 on-chain 이벤트를 emit하지 않는다.
+
+핵심 원칙:
+
+- **On-chain**
+  - 정산 로직은 settlementTick만 기록하며 포지션별 승/패/정산금은 상태로 기록하지 않는다.
+  - 정산 이후, 시장별로 O(1) 크기의 `SettlementChunkRequested(marketId, chunkIndex)` 이벤트만 emit한다.
+  - `Market.openPositionCount`, `Market.snapshotChunkCursor`, `Market.snapshotChunksDone`는 스냅샷 배치 진행상태 메타데이터다.
+
+- **Off-chain (subgraph/indexer)**
+  - 포지션 생성 시 `UserPosition`에 `seqInMarket`를 부여(온체인 저장 없음).
+  - `CHUNK_SIZE`(예: 256~512) 단위로 `chunkIndex`를 나누고, `SettlementChunkRequested`를 수신한 서브그래프가 `seqInMarket` 범위별 승/패/정산금을 계산해 `UserPosition.outcome/payout/settledByBatch`에 기록한다.
+  - On-chain view(`_calculateClaimAmount`)는 claim 처리에만 사용, 서브그래프는 동일 수학을 off-chain에서 복제한다.
+
+이렇게 하면 정산 로그 가스는 O(#chunks)로 제한되고, per-position 정산 상태는 인덱서 레이어에서만 관리한다.
 
 ---
 
@@ -513,7 +535,7 @@ contract SignalsCore is
 
 #### `MarketLifecycleModule`
 
-- v0 `CLMSRMarketManager`의 로직을 거의 그대로 포팅:
+- v0 `CLMSRMarketManager`의 로직을 거의 그대로 포팅하되, v0의 `emitPositionSettledBatch/PositionSettled` 패턴은 포팅하지 않는다(포지션 수만큼 로그를 찍지 않는다).
 
   - `createMarket`
   - `settleMarket`
@@ -521,6 +543,35 @@ contract SignalsCore is
   - `setMarketActive`
   - `updateMarketTiming`
   - 정산/오라클 상태 머신, 실패/수동 정산 등
+  - 정산 후 스냅샷 배치 트리거:
+
+    ```solidity
+    event SettlementChunkRequested(uint256 indexed marketId, uint32 indexed chunkIndex);
+    uint32 internal constant CHUNK_SIZE = 512; // 스테이징 인덱서 성능 보고 튜닝
+
+    function requestSettlementChunks(uint256 marketId, uint32 maxChunksPerTx) external onlyOwner onlyDelegated {
+        require(_marketExists(marketId), CE.MarketNotFound(marketId));
+        Market storage m = markets[marketId];
+        require(m.settled, CE.MarketNotSettled(marketId));
+        require(!m.snapshotChunksDone, "SNAPSHOT_ALREADY_DONE");
+        require(maxChunksPerTx > 0, CE.ZeroLimit());
+
+        uint32 totalChunks = (m.openPositionCount + CHUNK_SIZE - 1) / CHUNK_SIZE;
+        uint32 cursor = m.snapshotChunkCursor;
+        uint32 emitted = 0;
+
+        while (cursor < totalChunks && emitted < maxChunksPerTx) {
+            emit SettlementChunkRequested(marketId, cursor);
+            cursor++;
+            emitted++;
+        }
+
+        m.snapshotChunkCursor = cursor;
+        if (cursor >= totalChunks) {
+            m.snapshotChunksDone = true;
+        }
+    }
+    ```
 
 - `SignalsCore`에 라이프사이클 엔드포인트를 정의하고 `_delegate(lifecycleModule)`로 연결
 
@@ -590,6 +641,7 @@ contract SignalsCore is
   - `settlementOracleState`
   - `_nextMarketId`
   - 기타 필요한 mappings
+- 스냅샷/인덱싱을 위한 `Market` 필드(`openPositionCount`, `snapshotChunkCursor`, `snapshotChunksDone`)까지 포함해 v1 canonical 레이아웃으로 확정한다.
 
 - 사용하지 않는 필드, 실험/임시 필드는 제거
 - v1 기준으로 `__gap` 크기 재설정
@@ -671,6 +723,8 @@ address public oracleModule;  // 나중에 사용
     - `reopenMarket(...)`
     - `setMarketActive(...)`
     - `updateMarketTiming(...)`
+    - `requestSettlementChunks(uint256 marketId, uint32 maxChunksPerTx)`
+    - `event SettlementChunkRequested(uint256 indexed marketId, uint32 indexed chunkIndex);`
 
   - `TradeModule`:
 
@@ -843,6 +897,7 @@ address public oracleModule;  // 나중에 사용
   - `_applyFactorChunked` (factor 적용 및 트리 업데이트)
   - `_quoteFee`, `_resolveFeeRecipient`, `_resolveFeePolicy` (`IFeePolicy` external call 기반으로 정리, v0 FeePolicy 컨트랙트들은 Config Layer에서 관리)
   - `_validateActiveMarket`, `_validateTick`, `_marketExists`
+  - `openPositionCount` 유지: 신규 포지션 생성 시 +1, 수량 0으로 완전 종료 시(정산 전) -1, 정산 후에는 더 이상 변경하지 않는다.
 
 - 반대로, 다음 함수들은 `SignalsClmsrMath` / `SignalsDistributionMath` 라이브러리로만 존재하고 TradeModule에서는 호출만 한다:
 
@@ -886,6 +941,11 @@ address public oracleModule;  // 나중에 사용
   - `settleMarket`는 `OracleModule.getSettlementPrice(marketId, timestamp)`를 통해 정산 가격을 획득하며, OracleModule이 feed/adapter/서명 검증의 단일 진입점임을 검증
 
   - 정산/오라클 관련 테스트(`claim-gating`, `settlement`, `manager` spec)를 v1 모듈에 맞춰 재실행
+  - `requestSettlementChunks` 테스트:
+    - `totalChunks = ceil(openPositionCount / CHUNK_SIZE)` 계산 검증
+    - 첫 호출에서 `min(totalChunks, maxChunksPerTx)`개의 `SettlementChunkRequested` 이벤트 발생 검증
+    - 충분히 큰 `maxChunksPerTx`로 한 번에 `snapshotChunksDone == true` 되는지 확인
+    - `openPositionCount == 0`이면 이벤트 없이 `snapshotChunksDone == true` 되는지 확인
 
 **진입 기준**
 
@@ -933,6 +993,14 @@ address public oracleModule;  // 나중에 사용
   5. `SignalsCore` (proxy) 배포
   6. `SignalsCore.setModules(...)` 호출로 모듈 주소 세팅
   7. `SignalsCore`에 Position 컨트랙트 주소 등 초기 설정
+
+- 서브그래프/인덱서 연동
+
+  - v1 subgraph 스키마/매핑에서:
+    - `UserPosition`에 `seqInMarket`, `outcome`, `payout`, `settledByBatch`, `closedBeforeSettlement` 필드 추가.
+    - 포지션 생성 핸들러에서 마켓별 `seqInMarket` 카운터 증가, 정산 전 완전 종료된 포지션은 `closedBeforeSettlement=true`.
+    - `SettlementChunkRequested(marketId, chunkIndex)` 핸들러에서 CHUNK_SIZE 범위별 승/패/정산금 계산 후 `settledByBatch=true` 반영.
+  - Goldsky 스테이징 인덱서에서 CHUNK_SIZE(예: 256/512/1024) 후보 부하 테스트 후 최종값 채택.
 
 - 환경 변수(`envManager`)도 v1 기준으로 리셋
 - 운영 환경에서는 모듈 주소를 외부에 노출하지 않고 FE/SDK는 항상 `SignalsCore`만 호출하도록 하며, 테스트에서도 Core 경유(delegatecall) 헬퍼로 모듈 로직을 실행하고 모듈 컨트랙트를 직접 인스턴스해 호출하지 않는다는 규칙을 명문화
