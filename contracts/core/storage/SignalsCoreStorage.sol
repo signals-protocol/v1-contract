@@ -26,11 +26,9 @@ abstract contract SignalsCoreStorage {
     mapping(uint256 => SettlementOracleState) internal settlementOracleState;
     address public settlementOracleSigner;
 
-    mapping(uint256 => bool) public positionSettledEmitted;
-
     address public feeRecipient;
     address public defaultFeePolicy;
 
     // Reserve ample slots for future upgrades; do not change after first deployment.
-    uint256[50] internal __gap;
+    uint256[51] internal __gap;
 }

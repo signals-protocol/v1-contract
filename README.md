@@ -6,11 +6,11 @@ Signals v1 온체인 아키텍처 구현 프로젝트.
 
 ## 현재 상태
 
-**Phase 1: Storage / Interface 정리** 진행 중
+**Phase 2: Core + 모듈 스캐폴딩**까지 완료 (커밋/푸시 보류 중)
 
 - [x] Phase 0: 레포 부트스트랩 완료
-- [ ] Phase 1: Storage / Interface 정리
-- [ ] Phase 2: Core + 모듈 스캐폴딩
+- [x] Phase 1: Storage / Interface 정리
+- [x] Phase 2: Core + 모듈 스캐폴딩
 - [ ] Phase 3: v0 로직 포팅
 - [ ] Phase 4: Risk / Invariants 도입
 - [ ] Phase 5: LP Vault / Backstop 통합
@@ -29,6 +29,7 @@ Signals v1 온체인 아키텍처 구현 프로젝트.
 signals-v1/
 ├── contracts/
 │   ├── core/
+│   │   └── SignalsCore.sol              # Core 스켈레톤(UUPS + delegate stubs)
 │   │   └── storage/
 │   │       └── SignalsCoreStorage.sol    # Core 스토리지 레이아웃
 │   ├── interfaces/
@@ -36,7 +37,12 @@ signals-v1/
 │   │   └── ISignalsPosition.sol          # Position 인터페이스
 │   ├── lib/
 │   │   └── LazyMulSegmentTree.sol        # 세그먼트 트리 라이브러리
-│   ├── modules/                          # (예정) 모듈들
+│   ├── modules/
+│   │   ├── TradeModule.sol               # delegate-only 스켈레톤
+│   │   ├── MarketLifecycleModule.sol     # 정산 청크 이벤트 선언 포함 스켈레톤
+│   │   └── OracleModule.sol              # delegate-only 스켈레톤
+│   ├── errors/
+│   │   └── ModuleErrors.sol              # NotDelegated 등 공통 에러
 │   └── position/
 │       └── SignalsPositionStorage.sol    # Position 스토리지 레이아웃
 ├── test/

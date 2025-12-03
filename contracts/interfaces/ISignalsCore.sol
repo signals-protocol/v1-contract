@@ -55,4 +55,29 @@ interface ISignalsCore {
     ) external;
 
     function claimPayout(uint256 positionId) external;
+
+    // View helpers (v0 parity)
+    function calculateOpenCost(
+        uint256 marketId,
+        int256 lowerTick,
+        int256 upperTick,
+        uint128 quantity
+    ) external view returns (uint256 cost);
+
+    function calculateIncreaseCost(
+        uint256 positionId,
+        uint128 quantity
+    ) external view returns (uint256 cost);
+
+    function calculateDecreaseProceeds(
+        uint256 positionId,
+        uint128 quantity
+    ) external view returns (uint256 proceeds);
+
+    function calculateCloseProceeds(uint256 positionId) external view returns (uint256 proceeds);
+
+    function calculatePositionValue(uint256 positionId) external view returns (uint256 value);
+
+    // Lifecycle: settlement snapshot trigger
+    function requestSettlementChunks(uint256 marketId, uint32 maxChunksPerTx) external returns (uint32 emitted);
 }
