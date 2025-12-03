@@ -1,0 +1,19 @@
+[
+  {
+    "name": "example-basic-open",
+    "params": {
+      "marketId": 1,
+      "lowerTick": 0,
+      "upperTick": 10,
+      "quantity": "0"
+    },
+    "expected": {
+      "openCost": "0",
+      "increaseCost": "0",
+      "decreaseProceeds": "0",
+      "closeProceeds": "0",
+      "positionValue": "0"
+    },
+    "notes": "Replace with real v0/SDK parity values. This file is a template, not used in tests."
+  }
+]

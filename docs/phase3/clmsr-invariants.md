@@ -46,7 +46,7 @@ Use it to write/extend tests in `test/unit/clmsrParity.test.ts` (parity + round-
 
 ## Test harness plan (to implement in Phase 3-0)
 - `test/unit/clmsrParity.test.ts`
-  - SDK parity cases (pull fixtures from v0 or SDK once wired).
+  - SDK parity cases (pull fixtures from v0 or SDK once wired). Drop JSON fixtures in `test/fixtures/clmsrFixtures.json` (shape in `clmsrFixtures.sample.json`).
   - Round-trip property tests (fuzzable).
   - E2E scenario: `open → increase → decrease → close` with/without fee, assert debit/credit sums.
-- Keep tests green while wiring: start with `describe.skip` scaffolding, then enable as fixtures arrive.
+- Harness auto-skips if `clmsrFixtures.json` is absent, so CI stays green until fixtures are added.
