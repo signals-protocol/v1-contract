@@ -7,7 +7,7 @@ Signals v1 온체인 아키텍처 구현 프로젝트.
 ## 현재 상태
 
 **Phase 2: Core + 모듈 스캐폴딩** 완료.
-- Phase 3-0 scaffolding: CLMSR parity harness stub(`test/unit/clmsrParity.test.ts`) & invariants note(`docs/phase3/clmsr-invariants.md`).
+- Phase 3-0 complete: CLMSR math/LazyMulSegmentTree 포팅 + SDK/v0 parity · invariant · round-trip · e2e 테스트 `test/unit/clmsrParity.test.ts` 녹색.
 
 - [x] Phase 0: 레포 부트스트랩 완료
 - [x] Phase 1: Storage / Interface 정리

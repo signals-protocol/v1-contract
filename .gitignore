@@ -101,6 +101,8 @@ build/Release
 # Misc
 lib-cov
 web_modules/
+.DS_Store
+signals-v0/
 
 # Typechain
 typechain-types
@@ -110,3 +112,4 @@ complete_codebase-v0.md
 plan.md
 scripts/generate_codebase.sh
 test/fixtures/clmsrFixtures.json
+whitepaper.pdf

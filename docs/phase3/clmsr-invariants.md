@@ -44,9 +44,12 @@ Use it to write/extend tests in `test/unit/clmsrParity.test.ts` (parity + round-
 - Snapshot batching uses `SettlementChunkRequested(marketId, chunkIndex)` with `CHUNK_SIZE`.
 - Subgraph assigns `seqInMarket` off-chain; on-chain does **not** emit per-position events.
 
-## Test harness plan (to implement in Phase 3-0)
+## Test harness coverage (Phase 3-0)
 - `test/unit/clmsrParity.test.ts`
-  - SDK parity cases (pull fixtures from v0 or SDK once wired). Drop JSON fixtures in `test/fixtures/clmsrFixtures.json` (shape in `clmsrFixtures.sample.json`).
-  - Round-trip property tests (fuzzable).
-  - E2E scenario: `open → increase → decrease → close` with/without fee, assert debit/credit sums.
-- Harness auto-skips if `clmsrFixtures.json` is absent, so CI stays green until fixtures are added.
+  - Closed-form sanity (uniform bins, qty=1, cost/proceeds ≈ α ln(Σ_after/Σ_before)).
+  - Round-trip qty→cost→qty on uniform/non-uniform distributions.
+  - e2e apply/restore factors (buy then sell) with root sum restored.
+  - v0 parity for `_safeExp` via `signals-v0` artifacts (`CLMSRMathHarness`).
+- TODO (next add-ons to fully lock plan.md exit criteria):
+  - SDK/v0 fixture-based parity for `calculateOpenCost/QuantityFromCost/DecreaseProceeds/CloseProceeds`.
+  - Trade-level E2E (`open→increase→decrease→close`, fee on/off) with debit/credit sums checked.
