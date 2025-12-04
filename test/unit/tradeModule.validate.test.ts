@@ -46,7 +46,10 @@ function buildMarket(baseTime: bigint, overrides: Partial<MarketStruct> = {}): M
 
 describe("TradeModule validation helpers (Phase 3-1)", () => {
   async function deployHarness() {
-    const Factory = await ethers.getContractFactory("TradeModuleHarness");
+    const lazyLib = await (await ethers.getContractFactory("LazyMulSegmentTree")).deploy();
+    const Factory = await ethers.getContractFactory("TradeModuleHarness", {
+      libraries: { LazyMulSegmentTree: lazyLib.target },
+    });
     return Factory.deploy();
   }
 

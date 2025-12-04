@@ -3,16 +3,26 @@ pragma solidity ^0.8.24;
 
 import "../core/storage/SignalsCoreStorage.sol";
 import "../interfaces/ISignalsCore.sol";
+import "../interfaces/IFeePolicy.sol";
+import "../interfaces/ISignalsPosition.sol";
 import "../errors/CLMSRErrors.sol";
 import "../errors/ModuleErrors.sol";
 import "../core/lib/SignalsDistributionMath.sol";
 import "../lib/LazyMulSegmentTree.sol";
+import "../lib/FixedPointMathU.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+interface IOwnableLite {
+    function owner() external view returns (address);
+}
 
 /// @notice Delegate-only trade module (skeleton)
 contract TradeModule is SignalsCoreStorage {
     address private immutable self;
 
     using SignalsDistributionMath for LazyMulSegmentTree.Tree;
+    using FixedPointMathU for uint256;
+    using SafeERC20 for IERC20;
 
     modifier onlyDelegated() {
         if (address(this) == self) revert ModuleErrors.NotDelegated();
@@ -78,44 +88,85 @@ contract TradeModule is SignalsCoreStorage {
         int256 lowerTick,
         int256 upperTick,
         uint128 quantity
-    ) external view onlyDelegated returns (uint256 cost) {
-        marketId;
-        lowerTick;
-        upperTick;
-        quantity;
-        cost = 0;
+    ) external view returns (uint256 cost) {
+        if (quantity == 0) revert CE.InvalidQuantity(quantity);
+        ISignalsCore.Market storage market = _loadAndValidateMarket(marketId);
+        _validateTickRange(lowerTick, upperTick, market);
+
+        uint256 costWad = _calculateTradeCostInternal(
+            marketId,
+            lowerTick,
+            upperTick,
+            uint256(quantity).toWad()
+        );
+        return _roundDebit(costWad);
     }
 
     function calculateIncreaseCost(
         uint256 positionId,
         uint128 quantity
-    ) external view onlyDelegated returns (uint256 cost) {
-        positionId;
-        quantity;
-        cost = 0;
+    ) external view returns (uint256 cost) {
+        if (quantity == 0) revert CE.InvalidQuantity(quantity);
+        ISignalsCore.Market storage market;
+        {
+            ISignalsPosition.Position memory position = positionContract.getPosition(positionId);
+            market = _loadAndValidateMarket(position.marketId);
+            _validateTickRange(position.lowerTick, position.upperTick, market);
+            uint256 costWad = _calculateTradeCostInternal(
+                position.marketId,
+                position.lowerTick,
+                position.upperTick,
+                uint256(quantity).toWad()
+            );
+            return _roundDebit(costWad);
+        }
     }
 
     function calculateDecreaseProceeds(
         uint256 positionId,
         uint128 quantity
-    ) external view onlyDelegated returns (uint256 proceeds) {
-        positionId;
-        quantity;
-        proceeds = 0;
+    ) external view returns (uint256 proceeds) {
+        if (quantity == 0) revert CE.InvalidQuantity(quantity);
+        ISignalsPosition.Position memory position = positionContract.getPosition(positionId);
+        ISignalsCore.Market storage market = _loadAndValidateMarket(position.marketId);
+        _validateTickRange(position.lowerTick, position.upperTick, market);
+        uint256 proceedsWad = _calculateSellProceeds(
+            position.marketId,
+            position.lowerTick,
+            position.upperTick,
+            uint256(quantity).toWad()
+        );
+        return _roundCredit(proceedsWad);
     }
 
     function calculateCloseProceeds(
         uint256 positionId
-    ) external view onlyDelegated returns (uint256 proceeds) {
-        positionId;
-        proceeds = 0;
+    ) external view returns (uint256 proceeds) {
+        ISignalsPosition.Position memory position = positionContract.getPosition(positionId);
+        ISignalsCore.Market storage market = _loadAndValidateMarket(position.marketId);
+        _validateTickRange(position.lowerTick, position.upperTick, market);
+        uint256 proceedsWad = _calculateSellProceeds(
+            position.marketId,
+            position.lowerTick,
+            position.upperTick,
+            uint256(position.quantity).toWad()
+        );
+        return _roundCredit(proceedsWad);
     }
 
     function calculatePositionValue(
         uint256 positionId
-    ) external view onlyDelegated returns (uint256 value) {
-        positionId;
-        value = 0;
+    ) external view returns (uint256 value) {
+        ISignalsPosition.Position memory position = positionContract.getPosition(positionId);
+        ISignalsCore.Market storage market = markets[position.marketId];
+        _validateTickRange(position.lowerTick, position.upperTick, market);
+        uint256 proceedsWad = _calculateSellProceeds(
+            position.marketId,
+            position.lowerTick,
+            position.upperTick,
+            uint256(position.quantity).toWad()
+        );
+        return _roundCredit(proceedsWad);
     }
 
     // --- Shared validation helpers ---
@@ -214,5 +265,62 @@ contract TradeModule is SignalsCoreStorage {
         LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
         (uint32 loBin, uint32 hiBin) = _ticksToBins(market, lowerTick, upperTick);
         quantityWad = tree.calculateQuantityFromCost(market.liquidityParameter, loBin, hiBin, costWad);
+    }
+
+    // --- Fee/payment helpers ---
+
+    function _roundDebit(uint256 wadAmount) internal pure returns (uint256) {
+        return wadAmount.fromWadRoundUp();
+    }
+
+    function _roundCredit(uint256 wadAmount) internal pure returns (uint256) {
+        return wadAmount.fromWad();
+    }
+
+    function _resolveFeeRecipient() internal view returns (address) {
+        if (feeRecipient != address(0)) return feeRecipient;
+        return IOwnableLite(address(this)).owner();
+    }
+
+    function _resolveFeePolicy(ISignalsCore.Market memory market) internal view returns (address) {
+        return market.feePolicy != address(0) ? market.feePolicy : defaultFeePolicy;
+    }
+
+    function _quoteFee(
+        bool isBuy,
+        address trader,
+        uint256 marketId,
+        int256 lowerTick,
+        int256 upperTick,
+        uint128 quantity,
+        uint256 baseAmount
+    ) internal view returns (uint256 fee6) {
+        ISignalsCore.Market memory market = markets[marketId];
+        address policyAddress = _resolveFeePolicy(market);
+        if (policyAddress == address(0)) return 0;
+        IFeePolicy.QuoteParams memory params = IFeePolicy.QuoteParams({
+            trader: trader,
+            marketId: marketId,
+            lowerTick: lowerTick,
+            upperTick: upperTick,
+            quantity: quantity,
+            baseAmount: baseAmount,
+            isBuy: isBuy,
+            context: bytes32(0)
+        });
+        fee6 = IFeePolicy(policyAddress).quoteFee(params);
+        if (fee6 > baseAmount) revert CE.FeeExceedsBase(fee6, baseAmount);
+    }
+
+    function _pullPayment(address from, uint256 amount6) internal {
+        if (amount6 == 0) return;
+        uint256 balance = paymentToken.balanceOf(from);
+        if (balance < amount6) revert CE.InsufficientBalance(from, amount6, balance);
+        paymentToken.safeTransferFrom(from, address(this), amount6);
+    }
+
+    function _pushPayment(address to, uint256 amount6) internal {
+        if (amount6 == 0) return;
+        paymentToken.safeTransfer(to, amount6);
     }
 }

@@ -136,43 +136,58 @@ contract SignalsCore is
         int256 upperTick,
         uint128 quantity
     ) external view override returns (uint256 cost) {
-        marketId;
-        lowerTick;
-        upperTick;
-        quantity;
-        cost = 0;
+        bytes memory ret = _delegateView(tradeModule, abi.encodeWithSignature(
+            "calculateOpenCost(uint256,int256,int256,uint128)",
+            marketId,
+            lowerTick,
+            upperTick,
+            quantity
+        ));
+        if (ret.length > 0) cost = abi.decode(ret, (uint256));
     }
 
     function calculateIncreaseCost(
         uint256 positionId,
         uint128 quantity
     ) external view override returns (uint256 cost) {
-        positionId;
-        quantity;
-        cost = 0;
+        bytes memory ret = _delegateView(tradeModule, abi.encodeWithSignature(
+            "calculateIncreaseCost(uint256,uint128)",
+            positionId,
+            quantity
+        ));
+        if (ret.length > 0) cost = abi.decode(ret, (uint256));
     }
 
     function calculateDecreaseProceeds(
         uint256 positionId,
         uint128 quantity
     ) external view override returns (uint256 proceeds) {
-        positionId;
-        quantity;
-        proceeds = 0;
+        bytes memory ret = _delegateView(tradeModule, abi.encodeWithSignature(
+            "calculateDecreaseProceeds(uint256,uint128)",
+            positionId,
+            quantity
+        ));
+        if (ret.length > 0) proceeds = abi.decode(ret, (uint256));
     }
 
     function calculateCloseProceeds(
         uint256 positionId
     ) external view override returns (uint256 proceeds) {
-        positionId;
-        proceeds = 0;
+        bytes memory ret = _delegateView(tradeModule, abi.encodeWithSignature(
+            "calculateCloseProceeds(uint256)",
+            positionId
+        ));
+        if (ret.length > 0) proceeds = abi.decode(ret, (uint256));
     }
 
     function calculatePositionValue(
         uint256 positionId
     ) external view override returns (uint256 value) {
-        positionId;
-        value = 0;
+        bytes memory ret = _delegateView(tradeModule, abi.encodeWithSignature(
+            "calculatePositionValue(uint256)",
+            positionId
+        ));
+        if (ret.length > 0) value = abi.decode(ret, (uint256));
     }
 
     /// @notice Trigger settlement snapshot chunks after market settlement (owner only).
@@ -197,6 +212,18 @@ contract SignalsCore is
     function _delegate(address module, bytes memory callData) internal returns (bytes memory) {
         require(module != address(0), "ModuleNotSet");
         (bool success, bytes memory ret) = module.delegatecall(callData);
+        if (!success) {
+            assembly ("memory-safe") {
+                revert(add(ret, 32), mload(ret))
+            }
+        }
+        return ret;
+    }
+
+    /// @dev Delegate to a module for view paths via staticcall; bubble up reverts.
+    function _delegateView(address module, bytes memory callData) internal view returns (bytes memory) {
+        require(module != address(0), "ModuleNotSet");
+        (bool success, bytes memory ret) = module.staticcall(callData);
         if (!success) {
             assembly ("memory-safe") {
                 revert(add(ret, 32), mload(ret))
