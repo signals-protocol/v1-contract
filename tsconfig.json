@@ -15,6 +15,7 @@
     "hardhat.config.ts",
     "scripts",
     "test",
-    "contracts"
+    "contracts",
+    "typechain-types"
   ]
 }

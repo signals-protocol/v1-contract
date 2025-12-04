@@ -1,29 +1,57 @@
 import { ethers } from "hardhat";
 import { expect } from "chai";
-import { BigNumberish } from "ethers";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import {
+  MockPaymentToken,
+  MockSignalsPosition,
+  MockFeePolicy,
+  TradeModuleProxy,
+  TradeModule,
+} from "../../typechain-types";
+import { ISignalsCore } from "../../typechain-types/contracts/harness/TradeModuleProxy";
 
 const WAD = ethers.parseEther("1");
 
-function toBN(v: BigNumberish) {
-  return BigInt(v.toString());
+interface DeployedSystem {
+  owner: HardhatEthersSigner;
+  user: HardhatEthersSigner;
+  payment: MockPaymentToken;
+  position: MockSignalsPosition;
+  core: TradeModuleProxy;
+  feePolicy: MockFeePolicy;
 }
 
 describe("TradeModule flow (minimal parity)", () => {
-  async function deploySystem(marketOverrides: Partial<any> = {}, feeBps = 0) {
+  async function deploySystem(
+    marketOverrides: Partial<ISignalsCore.MarketStruct> = {},
+    feeBps = 0
+  ): Promise<DeployedSystem> {
     const [owner, user] = await ethers.getSigners();
 
-    const payment = await (await ethers.getContractFactory("MockPaymentToken")).deploy();
-    const position = await (await ethers.getContractFactory("MockSignalsPosition")).deploy();
-    const feePolicy = await (await ethers.getContractFactory("MockFeePolicy")).deploy(feeBps);
+    const payment = await (
+      await ethers.getContractFactory("MockPaymentToken")
+    ).deploy();
+    const position = await (
+      await ethers.getContractFactory("MockSignalsPosition")
+    ).deploy();
+    const feePolicy = await (
+      await ethers.getContractFactory("MockFeePolicy")
+    ).deploy(feeBps);
 
-    const lazyLib = await (await ethers.getContractFactory("LazyMulSegmentTree")).deploy();
-    const tradeModule = await (await ethers.getContractFactory("TradeModule", {
-      libraries: { LazyMulSegmentTree: lazyLib.target },
-    })).deploy();
+    const lazyLib = await (
+      await ethers.getContractFactory("LazyMulSegmentTree")
+    ).deploy();
+    const tradeModule = await (
+      await ethers.getContractFactory("TradeModule", {
+        libraries: { LazyMulSegmentTree: lazyLib.target },
+      })
+    ).deploy();
 
-    const core = await (await ethers.getContractFactory("TradeModuleProxy", {
-      libraries: { LazyMulSegmentTree: lazyLib.target },
-    })).deploy(tradeModule.target);
+    const core = await (
+      await ethers.getContractFactory("TradeModuleProxy", {
+        libraries: { LazyMulSegmentTree: lazyLib.target },
+      })
+    ).deploy(tradeModule.target);
 
     await core.setAddresses(
       payment.target,
@@ -35,7 +63,7 @@ describe("TradeModule flow (minimal parity)", () => {
     );
 
     const now = (await ethers.provider.getBlock("latest"))!.timestamp;
-    const market = {
+    const market: ISignalsCore.MarketStruct = {
       isActive: true,
       settled: false,
       snapshotChunksDone: false,
@@ -53,7 +81,7 @@ describe("TradeModule flow (minimal parity)", () => {
       liquidityParameter: WAD,
       feePolicy: ethers.ZeroAddress,
       ...marketOverrides,
-    } as any;
+    };
     await core.setMarket(1, market);
     await core.seedTree(1, [WAD, WAD, WAD, WAD]);
 
@@ -61,7 +89,14 @@ describe("TradeModule flow (minimal parity)", () => {
     await payment.transfer(user.address, 10_000_000n); // 10 USDC (6 decimals)
     await payment.connect(user).approve(core.target, ethers.MaxUint256);
 
-    return { owner, user, payment, position, core, feePolicy };
+    return {
+      owner,
+      user,
+      payment: payment as MockPaymentToken,
+      position: position as MockSignalsPosition,
+      core: core as TradeModuleProxy,
+      feePolicy: feePolicy as MockFeePolicy,
+    };
   }
 
   it("open -> increase -> decrease -> close updates balances and openPositionCount", async () => {
@@ -90,18 +125,22 @@ describe("TradeModule flow (minimal parity)", () => {
 
   it("rejects zero quantity and misaligned ticks", async () => {
     const { user, core } = await deploySystem();
-    await expect(core.connect(user).openPosition(1, 0, 4, 0, 1_000_000)).to.be.reverted;
+    await expect(core.connect(user).openPosition(1, 0, 4, 0, 1_000_000)).to.be
+      .reverted;
 
     const { user: u2, core: c2 } = await deploySystem({ tickSpacing: 2 });
-    await expect(c2.connect(u2).openPosition(1, 1, 3, 1_000, 5_000_000)).to.be.reverted;
+    await expect(c2.connect(u2).openPosition(1, 1, 3, 1_000, 5_000_000)).to.be
+      .reverted;
   });
 
   it("reverts on inactive market and invalid ticks", async () => {
     const { user, core } = await deploySystem({ isActive: false });
-    await expect(core.connect(user).openPosition(1, 0, 4, 1_000, 5_000_000)).to.be.reverted;
+    await expect(core.connect(user).openPosition(1, 0, 4, 1_000, 5_000_000)).to
+      .be.reverted;
 
     const { user: user2, core: core2 } = await deploySystem();
-    await expect(core2.connect(user2).openPosition(1, 0, 5, 1_000, 5_000_000)).to.be.reverted;
+    await expect(core2.connect(user2).openPosition(1, 0, 5, 1_000, 5_000_000))
+      .to.be.reverted;
   });
 
   it("calculateOpenCost matches actual debit (fee=0)", async () => {
@@ -121,7 +160,7 @@ describe("TradeModule flow (minimal parity)", () => {
     // mark market settled in the past to satisfy claim gate
     const m = await core.markets(1);
     const past = m.endTimestamp - 1000n;
-    await core.setMarket(1, {
+    const settledMarket: ISignalsCore.MarketStruct = {
       isActive: m.isActive,
       settled: true,
       snapshotChunksDone: m.snapshotChunksDone,
@@ -138,7 +177,8 @@ describe("TradeModule flow (minimal parity)", () => {
       settlementValue: m.settlementValue,
       liquidityParameter: m.liquidityParameter,
       feePolicy: m.feePolicy,
-    });
+    };
+    await core.setMarket(1, settledMarket);
 
     const balBefore = await payment.balanceOf(user.address);
     await core.connect(user).claimPayout(1);
@@ -157,7 +197,7 @@ describe("TradeModule flow (minimal parity)", () => {
 
     // settle but too early for claim window
     const m = await core.markets(1);
-    await core.setMarket(1, {
+    const earlySettleMarket: ISignalsCore.MarketStruct = {
       isActive: m.isActive,
       settled: true,
       snapshotChunksDone: m.snapshotChunksDone,
@@ -174,12 +214,13 @@ describe("TradeModule flow (minimal parity)", () => {
       settlementValue: m.settlementValue,
       liquidityParameter: m.liquidityParameter,
       feePolicy: m.feePolicy,
-    });
+    };
+    await core.setMarket(1, earlySettleMarket);
     await expect(core.connect(user).claimPayout(1)).to.be.reverted;
 
     // allow claim by moving settlementTimestamp to past
     const m2 = await core.markets(1);
-    await core.setMarket(1, {
+    const claimableMarket: ISignalsCore.MarketStruct = {
       isActive: m2.isActive,
       settled: m2.settled,
       snapshotChunksDone: m2.snapshotChunksDone,
@@ -196,7 +237,8 @@ describe("TradeModule flow (minimal parity)", () => {
       settlementValue: m2.settlementValue,
       liquidityParameter: m2.liquidityParameter,
       feePolicy: m2.feePolicy,
-    });
+    };
+    await core.setMarket(1, claimableMarket);
     await core.connect(user).claimPayout(1);
     await expect(core.connect(user).claimPayout(1)).to.be.reverted; // burned position
   });
@@ -204,9 +246,12 @@ describe("TradeModule flow (minimal parity)", () => {
   it("enforces maxCost and minProceeds, and applies fee policy", async () => {
     const system = await deploySystem({}, 100); // 1% fee
     const { user, core, payment, feePolicy } = system;
-    const tradeModule = await ethers.getContractAt("TradeModule", await core.module());
+    const tradeModule = (await ethers.getContractAt(
+      "TradeModule",
+      await core.module()
+    )) as unknown as TradeModule;
     const m = await core.markets(1);
-    await core.setMarket(1, {
+    const feeMarket: ISignalsCore.MarketStruct = {
       isActive: m.isActive,
       settled: m.settled,
       snapshotChunksDone: m.snapshotChunksDone,
@@ -222,20 +267,19 @@ describe("TradeModule flow (minimal parity)", () => {
       settlementTick: m.settlementTick,
       settlementValue: m.settlementValue,
       liquidityParameter: m.liquidityParameter,
-      feePolicy: (await feePolicy).target,
-    });
-    await expect(core.connect(user).openPosition(1, 0, 4, 1_000, 1)).to.be.revertedWithCustomError(
-      tradeModule,
-      "CostExceedsMaximum"
-    );
+      feePolicy: await feePolicy.getAddress(),
+    };
+    await core.setMarket(1, feeMarket);
+    await expect(
+      core.connect(user).openPosition(1, 0, 4, 1_000, 1)
+    ).to.be.revertedWithCustomError(tradeModule, "CostExceedsMaximum");
 
     const quote = await core.calculateOpenCost.staticCall(1, 0, 4, 1_000);
     await core.connect(user).openPosition(1, 0, 4, 1_000, quote + 10_000n);
 
-    await expect(core.connect(user).decreasePosition(1, 500, quote)).to.be.revertedWithCustomError(
-      tradeModule,
-      "ProceedsBelowMinimum"
-    );
+    await expect(
+      core.connect(user).decreasePosition(1, 500, quote)
+    ).to.be.revertedWithCustomError(tradeModule, "ProceedsBelowMinimum");
 
     const feeRecipient = await core.feeRecipient();
     const feeBefore = await payment.balanceOf(feeRecipient);
@@ -247,6 +291,7 @@ describe("TradeModule flow (minimal parity)", () => {
   it("reverts when allowance is insufficient", async () => {
     const { user, payment, core } = await deploySystem();
     await payment.connect(user).approve(core.target, 0);
-    await expect(core.connect(user).openPosition(1, 0, 4, 1_000, 5_000_000)).to.be.reverted;
+    await expect(core.connect(user).openPosition(1, 0, 4, 1_000, 5_000_000)).to
+      .be.reverted;
   });
 });
