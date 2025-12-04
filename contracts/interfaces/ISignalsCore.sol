@@ -62,22 +62,61 @@ interface ISignalsCore {
         int256 lowerTick,
         int256 upperTick,
         uint128 quantity
-    ) external view returns (uint256 cost);
+    ) external returns (uint256 cost);
 
     function calculateIncreaseCost(
         uint256 positionId,
         uint128 quantity
-    ) external view returns (uint256 cost);
+    ) external returns (uint256 cost);
 
     function calculateDecreaseProceeds(
         uint256 positionId,
         uint128 quantity
-    ) external view returns (uint256 proceeds);
+    ) external returns (uint256 proceeds);
 
-    function calculateCloseProceeds(uint256 positionId) external view returns (uint256 proceeds);
+    function calculateCloseProceeds(uint256 positionId) external returns (uint256 proceeds);
 
-    function calculatePositionValue(uint256 positionId) external view returns (uint256 value);
+    function calculatePositionValue(uint256 positionId) external returns (uint256 value);
 
     // Lifecycle: settlement snapshot trigger
     function requestSettlementChunks(uint256 marketId, uint32 maxChunksPerTx) external returns (uint32 emitted);
+
+    // Lifecycle / oracle admin
+    function createMarket(
+        int256 minTick,
+        int256 maxTick,
+        int256 tickSpacing,
+        uint64 startTimestamp,
+        uint64 endTimestamp,
+        uint64 settlementTimestamp,
+        uint32 numBins,
+        uint256 liquidityParameter,
+        address feePolicy
+    ) external returns (uint256 marketId);
+
+    function settleMarket(uint256 marketId) external;
+
+    function reopenMarket(uint256 marketId) external;
+
+    function setMarketActive(uint256 marketId, bool isActive) external;
+
+    function updateMarketTiming(
+        uint256 marketId,
+        uint64 startTimestamp,
+        uint64 endTimestamp,
+        uint64 settlementTimestamp
+    ) external;
+
+    function submitSettlementPrice(
+        uint256 marketId,
+        int256 settlementValue,
+        uint64 priceTimestamp,
+        bytes calldata signature
+    ) external;
+
+    function setOracleConfig(address signer) external;
+
+    function getSettlementPrice(uint256 marketId, uint256 timestamp)
+        external
+        returns (int256 price, uint64 priceTimestamp);
 }

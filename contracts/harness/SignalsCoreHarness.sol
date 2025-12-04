@@ -27,4 +27,14 @@ contract SignalsCoreHarness is SignalsCore {
     function harnessSetPaymentToken(address token) external onlyOwner {
         paymentToken = IERC20(token);
     }
+
+    function harnessGetTreeSize(uint256 marketId) external view returns (uint32) {
+        return marketTrees[marketId].size;
+    }
+
+    function harnessGetTreeSum(uint256 marketId) external view returns (uint256) {
+        LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
+        if (tree.size == 0) return 0;
+        return tree.getRangeSum(0, tree.size - 1);
+    }
 }

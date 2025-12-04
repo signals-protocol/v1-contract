@@ -25,6 +25,7 @@ interface CLMSRErrors {
     error FeeExceedsBase(uint256 fee, uint256 baseAmount);
     error InvalidFeePolicy(address policy);
     error InvalidMarketParameters(int256 minTick, int256 maxTick, int256 tickSpacing);
+    error InvalidTimeRange(uint64 start, uint64 end, uint64 settlement);
 
     /* Access control */
     error UnauthorizedCaller(address caller);
@@ -41,6 +42,7 @@ interface CLMSRErrors {
     error RangeBinsOutOfBounds(uint32 lowerBin, uint32 upperBin, uint32 numBins);
     error InvalidRangeBins(uint32 lowerBin, uint32 upperBin);
     error ManagerNotSet();
+    error SnapshotAlreadyCompleted();
 
     /* Position */
     error PositionNotFound(uint256 positionId);
@@ -94,6 +96,7 @@ library CE {
     error FeeExceedsBase(uint256 fee, uint256 baseAmount);
     error InvalidFeePolicy(address policy);
     error InvalidMarketParameters(int256 minTick, int256 maxTick, int256 tickSpacing);
+    error InvalidTimeRange(uint64 start, uint64 end, uint64 settlement);
 
     /* Access control */
     error UnauthorizedCaller(address caller);
@@ -110,6 +113,7 @@ library CE {
     error RangeBinsOutOfBounds(uint32 lowerBin, uint32 upperBin, uint32 numBins);
     error InvalidRangeBins(uint32 lowerBin, uint32 upperBin);
     error ManagerNotSet();
+    error SnapshotAlreadyCompleted();
 
     /* Position */
     error PositionNotFound(uint256 positionId);

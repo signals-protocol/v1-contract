@@ -135,7 +135,7 @@ contract SignalsCore is
         int256 lowerTick,
         int256 upperTick,
         uint128 quantity
-    ) external view override returns (uint256 cost) {
+    ) external override returns (uint256 cost) {
         bytes memory ret = _delegateView(tradeModule, abi.encodeWithSignature(
             "calculateOpenCost(uint256,int256,int256,uint128)",
             marketId,
@@ -149,7 +149,7 @@ contract SignalsCore is
     function calculateIncreaseCost(
         uint256 positionId,
         uint128 quantity
-    ) external view override returns (uint256 cost) {
+    ) external override returns (uint256 cost) {
         bytes memory ret = _delegateView(tradeModule, abi.encodeWithSignature(
             "calculateIncreaseCost(uint256,uint128)",
             positionId,
@@ -161,7 +161,7 @@ contract SignalsCore is
     function calculateDecreaseProceeds(
         uint256 positionId,
         uint128 quantity
-    ) external view override returns (uint256 proceeds) {
+    ) external override returns (uint256 proceeds) {
         bytes memory ret = _delegateView(tradeModule, abi.encodeWithSignature(
             "calculateDecreaseProceeds(uint256,uint128)",
             positionId,
@@ -172,7 +172,7 @@ contract SignalsCore is
 
     function calculateCloseProceeds(
         uint256 positionId
-    ) external view override returns (uint256 proceeds) {
+    ) external override returns (uint256 proceeds) {
         bytes memory ret = _delegateView(tradeModule, abi.encodeWithSignature(
             "calculateCloseProceeds(uint256)",
             positionId
@@ -182,12 +182,99 @@ contract SignalsCore is
 
     function calculatePositionValue(
         uint256 positionId
-    ) external view override returns (uint256 value) {
+    ) external override returns (uint256 value) {
         bytes memory ret = _delegateView(tradeModule, abi.encodeWithSignature(
             "calculatePositionValue(uint256)",
             positionId
         ));
         if (ret.length > 0) value = abi.decode(ret, (uint256));
+    }
+
+    // --- Lifecycle / oracle ---
+
+    function createMarket(
+        int256 minTick,
+        int256 maxTick,
+        int256 tickSpacing,
+        uint64 startTimestamp,
+        uint64 endTimestamp,
+        uint64 settlementTimestamp,
+        uint32 numBins,
+        uint256 liquidityParameter,
+        address feePolicy
+    ) external override onlyOwner whenNotPaused returns (uint256 marketId) {
+        bytes memory ret = _delegate(lifecycleModule, abi.encodeWithSignature(
+            "createMarket(int256,int256,int256,uint64,uint64,uint64,uint32,uint256,address)",
+            minTick,
+            maxTick,
+            tickSpacing,
+            startTimestamp,
+            endTimestamp,
+            settlementTimestamp,
+            numBins,
+            liquidityParameter,
+            feePolicy
+        ));
+        if (ret.length > 0) marketId = abi.decode(ret, (uint256));
+    }
+
+    function settleMarket(uint256 marketId) external override onlyOwner whenNotPaused {
+        _delegate(lifecycleModule, abi.encodeWithSignature("settleMarket(uint256)", marketId));
+    }
+
+    function reopenMarket(uint256 marketId) external override onlyOwner whenNotPaused {
+        _delegate(lifecycleModule, abi.encodeWithSignature("reopenMarket(uint256)", marketId));
+    }
+
+    function setMarketActive(uint256 marketId, bool isActive) external override onlyOwner whenNotPaused {
+        _delegate(lifecycleModule, abi.encodeWithSignature("setMarketActive(uint256,bool)", marketId, isActive));
+    }
+
+    function updateMarketTiming(
+        uint256 marketId,
+        uint64 startTimestamp,
+        uint64 endTimestamp,
+        uint64 settlementTimestamp
+    ) external override onlyOwner whenNotPaused {
+        _delegate(lifecycleModule, abi.encodeWithSignature(
+            "updateMarketTiming(uint256,uint64,uint64,uint64)",
+            marketId,
+            startTimestamp,
+            endTimestamp,
+            settlementTimestamp
+        ));
+    }
+
+    function submitSettlementPrice(
+        uint256 marketId,
+        int256 settlementValue,
+        uint64 priceTimestamp,
+        bytes calldata signature
+    ) external override whenNotPaused {
+        _delegate(oracleModule, abi.encodeWithSignature(
+            "submitSettlementPrice(uint256,int256,uint64,bytes)",
+            marketId,
+            settlementValue,
+            priceTimestamp,
+            signature
+        ));
+    }
+
+    function setOracleConfig(address signer) external override onlyOwner whenNotPaused {
+        _delegate(oracleModule, abi.encodeWithSignature("setOracleConfig(address)", signer));
+    }
+
+    function getSettlementPrice(uint256 marketId, uint256 timestamp)
+        external
+        override
+        returns (int256 price, uint64 priceTimestamp)
+    {
+        bytes memory ret = _delegateView(oracleModule, abi.encodeWithSignature(
+            "getSettlementPrice(uint256,uint256)",
+            marketId,
+            timestamp
+        ));
+        if (ret.length > 0) (price, priceTimestamp) = abi.decode(ret, (int256, uint64));
     }
 
     /// @notice Trigger settlement snapshot chunks after market settlement (owner only).
@@ -221,9 +308,9 @@ contract SignalsCore is
     }
 
     /// @dev Delegate to a module for view paths via staticcall; bubble up reverts.
-    function _delegateView(address module, bytes memory callData) internal view returns (bytes memory) {
+    function _delegateView(address module, bytes memory callData) internal returns (bytes memory) {
         require(module != address(0), "ModuleNotSet");
-        (bool success, bytes memory ret) = module.staticcall(callData);
+        (bool success, bytes memory ret) = module.delegatecall(callData);
         if (!success) {
             assembly ("memory-safe") {
                 revert(add(ret, 32), mload(ret))
