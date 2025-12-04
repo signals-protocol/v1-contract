@@ -3,9 +3,10 @@ pragma solidity ^0.8.24;
 
 import "../lib/LazyMulSegmentTree.sol";
 import "../core/lib/SignalsClmsrMath.sol";
+import "../core/lib/SignalsDistributionMath.sol";
 
 /// @notice Harness for CLMSR math: initializes a tree from bins and exposes quote helpers.
-/// @dev Uses the same LazyMulSegmentTree/SignalsClmsrMath stack that will back TradeModule,
+/// @dev Uses the same LazyMulSegmentTree/SignalsDistributionMath stack that will back TradeModule,
 ///      but without touching SignalsCore storage.
 contract ClmsrMathHarness {
     using LazyMulSegmentTree for LazyMulSegmentTree.Tree;
@@ -42,7 +43,7 @@ contract ClmsrMathHarness {
         uint32 hiBin,
         uint256 quantityWad
     ) external view returns (uint256 costWad) {
-        costWad = SignalsClmsrMath.calculateTradeCost(tree, alpha, loBin, hiBin, quantityWad);
+        costWad = SignalsDistributionMath.calculateTradeCost(tree, alpha, loBin, hiBin, quantityWad);
     }
 
     function quoteSell(
@@ -51,7 +52,7 @@ contract ClmsrMathHarness {
         uint32 hiBin,
         uint256 quantityWad
     ) external view returns (uint256 proceedsWad) {
-        proceedsWad = SignalsClmsrMath.calculateSellProceeds(tree, alpha, loBin, hiBin, quantityWad);
+        proceedsWad = SignalsDistributionMath.calculateSellProceeds(tree, alpha, loBin, hiBin, quantityWad);
     }
 
     function quantityFromCost(
@@ -60,7 +61,7 @@ contract ClmsrMathHarness {
         uint32 hiBin,
         uint256 costWad
     ) external view returns (uint256 quantityWad) {
-        quantityWad = SignalsClmsrMath.calculateQuantityFromCost(tree, alpha, loBin, hiBin, costWad);
+        quantityWad = SignalsDistributionMath.calculateQuantityFromCost(tree, alpha, loBin, hiBin, costWad);
     }
 
     /// @notice Expose the core safe exponential helper for parity tests against v0.

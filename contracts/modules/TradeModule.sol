@@ -5,10 +5,14 @@ import "../core/storage/SignalsCoreStorage.sol";
 import "../interfaces/ISignalsCore.sol";
 import "../errors/CLMSRErrors.sol";
 import "../errors/ModuleErrors.sol";
+import "../core/lib/SignalsDistributionMath.sol";
+import "../lib/LazyMulSegmentTree.sol";
 
 /// @notice Delegate-only trade module (skeleton)
 contract TradeModule is SignalsCoreStorage {
     address private immutable self;
+
+    using SignalsDistributionMath for LazyMulSegmentTree.Tree;
 
     modifier onlyDelegated() {
         if (address(this) == self) revert ModuleErrors.NotDelegated();
@@ -156,5 +160,59 @@ contract TradeModule is SignalsCoreStorage {
         if ((upperTick - lowerTick) % market.tickSpacing != 0) {
             revert CE.InvalidTickRange(lowerTick, upperTick);
         }
+    }
+
+    /// @dev Converts ticks to inclusive bin range; reverts if out of bounds.
+    function _ticksToBins(
+        ISignalsCore.Market memory market,
+        int256 lowerTick,
+        int256 upperTick
+    ) internal pure returns (uint32 loBin, uint32 hiBin) {
+        _validateTickRange(lowerTick, upperTick, market);
+        loBin = uint32(uint256((lowerTick - market.minTick) / market.tickSpacing));
+        hiBin = uint32(uint256((upperTick - market.minTick) / market.tickSpacing - 1));
+        if (loBin >= market.numBins || hiBin >= market.numBins) {
+            revert CE.RangeBinsOutOfBounds(loBin, hiBin, market.numBins);
+        }
+        if (loBin > hiBin) revert CE.InvalidRangeBins(loBin, hiBin);
+    }
+
+    /// @dev Thin wrapper to calculate buy cost using shared library.
+    function _calculateTradeCostInternal(
+        uint256 marketId,
+        int256 lowerTick,
+        int256 upperTick,
+        uint256 quantityWad
+    ) internal view returns (uint256 costWad) {
+        ISignalsCore.Market storage market = markets[marketId];
+        LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
+        (uint32 loBin, uint32 hiBin) = _ticksToBins(market, lowerTick, upperTick);
+        costWad = tree.calculateTradeCost(market.liquidityParameter, loBin, hiBin, quantityWad);
+    }
+
+    /// @dev Thin wrapper to calculate sell proceeds using shared library.
+    function _calculateSellProceeds(
+        uint256 marketId,
+        int256 lowerTick,
+        int256 upperTick,
+        uint256 quantityWad
+    ) internal view returns (uint256 proceedsWad) {
+        ISignalsCore.Market storage market = markets[marketId];
+        LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
+        (uint32 loBin, uint32 hiBin) = _ticksToBins(market, lowerTick, upperTick);
+        proceedsWad = tree.calculateSellProceeds(market.liquidityParameter, loBin, hiBin, quantityWad);
+    }
+
+    /// @dev Thin wrapper to back out quantity from cost using shared library.
+    function _calculateQuantityFromCostInternal(
+        uint256 marketId,
+        int256 lowerTick,
+        int256 upperTick,
+        uint256 costWad
+    ) internal view returns (uint256 quantityWad) {
+        ISignalsCore.Market storage market = markets[marketId];
+        LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
+        (uint32 loBin, uint32 hiBin) = _ticksToBins(market, lowerTick, upperTick);
+        quantityWad = tree.calculateQuantityFromCost(market.liquidityParameter, loBin, hiBin, costWad);
     }
 }

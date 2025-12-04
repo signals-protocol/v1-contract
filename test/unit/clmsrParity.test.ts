@@ -153,6 +153,16 @@ describe("CLMSR SDK parity (calculate* level)", () => {
     return (a * b + half) / WAD;
   }
 
+  async function deployHarnessWithFactors(factors: bigint[]) {
+    const lazyLib = await (await ethers.getContractFactory("LazyMulSegmentTree")).deploy();
+    const Factory = await ethers.getContractFactory("ClmsrMathHarness", {
+      libraries: { LazyMulSegmentTree: lazyLib.target },
+    });
+    const harness = await Factory.deploy();
+    await harness.seed(factors);
+    return harness;
+  }
+
   it("matches SDK calculateOpenCost & quantityFromCost (fee=0)", async () => {
     const harness = await deployHarnessWithUniform();
     const quantity6 = BigInt(1_000_000); // 1 USDC
@@ -216,6 +226,63 @@ describe("CLMSR SDK parity (calculate* level)", () => {
     const MICRO_TOLERANCE = new Big("1000"); // allow ~0.001 USDC diff for rounding
     expect(proceeds6.minus(sdkProceeds6).abs().lte(MICRO_TOLERANCE), `decrease proceeds mismatch`).to.be.true;
     expect(close6.minus(sdkClose6).abs().lte(MICRO_TOLERANCE), `close proceeds mismatch`).to.be.true;
+  });
+
+  it("matches SDK open/cost parity on non-uniform distribution and alpha ≠ 1", async () => {
+    const alphaCustom = BigInt(toWAD("0.75").toString());
+    const factors = [WAD, WAD * 2n, WAD * 4n, WAD * 8n]; // non-uniform sum = 15 WAD
+    const distributionCustom = mapDistribution({
+      totalSum: factors.reduce((acc, v) => acc + v, 0n).toString(),
+      binFactors: factors.map((b) => b.toString()),
+    });
+
+    const marketCustom = mapMarket({
+      liquidityParameter: alphaCustom.toString(),
+      minTick: 0,
+      maxTick: 4,
+      tickSpacing: 1,
+      feePolicyDescriptor: "",
+    });
+
+    const harness = await deployHarnessWithFactors(factors);
+
+    // Range 1..3 (bins 1 and 2), 1.5 USDC
+    const quantity6 = BigInt(1_500_000);
+    const sdkOpen = sdkClient.calculateOpenCost(1, 3, quantity6.toString(), distributionCustom, marketCustom);
+
+    const costWad = await harness.quoteBuy(alphaCustom, 1, 2, MathUtils.toWad(new Big(quantity6.toString())).toString());
+    const harnessCost6 = MathUtils.fromWadRoundUp(new Big(costWad.toString()));
+
+    const sdkCost6 = new Big(sdkOpen.cost.toString());
+    const diffCost = harnessCost6.minus(sdkCost6).abs();
+    expect(diffCost.lte(1), `cost mismatch ${harnessCost6.toString()} vs ${sdkCost6.toString()}`).to.be.true;
+
+    // Round-trip quantityFromCost using SDK cost
+    const sdkQty = sdkClient.calculateQuantityFromCost(1, 3, sdkOpen.cost.toString(), distributionCustom, marketCustom);
+    const qtyWad = await harness.quantityFromCost(
+      alphaCustom,
+      1,
+      2,
+      MathUtils.toWad(new Big(sdkOpen.cost.toString())).toString()
+    );
+    const harnessQty6 = MathUtils.fromWadNearest(new Big(qtyWad.toString()));
+    const sdkQty6 = new Big(sdkQty.quantity.toString());
+    const diffQty = harnessQty6.minus(sdkQty6).abs();
+    const MICRO_TOLERANCE = new Big("2000"); // allow small rounding drift on non-uniform tree
+    expect(diffQty.lte(MICRO_TOLERANCE), `quantity mismatch ${harnessQty6.toString()} vs ${sdkQty6.toString()}`).to.be.true;
+  });
+
+  it("preserves parity for a larger (but safe) quantity on full-range trade", async () => {
+    const harness = await deployHarnessWithUniform();
+    const quantity6 = BigInt(3_000_000); // 3 USDC
+
+    const sdkOpen = sdkClient.calculateOpenCost(0, 4, quantity6.toString(), distribution, market);
+    const costWad = await harness.quoteBuy(alphaWad, 0, 3, MathUtils.toWad(new Big(quantity6.toString())).toString());
+    const harnessCost6 = MathUtils.fromWadRoundUp(new Big(costWad.toString()));
+    const sdkCost6 = new Big(sdkOpen.cost.toString());
+    const diffCost = harnessCost6.minus(sdkCost6).abs();
+    const pctTolerance = new Big("0.02"); // allow up to 2% diff on larger notional until full module port
+    expect(diffCost.lte(sdkCost6.mul(pctTolerance)), `cost mismatch ${harnessCost6.toString()} vs ${sdkCost6.toString()}`).to.be.true;
   });
 });
 
