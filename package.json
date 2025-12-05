@@ -8,7 +8,16 @@
     "test": "hardhat test",
     "clean": "hardhat clean",
     "lint": "echo \"TODO: add lint configuration\"",
-    "format": "echo \"TODO: add formatter configuration\""
+    "format": "echo \"TODO: add formatter configuration\"",
+    "deploy:localhost": "COMMAND=deploy:localhost hardhat run scripts/dispatcher.ts --network localhost",
+    "deploy:citrea:dev": "COMMAND=deploy:citrea:dev hardhat run scripts/dispatcher.ts --network citrea-dev",
+    "deploy:citrea:prod": "COMMAND=deploy:citrea:prod hardhat run scripts/dispatcher.ts --network citrea-prod",
+    "upgrade:citrea:dev": "COMMAND=upgrade:citrea:dev hardhat run scripts/dispatcher.ts --network citrea-dev",
+    "upgrade:citrea:prod": "COMMAND=upgrade:citrea:prod hardhat run scripts/dispatcher.ts --network citrea-prod",
+    "safety-check:citrea:dev": "COMMAND=safety-check:citrea:dev hardhat run scripts/dispatcher.ts --network citrea-dev",
+    "safety-check:citrea:prod": "COMMAND=safety-check:citrea:prod hardhat run scripts/dispatcher.ts --network citrea-prod",
+    "verify:citrea:dev": "COMMAND=verify:citrea:dev hardhat run scripts/dispatcher.ts --network citrea-dev",
+    "verify:citrea:prod": "COMMAND=verify:citrea:prod hardhat run scripts/dispatcher.ts --network citrea-prod"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
@@ -21,6 +30,8 @@
     "@nomicfoundation/ignition-core": "^0.15.0",
     "@openzeppelin/contracts": "^5.0.2",
     "@openzeppelin/contracts-upgradeable": "^5.0.2",
+    "@openzeppelin/hardhat-upgrades": "^2.3.3",
+    "dotenv": "^16.4.5",
     "@typechain/ethers-v6": "^0.5.1",
     "@typechain/hardhat": "^9.1.0",
     "@types/big.js": "^6.2.2",
