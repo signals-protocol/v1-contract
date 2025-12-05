@@ -30,7 +30,9 @@ describe("Access / Upgrade guards", () => {
 
     const newImpl = await posFactory.deploy();
     await newImpl.waitForDeployment();
-    const rogue = new ethers.Contract(await proxy.getAddress(), ["function upgradeTo(address)"], attacker);
+    const upgradeIface = ["function upgradeTo(address)"];
+    const proxyAddr = await proxy.getAddress();
+    const rogue = new ethers.Contract(proxyAddr, upgradeIface, attacker);
     await expect(rogue.upgradeTo(await newImpl.getAddress())).to.be.reverted;
   });
 });

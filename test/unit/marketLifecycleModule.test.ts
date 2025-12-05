@@ -321,6 +321,39 @@ describe("MarketLifecycleModule", () => {
     );
   });
 
+  it("rejects re-settlement and supports multi-chunk ordering", async () => {
+    const { core, lifecycle } = await setup();
+    await createDefaultMarket(core);
+    const lifecycleEvents = lifecycle.attach(await core.getAddress());
+
+    // mark as settled with large openPositionCount to force multiple chunks
+    const market = await core.markets(1);
+    await core.harnessSetMarket(
+      1,
+      cloneMarket(market, {
+        settled: true,
+        openPositionCount: 1025, // ceil(1025/512) = 3 chunks
+        snapshotChunkCursor: 0,
+        snapshotChunksDone: false,
+      })
+    );
+
+    await expect(core.settleMarket(1)).to.be.revertedWithCustomError(lifecycle, "MarketAlreadySettled");
+
+    const tx1 = await core.requestSettlementChunks(1, 2);
+    await expect(tx1).to.emit(lifecycleEvents, "SettlementChunkRequested").withArgs(1, 0);
+    await expect(tx1).to.emit(lifecycleEvents, "SettlementChunkRequested").withArgs(1, 1);
+    let updated = await core.markets(1);
+    expect(updated.snapshotChunkCursor).to.equal(2);
+    expect(updated.snapshotChunksDone).to.equal(false);
+
+    const tx2 = await core.requestSettlementChunks(1, 2);
+    await expect(tx2).to.emit(lifecycleEvents, "SettlementChunkRequested").withArgs(1, 2);
+    updated = await core.markets(1);
+    expect(updated.snapshotChunkCursor).to.equal(3);
+    expect(updated.snapshotChunksDone).to.equal(true);
+  });
+
   it("handles zero open positions and chunk input validation", async () => {
     const { core, lifecycle } = await setup();
     await createDefaultMarket(core);
