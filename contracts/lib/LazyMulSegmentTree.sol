@@ -25,7 +25,6 @@ library LazyMulSegmentTree {
         uint32 root;
         uint32 nextIndex;
         uint32 size;
-        uint256 cachedRootSum;
     }
 
     function init(Tree storage tree, uint32 treeSize) external {
@@ -36,7 +35,6 @@ library LazyMulSegmentTree {
         tree.size = treeSize;
         tree.nextIndex = 0;
         tree.root = _allocateNode(tree, 0, treeSize - 1);
-        tree.cachedRootSum = tree.nodes[tree.root].sum;
     }
 
     function applyRangeFactor(Tree storage tree, uint32 lo, uint32 hi, uint256 factor) external {
@@ -73,7 +71,6 @@ library LazyMulSegmentTree {
 
         (uint32 rootIndex, uint256 total) = _buildTreeFromArray(tree, 0, tree.size - 1, factors);
         tree.root = rootIndex;
-        tree.cachedRootSum = total;
     }
 
     // --- internal helpers ---
@@ -123,10 +120,6 @@ library LazyMulSegmentTree {
         uint256 newPendingFactor = _combineFactors(priorPending, factor);
         if (newPendingFactor > type(uint192).max) revert CE.LazyFactorOverflow();
         node.pendingFactor = uint192(newPendingFactor);
-
-        if (nodeIndex == tree.root) {
-            tree.cachedRootSum = node.sum;
-        }
     }
 
     function _pushPendingFactor(Tree storage tree, uint32 nodeIndex, uint32 l, uint32 r) private {
@@ -149,9 +142,6 @@ library LazyMulSegmentTree {
             node.childPtr = _packChildPtr(left, right);
             node.pendingFactor = uint192(ONE_WAD);
 
-            if (nodeIndex == tree.root) {
-                tree.cachedRootSum = node.sum;
-            }
         }
     }
 
@@ -184,9 +174,6 @@ library LazyMulSegmentTree {
         uint256 leftSum = left != 0 ? tree.nodes[left].sum : _defaultSum(l, mid);
         uint256 rightSum = right != 0 ? tree.nodes[right].sum : _defaultSum(mid + 1, r);
         node.sum = leftSum + rightSum;
-        if (nodeIndex == tree.root) {
-            tree.cachedRootSum = node.sum;
-        }
     }
 
     function _applyFactorRecursive(
@@ -228,9 +215,6 @@ library LazyMulSegmentTree {
                 node.pendingFactor = uint192(newPendingFactor);
             }
 
-            if (nodeIndex == tree.root) {
-                tree.cachedRootSum = node.sum;
-            }
             return;
         }
 
@@ -253,9 +237,6 @@ library LazyMulSegmentTree {
         uint256 leftSum = leftChild != 0 ? tree.nodes[leftChild].sum : _defaultSum(l, mid);
         uint256 rightSum = rightChild != 0 ? tree.nodes[rightChild].sum : _defaultSum(mid + 1, r);
         current.sum = leftSum + rightSum;
-        if (nodeIndex == tree.root) {
-            tree.cachedRootSum = current.sum;
-        }
     }
 
     function _sumRangeWithAccFactor(

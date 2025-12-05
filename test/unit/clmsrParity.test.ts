@@ -136,11 +136,11 @@ describe("CLMSR SDK parity and invariants (Phase 3-0 harness)", () => {
     const halfQty = WAD / 2n; // 0.5
     const factor = wadExp(0.5); // exp(q/alpha) with q=0.5
 
-    const rootBefore = await harness.cachedRootSum();
+    const rootBefore = await harness.rangeSum(0, 3);
     // Buy: quote then apply factor to mutate tree (simulating stateful trade)
     const cost = await harness.quoteBuy(alpha, loBin, hiBin, halfQty);
     await harness.applyRangeFactor(loBin, hiBin, factor);
-    const rootAfterBuy = await harness.cachedRootSum();
+    const rootAfterBuy = await harness.rangeSum(0, 3);
     const expectedAfterBuy = (rootBefore * factor) / WAD;
     approx(rootAfterBuy, expectedAfterBuy, TOLERANCE * 10n);
 
@@ -148,7 +148,7 @@ describe("CLMSR SDK parity and invariants (Phase 3-0 harness)", () => {
     const proceeds = await harness.quoteSell(alpha, loBin, hiBin, halfQty);
     const inverseFactor = (WAD * WAD) / factor;
     await harness.applyRangeFactor(loBin, hiBin, inverseFactor);
-    const rootAfterSell = await harness.cachedRootSum();
+    const rootAfterSell = await harness.rangeSum(0, 3);
     approx(rootAfterSell, rootBefore, TOLERANCE * 10n);
 
     // Cost and proceeds should be ~symmetric for this round-trip

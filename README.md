@@ -4,18 +4,11 @@ Signals v1 온체인 아키텍처 구현 프로젝트.
 
 기존 Tenet CLMSR v0 시스템을 기반으로 **모듈화된 아키텍처**와 **클린한 스토리지 레이아웃**을 목표로 재설계 중.
 
-## 현재 상태
+## Current status
 
-**Phase 2: Core + 모듈 스캐폴딩** 완료.
-- Phase 3-0 complete: CLMSR math/LazyMulSegmentTree 포팅 + SDK/v0 parity · invariant · round-trip · e2e 테스트 `test/unit/clmsrParity.test.ts` 녹색.
-
-- [x] Phase 0: 레포 부트스트랩 완료
-- [x] Phase 1: Storage / Interface 정리
-- [x] Phase 2: Core + 모듈 스캐폴딩
-- [ ] Phase 3: v0 로직 포팅 (SDK parity/invariants in progress)
-- [ ] Phase 4: Risk / Invariants 도입
-- [ ] Phase 5: LP Vault / Backstop 통합
-- [ ] Phase 6: 메인넷 준비
+- Phase 3 (v0 parity + modularization) is complete: CLMSR math/LazyMulSegmentTree ported, Trade/Lifecycle/Oracle/Position modules wired, SDK/v0 parity tests green, deployment/upgrade scripts for citrea dev/prod present. RangeFactorApplied-style events are removed; tree internals are private implementation details.
+- Phase 3-H hardening: added fuzz/slippage/settlement chunk/upgrade/access guards; on-chain ↔ SDK parity kept at ≤1e-6 WAD / ≤1 μUSDC.
+- Next: Phase 4 Risk hooks while keeping parity tests green.
 
 ## 설계 목표
 

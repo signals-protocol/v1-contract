@@ -38,7 +38,7 @@ library SignalsDistributionMath {
             return _calculateSingleTradeCost(tree, alpha, loBin, hiBin, totalQuantity);
         }
 
-        uint256 sumBefore = tree.cachedRootSum;
+        uint256 sumBefore = tree.nodes[tree.root].sum;
         uint256 affectedSum = tree.getRangeSum(loBin, hiBin);
         if (sumBefore == 0) revert CE.TreeNotInitialized();
 
@@ -106,7 +106,7 @@ library SignalsDistributionMath {
         uint32 hiBin,
         uint256 quantityWad
     ) private view returns (uint256 cost) {
-        uint256 sumBefore = tree.cachedRootSum;
+        uint256 sumBefore = tree.nodes[tree.root].sum;
         if (sumBefore == 0) revert CE.TreeNotInitialized();
         uint256 quantityScaled = quantityWad.wDiv(alpha);
         uint256 factor = quantityScaled.wExp();
@@ -135,7 +135,7 @@ library SignalsDistributionMath {
             return _calculateSingleSellProceeds(tree, alpha, loBin, hiBin, totalQuantity);
         }
 
-        uint256 sumBefore = tree.cachedRootSum;
+        uint256 sumBefore = tree.nodes[tree.root].sum;
         uint256 affectedSum = tree.getRangeSum(loBin, hiBin);
         if (sumBefore == 0) revert CE.TreeNotInitialized();
 
@@ -204,7 +204,7 @@ library SignalsDistributionMath {
         uint32 hiBin,
         uint256 quantityWad
     ) private view returns (uint256 proceeds) {
-        uint256 sumBefore = tree.cachedRootSum;
+        uint256 sumBefore = tree.nodes[tree.root].sum;
         if (sumBefore == 0) revert CE.TreeNotInitialized();
 
         uint256 quantityScaled = quantityWad.wDiv(alpha);
@@ -233,7 +233,7 @@ library SignalsDistributionMath {
         uint32 hiBin,
         uint256 costWad
     ) internal view returns (uint256 quantityWad) {
-        uint256 sumBefore = tree.cachedRootSum;
+        uint256 sumBefore = tree.nodes[tree.root].sum;
         uint256 affectedSum = tree.getRangeSum(loBin, hiBin);
         if (sumBefore == 0) revert CE.TreeNotInitialized();
         if (affectedSum == 0) revert CE.AffectedSumZero();

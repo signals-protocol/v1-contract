@@ -20,13 +20,8 @@ contract ClmsrMathHarness {
         tree.size = 0;
         tree.root = 0;
         tree.nextIndex = 0;
-        tree.cachedRootSum = 0;
         tree.init(uint32(factors.length));
         tree.seedWithFactors(factors);
-    }
-
-    function cachedRootSum() external view returns (uint256) {
-        return tree.cachedRootSum;
     }
 
     function applyRangeFactor(uint32 loBin, uint32 hiBin, uint256 factor) external {
