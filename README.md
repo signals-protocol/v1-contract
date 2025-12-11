@@ -1,66 +1,126 @@
 # Signals v1
 
-Signals v1 온체인 아키텍처 구현 프로젝트.
+Modular on-chain architecture for the Signals prediction market protocol, built on CLMSR (Continuous Logarithmic Market Scoring Rule).
 
-기존 Tenet CLMSR v0 시스템을 기반으로 **모듈화된 아키텍처**와 **클린한 스토리지 레이아웃**을 목표로 재설계 중.
+## Current Status
 
-## Current status
+**Phase 3 Complete** — v0 parity achieved with modular architecture.
 
-- Phase 3 (v0 parity + modularization) is complete: CLMSR math/LazyMulSegmentTree ported, Trade/Lifecycle/Oracle/Position modules wired, SDK/v0 parity tests green, deployment/upgrade scripts for citrea dev/prod present. RangeFactorApplied-style events are removed; tree internals are private implementation details.
-- Phase 3-H hardening: added fuzz/slippage/settlement chunk/upgrade/access guards; on-chain ↔ SDK parity kept at ≤1e-6 WAD / ≤1 μUSDC.
-- Next: Phase 4 Risk hooks while keeping parity tests green.
+| Component               | Status | Description                                        |
+| ----------------------- | ------ | -------------------------------------------------- |
+| `SignalsCore`           | ✅     | UUPS upgradeable entry point with delegate routing |
+| `TradeModule`           | ✅     | Position open/increase/decrease/close/claim        |
+| `MarketLifecycleModule` | ✅     | Market creation, settlement, timing updates        |
+| `OracleModule`          | ✅     | Settlement price feed with signature verification  |
+| `SignalsPosition`       | ✅     | ERC721 position NFT with market indexing           |
+| `LazyMulSegmentTree`    | ✅     | O(log n) range queries for CLMSR distribution      |
 
-## 설계 목표
+**56 tests passing** — SDK parity, fuzz, stress, slippage, settlement chunks, access control.
 
-1. 얇은 업그레이더블 Core + delegate 모듈 구조
-2. 24KB 코드 사이즈 제한 안정적 회피
-3. v1 기준 클린한 Storage layout
-4. Risk / Vault / Backstop 확장 가능한 설계
+### Progress
 
-## 프로젝트 구조
+- [x] Phase 0: Repository bootstrap
+- [x] Phase 1: Storage / Interface design
+- [x] Phase 2: Core + module scaffolding
+- [x] Phase 3: v0 logic porting (Trade, Lifecycle, Oracle, Position)
+- [ ] Phase 4: Risk module hooks
+- [ ] Phase 5: LP Vault / Backstop integration
+- [ ] Phase 6: Mainnet preparation
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      SignalsCore (UUPS)                     │
+│  - Storage holder (SignalsCoreStorage)                      │
+│  - Module routing via delegatecall                          │
+│  - Access control (Ownable, Pausable, ReentrancyGuard)      │
+└─────────────────────────────────────────────────────────────┘
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        ▼                     ▼                     ▼
+┌───────────────┐   ┌─────────────────────┐   ┌─────────────┐
+│  TradeModule  │   │ MarketLifecycleModule │  │ OracleModule │
+│  - openPosition   │  - createMarket       │  │ - submitPrice │
+│  - increasePosition│ - settleMarket       │  │ - getSettlement│
+│  - decreasePosition│ - requestSettlement  │  └─────────────┘
+│  - closePosition  │    Chunks             │
+│  - claimPayout    └─────────────────────┘
+│  - calculate*     │
+└───────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                    SignalsPosition (ERC721)                 │
+│  - Position NFT with market/owner indexing                  │
+│  - Core-only mint/burn/update                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Project Structure
 
 ```
 signals-v1/
 ├── contracts/
 │   ├── core/
-│   │   └── SignalsCore.sol              # Core 스켈레톤(UUPS + delegate stubs)
-│   │   └── storage/
-│   │       └── SignalsCoreStorage.sol    # Core 스토리지 레이아웃
-│   ├── interfaces/
-│   │   ├── ISignalsCore.sol              # Core 인터페이스
-│   │   └── ISignalsPosition.sol          # Position 인터페이스
-│   ├── lib/
-│   │   └── LazyMulSegmentTree.sol        # 세그먼트 트리 라이브러리
+│   │   ├── SignalsCore.sol              # UUPS entry point
+│   │   ├── storage/SignalsCoreStorage.sol
+│   │   └── lib/
+│   │       ├── SignalsClmsrMath.sol     # CLMSR math helpers
+│   │       └── SignalsDistributionMath.sol
 │   ├── modules/
-│   │   ├── TradeModule.sol               # delegate-only 스켈레톤
-│   │   ├── MarketLifecycleModule.sol     # 정산 청크 이벤트 선언 포함 스켈레톤
-│   │   └── OracleModule.sol              # delegate-only 스켈레톤
+│   │   ├── TradeModule.sol              # Trade execution
+│   │   ├── MarketLifecycleModule.sol    # Market management
+│   │   └── OracleModule.sol             # Settlement oracle
+│   ├── position/
+│   │   ├── SignalsPosition.sol          # ERC721 position token
+│   │   └── SignalsPositionStorage.sol
+│   ├── lib/
+│   │   ├── LazyMulSegmentTree.sol       # Segment tree for CLMSR
+│   │   └── FixedPointMathU.sol          # 18-decimal fixed point
+│   ├── interfaces/
 │   ├── errors/
-│   │   └── ModuleErrors.sol              # NotDelegated 등 공통 에러
-│   └── position/
-│       └── SignalsPositionStorage.sol    # Position 스토리지 레이아웃
+│   ├── mocks/
+│   └── harness/                         # Test helpers
 ├── test/
-│   ├── unit/
-│   ├── integration/
+│   ├── unit/                            # Module-level tests
+│   ├── integration/                     # Cross-module flows
 │   └── e2e/
-├── plan.md                               # 상세 마이그레이션 플랜
-└── README.md
+├── docs/
+│   └── phase3/clmsr-invariants.md
+└── plan.md                              # Full migration plan
 ```
 
-## 설치 및 빌드
+## Getting Started
 
 ```bash
-# 의존성 설치
+# Install dependencies
 yarn install
 
-# 컴파일
+# Compile contracts
 yarn compile
+
+# Run tests
+yarn test
+
+# Run specific test file
+yarn test test/integration/tradeModule.flow.test.ts
 ```
 
-## 문서
+## Key Design Decisions
 
-- [plan.md](./plan.md) - 상세 아키텍처 및 마이그레이션 플랜
+1. **Thin Core + Delegate Modules** — Core holds storage and routes to modules via delegatecall. Modules can be upgraded independently.
 
-## 라이선스
+2. **24KB Size Limit** — Heavy logic in modules, not Core. Trade/Lifecycle can be split further if needed.
+
+3. **Clean Storage Layout** — v1 canonical layout with gaps for future upgrades. No legacy fields from v0.
+
+4. **SDK Parity** — On-chain calculations match v0 SDK within ≤1 μUSDC tolerance.
+
+## Documentation
+
+- [plan.md](./plan.md) — Detailed architecture and migration plan
+- [docs/phase3/clmsr-invariants.md](./docs/phase3/clmsr-invariants.md) — CLMSR math invariants
+
+## License
 
 MIT
