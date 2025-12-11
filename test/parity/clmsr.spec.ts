@@ -5,56 +5,14 @@ import Big from "big.js";
 import fs from "fs";
 import path from "path";
 
-// SDK (v0 reference implementation)
-// We call into the published JS SDK that ships alongside signals-v0 to obtain
-// parity expectations without re-copying v0 contracts into the repo.
-// NOTE: quantities/costs in the SDK are in micro-USDC (6 decimals).
-// WAD values are 1e18 and conversion helpers live in MathUtils.
-// SDK is CommonJS without type declarations - require is intentional
-const sdk = require("../../signals-v0/clmsr-sdk/dist") as {
-  CLMSRSDK: new () => {
-    calculateOpenCost: (
-      l: number,
-      u: number,
-      qty: string,
-      dist: unknown,
-      mkt: unknown
-    ) => { cost: bigint };
-    calculateQuantityFromCost: (
-      l: number,
-      u: number,
-      cost: string,
-      dist: unknown,
-      mkt: unknown
-    ) => { quantity: bigint };
-    calculateDecreaseProceeds: (
-      pos: { lowerTick: number; upperTick: number; quantity: string },
-      qty: string,
-      dist: unknown,
-      mkt: unknown
-    ) => { proceeds: bigint };
-    calculateCloseProceeds: (
-      pos: { lowerTick: number; upperTick: number; quantity: string },
-      dist: unknown,
-      mkt: unknown
-    ) => { proceeds: bigint };
-  };
-  mapMarket: (m: {
-    liquidityParameter: string;
-    minTick: number;
-    maxTick: number;
-    tickSpacing: number;
-    feePolicyDescriptor: string;
-  }) => unknown;
-  mapDistribution: (d: { totalSum: string; binFactors: string[] }) => unknown;
-  MathUtils: {
-    toWad: (b: Big) => Big;
-    fromWadRoundUp: (b: Big) => Big;
-    fromWadNearest: (b: Big) => Big;
-  };
-  toWAD: (s: string) => Big;
-};
-const { CLMSRSDK, mapMarket, mapDistribution, MathUtils, toWAD } = sdk;
+import {
+  CLMSRSDK,
+  mapMarket,
+  mapDistribution,
+  toWAD,
+  Position,
+  MathUtils,
+} from "@whworjs7946/clmsr-v0";
 
 import { WAD } from "../helpers/constants";
 import { toBN } from "../helpers/utils";
@@ -177,10 +135,10 @@ describe("CLMSR SDK parity and invariants (Phase 3-0 harness)", () => {
 
 describe("CLMSR SDK parity (calculate* level)", () => {
   const sdkClient = new CLMSRSDK();
-  const alphaWad = BigInt(toWAD("1").toString());
+  const alphaWad = BigInt(toWAD("1").toFixed(0));
 
   const market = mapMarket({
-    liquidityParameter: toWAD("1").toString(),
+    liquidityParameter: toWAD("1").toFixed(0),
     minTick: 0,
     maxTick: 4,
     tickSpacing: 1,
@@ -188,9 +146,9 @@ describe("CLMSR SDK parity (calculate* level)", () => {
   });
 
   const distribution = mapDistribution({
-    totalSum: toWAD("4").toString(),
+    totalSum: toWAD("4").toFixed(0),
     binFactors: [toWAD("1"), toWAD("1"), toWAD("1"), toWAD("1")].map((b: Big) =>
-      b.toString()
+      b.toFixed(0)
     ),
   });
 
@@ -226,12 +184,12 @@ describe("CLMSR SDK parity (calculate* level)", () => {
 
   it("matches SDK calculateOpenCost & quantityFromCost (fee=0)", async () => {
     const harness = await deployHarnessWithUniform();
-    const quantity6 = BigInt(1_000_000); // 1 USDC
+    const quantity6 = new Big("1000000"); // 1 USDC
 
     const sdkOpen = sdkClient.calculateOpenCost(
       0,
       4,
-      quantity6.toString(),
+      quantity6,
       distribution,
       market
     );
@@ -239,23 +197,23 @@ describe("CLMSR SDK parity (calculate* level)", () => {
       alphaWad,
       0,
       3,
-      MathUtils.toWad(new Big(quantity6.toString())).toString()
+      MathUtils.toWad(quantity6).toFixed(0)
     );
     const harnessCost6 = MathUtils.fromWadRoundUp(new Big(costWad.toString()));
 
     // cost parity (micro-USDC)
-    const sdkCost6 = new Big(sdkOpen.cost.toString());
+    const sdkCost6 = sdkOpen.cost;
     const diffCost = harnessCost6.minus(sdkCost6).abs();
     expect(
       diffCost.lte(1),
-      `cost mismatch ${harnessCost6.toString()} vs ${sdkCost6.toString()}`
+      `cost mismatch ${harnessCost6.toFixed(0)} vs ${sdkCost6.toFixed(0)}`
     ).to.be.true;
 
     // quantityFromCost parity (using the SDK cost as input)
     const sdkQty = sdkClient.calculateQuantityFromCost(
       0,
       4,
-      sdkOpen.cost.toString(),
+      sdkOpen.cost,
       distribution,
       market
     );
@@ -263,28 +221,28 @@ describe("CLMSR SDK parity (calculate* level)", () => {
       alphaWad,
       0,
       3,
-      MathUtils.toWad(new Big(sdkOpen.cost.toString())).toString()
+      MathUtils.toWad(sdkOpen.cost).toFixed(0)
     );
     const harnessQty6 = MathUtils.fromWadNearest(new Big(qtyWad.toString()));
-    const sdkQty6 = new Big(sdkQty.quantity.toString());
+    const sdkQty6 = sdkQty.quantity;
     const diffQty = harnessQty6.minus(sdkQty6).abs();
     expect(
       diffQty.lte(1),
-      `quantity mismatch ${harnessQty6.toString()} vs ${sdkQty6.toString()}`
+      `quantity mismatch ${harnessQty6.toFixed(0)} vs ${sdkQty6.toFixed(0)}`
     ).to.be.true;
   });
 
   it("matches SDK decrease/close proceeds (fee=0)", async () => {
     const harness = await deployHarnessWithUniform();
-    const positionQty6 = BigInt(2_000_000); // 2 USDC position
-    const sellQty6 = BigInt(500_000); // sell 0.5 USDC
+    const positionQty6 = new Big("2000000"); // 2 USDC position
+    const sellQty6 = new Big("500000"); // sell 0.5 USDC
 
-    const sellQtyWad = MathUtils.toWad(new Big(sellQty6.toString()));
-    const positionQtyWad = MathUtils.toWad(new Big(positionQty6.toString()));
+    const sellQtyWad = MathUtils.toWad(sellQty6);
+    const positionQtyWad = MathUtils.toWad(positionQty6);
 
     // Simulate the market distribution after the position was opened: multiply bins by exp(q/alpha)
     const factorWad = await harness.exposedSafeExp(
-      positionQtyWad.toString(),
+      positionQtyWad.toFixed(0),
       alphaWad
     );
     const updatedBinFactors: bigint[] = [WAD, WAD, WAD, WAD].map((b) =>
@@ -299,14 +257,14 @@ describe("CLMSR SDK parity (calculate* level)", () => {
     // Update harness tree to the same post-open state
     await harness.applyRangeFactor(0, 3, factorWad.toString());
 
-    const position = {
+    const position: Position = {
       lowerTick: 0,
       upperTick: 4,
-      quantity: positionQty6.toString(),
+      quantity: positionQty6,
     };
     const sdkDec = sdkClient.calculateDecreaseProceeds(
       position,
-      sellQty6.toString(),
+      sellQty6,
       distributionAfterOpen,
       market
     );
@@ -320,20 +278,20 @@ describe("CLMSR SDK parity (calculate* level)", () => {
       alphaWad,
       0,
       3,
-      sellQtyWad.toString()
+      sellQtyWad.toFixed(0)
     );
     const closeWad = await harness.quoteSell(
       alphaWad,
       0,
       3,
-      positionQtyWad.toString()
+      positionQtyWad.toFixed(0)
     );
 
     const proceeds6 = MathUtils.fromWadNearest(new Big(proceedsWad.toString()));
     const close6 = MathUtils.fromWadNearest(new Big(closeWad.toString()));
 
-    const sdkProceeds6 = new Big(sdkDec.proceeds.toString());
-    const sdkClose6 = new Big(sdkClose.proceeds.toString());
+    const sdkProceeds6 = sdkDec.proceeds;
+    const sdkClose6 = sdkClose.proceeds;
 
     const MICRO_TOLERANCE = new Big("1000"); // allow ~0.001 USDC diff for rounding
     expect(
@@ -347,7 +305,7 @@ describe("CLMSR SDK parity (calculate* level)", () => {
   });
 
   it("matches SDK open/cost parity on non-uniform distribution and alpha ≠ 1", async () => {
-    const alphaCustom = BigInt(toWAD("0.75").toString());
+    const alphaCustom = BigInt(toWAD("0.75").toFixed(0));
     const factors = [WAD, WAD * 2n, WAD * 4n, WAD * 8n]; // non-uniform sum = 15 WAD
     const distributionCustom = mapDistribution({
       totalSum: factors.reduce((acc, v) => acc + v, 0n).toString(),
@@ -365,11 +323,11 @@ describe("CLMSR SDK parity (calculate* level)", () => {
     const harness = await deployHarnessWithFactors(factors);
 
     // Range 1..3 (bins 1 and 2), 1.5 USDC
-    const quantity6 = BigInt(1_500_000);
+    const quantity6 = new Big("1500000");
     const sdkOpen = sdkClient.calculateOpenCost(
       1,
       3,
-      quantity6.toString(),
+      quantity6,
       distributionCustom,
       marketCustom
     );
@@ -378,22 +336,22 @@ describe("CLMSR SDK parity (calculate* level)", () => {
       alphaCustom,
       1,
       2,
-      MathUtils.toWad(new Big(quantity6.toString())).toString()
+      MathUtils.toWad(quantity6).toFixed(0)
     );
     const harnessCost6 = MathUtils.fromWadRoundUp(new Big(costWad.toString()));
 
-    const sdkCost6 = new Big(sdkOpen.cost.toString());
+    const sdkCost6 = sdkOpen.cost;
     const diffCost = harnessCost6.minus(sdkCost6).abs();
     expect(
       diffCost.lte(1),
-      `cost mismatch ${harnessCost6.toString()} vs ${sdkCost6.toString()}`
+      `cost mismatch ${harnessCost6.toFixed(0)} vs ${sdkCost6.toFixed(0)}`
     ).to.be.true;
 
     // Round-trip quantityFromCost using SDK cost
     const sdkQty = sdkClient.calculateQuantityFromCost(
       1,
       3,
-      sdkOpen.cost.toString(),
+      sdkOpen.cost,
       distributionCustom,
       marketCustom
     );
@@ -401,26 +359,26 @@ describe("CLMSR SDK parity (calculate* level)", () => {
       alphaCustom,
       1,
       2,
-      MathUtils.toWad(new Big(sdkOpen.cost.toString())).toString()
+      MathUtils.toWad(sdkOpen.cost).toFixed(0)
     );
     const harnessQty6 = MathUtils.fromWadNearest(new Big(qtyWad.toString()));
-    const sdkQty6 = new Big(sdkQty.quantity.toString());
+    const sdkQty6 = sdkQty.quantity;
     const diffQty = harnessQty6.minus(sdkQty6).abs();
     const MICRO_TOLERANCE = new Big("2000"); // allow small rounding drift on non-uniform tree
     expect(
       diffQty.lte(MICRO_TOLERANCE),
-      `quantity mismatch ${harnessQty6.toString()} vs ${sdkQty6.toString()}`
+      `quantity mismatch ${harnessQty6.toFixed(0)} vs ${sdkQty6.toFixed(0)}`
     ).to.be.true;
   });
 
   it("preserves parity for a larger (but safe) quantity on full-range trade", async () => {
     const harness = await deployHarnessWithUniform();
-    const quantity6 = BigInt(3_000_000); // 3 USDC
+    const quantity6 = new Big("3000000"); // 3 USDC
 
     const sdkOpen = sdkClient.calculateOpenCost(
       0,
       4,
-      quantity6.toString(),
+      quantity6,
       distribution,
       market
     );
@@ -428,15 +386,15 @@ describe("CLMSR SDK parity (calculate* level)", () => {
       alphaWad,
       0,
       3,
-      MathUtils.toWad(new Big(quantity6.toString())).toString()
+      MathUtils.toWad(quantity6).toFixed(0)
     );
     const harnessCost6 = MathUtils.fromWadRoundUp(new Big(costWad.toString()));
-    const sdkCost6 = new Big(sdkOpen.cost.toString());
+    const sdkCost6 = sdkOpen.cost;
     const diffCost = harnessCost6.minus(sdkCost6).abs();
     const pctTolerance = new Big("0.02"); // allow up to 2% diff on larger notional until full module port
     expect(
       diffCost.lte(sdkCost6.mul(pctTolerance)),
-      `cost mismatch ${harnessCost6.toString()} vs ${sdkCost6.toString()}`
+      `cost mismatch ${harnessCost6.toFixed(0)} vs ${sdkCost6.toFixed(0)}`
     ).to.be.true;
   });
 });

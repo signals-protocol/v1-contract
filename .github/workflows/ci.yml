@@ -26,22 +26,8 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Install SDK dependencies
-        working-directory: signals-v0/clmsr-sdk
-        run: yarn install --frozen-lockfile
-
-      - name: Build SDK
-        working-directory: signals-v0/clmsr-sdk
-        run: yarn build
-
       - name: Compile contracts
         run: yarn hardhat compile
-
-      - name: Compile v0 contracts (for parity tests)
-        working-directory: signals-v0
-        run: |
-          yarn install --frozen-lockfile
-          yarn hardhat compile
 
       - name: TypeScript strict check
         run: npx tsc --noEmit --noUnusedLocals --noUnusedParameters
@@ -62,22 +48,8 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Install SDK dependencies
-        working-directory: signals-v0/clmsr-sdk
-        run: yarn install --frozen-lockfile
-
-      - name: Build SDK
-        working-directory: signals-v0/clmsr-sdk
-        run: yarn build
-
       - name: Compile contracts
         run: yarn hardhat compile
-
-      - name: Compile v0 contracts (for parity tests)
-        working-directory: signals-v0
-        run: |
-          yarn install --frozen-lockfile
-          yarn hardhat compile
 
       - name: Run tests
         run: yarn test
