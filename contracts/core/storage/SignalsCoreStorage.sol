@@ -177,20 +177,48 @@ abstract contract SignalsCoreStorage {
 
     /// @notice Batch aggregation result (Phase 6)
     struct BatchAggregation {
-        uint256 totalDepositAssets;
-        uint256 totalWithdrawShares;
-        uint256 depositPrice;
-        uint256 withdrawPrice;
-        bool processed;
+        uint256 totalDepositAssets;   // Sum of all eligible deposit amounts
+        uint256 totalWithdrawShares;  // Sum of all eligible withdraw shares
+        uint256 batchPrice;           // P^e_t used for this batch
+        bool processed;               // Whether batch has been processed
     }
 
-    // Phase 6 storage slots (not used until Phase 6)
-    // mapping(uint64 => DepositRequest) internal depositRequests;
-    // mapping(uint64 => WithdrawRequest) internal withdrawRequests;
-    // mapping(uint64 => BatchAggregation) internal batchAggregations;
-    // uint64 public nextDepositRequestId;
-    // uint64 public nextWithdrawRequestId;
+    /// @notice Pending aggregation for batch (pre-processing)
+    struct PendingBatchTotal {
+        uint256 deposits;    // Sum of pending deposit amounts for this batch
+        uint256 withdraws;   // Sum of pending withdraw shares for this batch
+    }
+
+    // ============================================================
+    // Phase 6: Request ID-based Queue Storage (Active)
+    // ============================================================
+
+    /// @notice Request ID → DepositRequest mapping
+    mapping(uint64 => DepositRequest) internal _depositRequests;
+
+    /// @notice Request ID → WithdrawRequest mapping
+    mapping(uint64 => WithdrawRequest) internal _withdrawRequests;
+
+    /// @notice Batch ID → Aggregation result (post-processing)
+    mapping(uint64 => BatchAggregation) internal _batchAggregations;
+
+    /// @notice Batch ID → Pending totals (pre-processing)
+    /// @dev Used for O(1) batch processing: totals are pre-aggregated on request
+    mapping(uint64 => PendingBatchTotal) internal _pendingBatchTotals;
+
+    /// @notice Next deposit request ID
+    uint64 public nextDepositRequestId;
+
+    /// @notice Next withdraw request ID
+    uint64 public nextWithdrawRequestId;
+
+    /// @notice Current batch ID (increments on each batch)
+    uint64 public currentBatchId;
+
+    /// @notice Withdrawal lag in batches (D_lag)
+    /// @dev Request made at batch N is eligible at batch N + withdrawalLagBatches
+    uint64 public withdrawalLagBatches;
 
     // Reserve ample slots for future upgrades; do not change after first deployment.
-    uint256[25] internal __gap;
+    uint256[20] internal __gap;
 }

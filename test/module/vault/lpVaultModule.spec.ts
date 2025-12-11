@@ -3,16 +3,19 @@ import { ethers } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { LPVaultModuleProxy, MockERC20 } from "../../../typechain-types";
 import { WAD } from "../../helpers/constants";
-import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 /**
- * VaultQueue Unit Tests - Request ID Based Queue (Phase 6)
+ * LPVaultModule Tests
  *
- * Tests the Request ID-based queue system for deposits and withdrawals.
- * Reference: plan.md Phase 6, docs/vault-invariants.md
+ * Tests the LP Vault operations in delegatecall environment.
+ * - Request ID-based deposit/withdraw queue
+ * - O(1) batch processing
+ * - Claims
+ *
+ * Reference: whitepaper Section 3, plan.md Phase 6
  */
 
-describe("VaultQueue - Request ID Based", () => {
+describe("LPVaultModule", () => {
   async function deployVaultFixture() {
     const [owner, userA, userB, userC] = await ethers.getSigners();
 
@@ -322,10 +325,8 @@ describe("VaultQueue - Request ID Based", () => {
       const moduleAtProxy = module.attach(proxy.target);
 
       // Process batch - should emit DailyBatchProcessed event
-      await expect(proxy.processDailyBatch(1n)).to.emit(
-        moduleAtProxy,
-        "DailyBatchProcessed"
-      );
+      await expect(proxy.processDailyBatch(1n))
+        .to.emit(moduleAtProxy, "DailyBatchProcessed");
 
       // Verify NAV increased by total deposits (300)
       expect(await proxy.getVaultNav()).to.equal(ethers.parseEther("1300"));
@@ -371,10 +372,8 @@ describe("VaultQueue - Request ID Based", () => {
 
       const moduleAtProxy = module.attach(proxy.target);
 
-      await expect(proxy.processDailyBatch(1n)).to.emit(
-        moduleAtProxy,
-        "DailyBatchProcessed"
-      );
+      await expect(proxy.processDailyBatch(1n))
+        .to.emit(moduleAtProxy, "DailyBatchProcessed");
 
       // N = 1000 - 200 = 800
       // S = 1000 - 200 = 800
@@ -423,7 +422,8 @@ describe("VaultQueue - Request ID Based", () => {
       const moduleAtProxy = module.attach(proxy.target);
 
       // shares = 100 / 1.1 ≈ 90.909...
-      const expectedShares = (depositAmount * WAD) / ethers.parseEther("1.1");
+      const expectedShares =
+        (depositAmount * WAD) / ethers.parseEther("1.1");
 
       // Event signature: DepositClaimed(requestId, owner, amount, shares)
       await expect(proxy.connect(userB).claimDeposit(0n))
@@ -501,7 +501,8 @@ describe("VaultQueue - Request ID Based", () => {
       const moduleAtProxy = module.attach(proxy.target);
 
       // payout = 100 * 1.2 = 120
-      const expectedPayout = (withdrawShares * ethers.parseEther("1.2")) / WAD;
+      const expectedPayout =
+        (withdrawShares * ethers.parseEther("1.2")) / WAD;
 
       // Event signature: WithdrawClaimed(requestId, owner, shares, assets)
       await expect(proxy.connect(userA).claimWithdraw(0n))
@@ -549,12 +550,7 @@ describe("VaultQueue - Request ID Based", () => {
       // Event signature: WithdrawClaimed(requestId, owner, shares, assets)
       await expect(proxy.connect(userA).claimWithdraw(0n))
         .to.emit(moduleAtProxy, "WithdrawClaimed")
-        .withArgs(
-          0n,
-          userA.address,
-          ethers.parseEther("100"),
-          ethers.parseEther("100")
-        );
+        .withArgs(0n, userA.address, ethers.parseEther("100"), ethers.parseEther("100"));
     });
   });
 
@@ -659,10 +655,8 @@ describe("VaultQueue - Request ID Based", () => {
 
       // NOW claimable
       const moduleAtProxy = module.attach(proxy.target);
-      await expect(proxy.connect(userA).claimWithdraw(0n)).to.emit(
-        moduleAtProxy,
-        "WithdrawClaimed"
-      );
+      await expect(proxy.connect(userA).claimWithdraw(0n))
+        .to.emit(moduleAtProxy, "WithdrawClaimed");
     });
   });
 });

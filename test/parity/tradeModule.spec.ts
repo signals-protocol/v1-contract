@@ -29,13 +29,22 @@ async function deploySystem(
 ): Promise<DeployedSystem> {
   const [owner, userA, userB] = await ethers.getSigners();
 
-  const payment = await (await ethers.getContractFactory("MockPaymentToken")).deploy();
-  const feePolicy = await (await ethers.getContractFactory("MockFeePolicy")).deploy(feeBps);
+  const payment = await (
+    await ethers.getContractFactory("MockPaymentToken")
+  ).deploy();
+  const feePolicy = await (
+    await ethers.getContractFactory("MockFeePolicy")
+  ).deploy(feeBps);
 
-  const positionImplFactory = await ethers.getContractFactory("SignalsPosition");
+  const positionImplFactory = await ethers.getContractFactory(
+    "SignalsPosition"
+  );
   const positionImpl = await positionImplFactory.deploy();
   await positionImpl.waitForDeployment();
-  const positionInit = positionImplFactory.interface.encodeFunctionData("initialize", [owner.address]);
+  const positionInit = positionImplFactory.interface.encodeFunctionData(
+    "initialize",
+    [owner.address]
+  );
   const positionProxy = (await (
     await ethers.getContractFactory("TestERC1967Proxy")
   ).deploy(await positionImpl.getAddress(), positionInit)) as TestERC1967Proxy;
@@ -44,12 +53,18 @@ async function deploySystem(
     await positionProxy.getAddress()
   )) as SignalsPosition;
 
-  const lazyLib = await (await ethers.getContractFactory("LazyMulSegmentTree")).deploy();
+  const lazyLib = await (
+    await ethers.getContractFactory("LazyMulSegmentTree")
+  ).deploy();
   const tradeModule = await (
-    await ethers.getContractFactory("TradeModule", { libraries: { LazyMulSegmentTree: lazyLib.target } })
+    await ethers.getContractFactory("TradeModule", {
+      libraries: { LazyMulSegmentTree: lazyLib.target },
+    })
   ).deploy();
   const core = await (
-    await ethers.getContractFactory("TradeModuleProxy", { libraries: { LazyMulSegmentTree: lazyLib.target } })
+    await ethers.getContractFactory("TradeModuleProxy", {
+      libraries: { LazyMulSegmentTree: lazyLib.target },
+    })
   ).deploy(tradeModule.target);
 
   await core.setAddresses(
@@ -113,7 +128,10 @@ describe("TradeModule parity and multi-user flows", () => {
     const positionId = Number(nextId);
     await core.connect(userA).openPosition(1, 0, 4, 2_000, 10_000_000); // 0.002 USDC
 
-    const quote = await core.calculateDecreaseProceeds.staticCall(positionId, 800);
+    const quote = await core.calculateDecreaseProceeds.staticCall(
+      positionId,
+      800
+    );
     const balBefore = await payment.balanceOf(userA.address);
     await core.connect(userA).decreasePosition(positionId, 800, quote);
     const balAfter = await payment.balanceOf(userA.address);
@@ -124,20 +142,23 @@ describe("TradeModule parity and multi-user flows", () => {
   });
 
   it("handles multi-user slippage and partial close", async () => {
-    const { userA, userB, payment, position, core, tradeModule } = await deploySystem();
+    const { userA, userB, payment, position, core, tradeModule } =
+      await deploySystem();
 
     const posAId = Number(await position.nextId());
     await core.connect(userA).openPosition(1, 0, 4, 1_500, 10_000_000);
 
     const quoteB = await core.calculateOpenCost.staticCall(1, 0, 4, 1_000);
-    await expect(core.connect(userB).openPosition(1, 0, 4, 1_000, quoteB - 1n)).to.be.revertedWithCustomError(
-      tradeModule,
-      "CostExceedsMaximum"
-    );
+    await expect(
+      core.connect(userB).openPosition(1, 0, 4, 1_000, quoteB - 1n)
+    ).to.be.revertedWithCustomError(tradeModule, "CostExceedsMaximum");
     const posBId = posAId + 1;
     await core.connect(userB).openPosition(1, 0, 4, 1_000, quoteB + 1_000n);
 
-    const decQuote = await core.calculateDecreaseProceeds.staticCall(posBId, 600);
+    const decQuote = await core.calculateDecreaseProceeds.staticCall(
+      posBId,
+      600
+    );
     const balBBefore = await payment.balanceOf(userB.address);
     await core.connect(userB).decreasePosition(posBId, 600, decQuote);
     const balBAfter = await payment.balanceOf(userB.address);

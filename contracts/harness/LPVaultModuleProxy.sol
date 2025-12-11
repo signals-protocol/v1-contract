@@ -33,59 +33,113 @@ contract LPVaultModuleProxy is SignalsCoreStorage {
         withdrawLag = lag;
     }
 
+    function setWithdrawalLagBatches(uint64 lag) external {
+        withdrawalLagBatches = lag;
+    }
+
+    function setFeeWaterfallConfig(
+        int256 pdd,
+        uint256 rhoBS,
+        uint256 phiLP,
+        uint256 phiBS,
+        uint256 phiTR
+    ) external {
+        feeWaterfallConfig.pdd = pdd;
+        feeWaterfallConfig.rhoBS = rhoBS;
+        feeWaterfallConfig.phiLP = phiLP;
+        feeWaterfallConfig.phiBS = phiBS;
+        feeWaterfallConfig.phiTR = phiTR;
+    }
+
+    function setCapitalStack(uint256 backstopNav, uint256 treasuryNav) external {
+        capitalStack.backstopNav = backstopNav;
+        capitalStack.treasuryNav = treasuryNav;
+    }
+
     // ============================================================
-    // Delegated calls
+    // Seeding
     // ============================================================
 
     function seedVault(uint256 seedAmount) external {
         _delegate(abi.encodeWithSelector(LPVaultModule.seedVault.selector, seedAmount));
     }
 
-    function requestDeposit(uint256 amount) external {
-        _delegate(abi.encodeWithSelector(LPVaultModule.requestDeposit.selector, amount));
+    // ============================================================
+    // Request Queue (Request ID Model)
+    // ============================================================
+
+    function requestDeposit(uint256 amount) external returns (uint64) {
+        bytes memory ret = _delegate(abi.encodeWithSelector(
+            LPVaultModule.requestDeposit.selector,
+            amount
+        ));
+        return abi.decode(ret, (uint64));
     }
 
-    function requestWithdraw(uint256 shares) external {
-        _delegate(abi.encodeWithSelector(LPVaultModule.requestWithdraw.selector, shares));
+    function requestWithdraw(uint256 shares) external returns (uint64) {
+        bytes memory ret = _delegate(abi.encodeWithSelector(
+            LPVaultModule.requestWithdraw.selector,
+            shares
+        ));
+        return abi.decode(ret, (uint64));
     }
 
-    function cancelDeposit() external {
-        _delegate(abi.encodeWithSelector(LPVaultModule.cancelDeposit.selector));
-    }
-
-    function cancelWithdraw() external {
-        _delegate(abi.encodeWithSelector(LPVaultModule.cancelWithdraw.selector));
-    }
-
-    function processBatch(int256 pnl, uint256 fees, uint256 grant) external {
-        // For backward compatibility, call with empty processedUsers array
-        address[] memory emptyUsers = new address[](0);
+    function cancelDeposit(uint64 requestId) external {
         _delegate(abi.encodeWithSelector(
-            LPVaultModule.processBatch.selector,
-            pnl,
-            fees,
-            grant,
-            emptyUsers
+            LPVaultModule.cancelDeposit.selector,
+            requestId
         ));
     }
 
-    function processBatchWithUsers(
-        int256 pnl,
-        uint256 fees,
-        uint256 grant,
-        address[] calldata processedUsers
-    ) external {
+    function cancelWithdraw(uint64 requestId) external {
         _delegate(abi.encodeWithSelector(
-            LPVaultModule.processBatch.selector,
-            pnl,
-            fees,
-            grant,
-            processedUsers
+            LPVaultModule.cancelWithdraw.selector,
+            requestId
         ));
     }
 
     // ============================================================
-    // View functions (direct storage reads)
+    // Batch Processing
+    // ============================================================
+
+    function recordDailyPnl(uint64 batchId, int256 lt, uint256 ftot) external {
+        _delegate(abi.encodeWithSelector(
+            LPVaultModule.recordDailyPnl.selector,
+            batchId,
+            lt,
+            ftot
+        ));
+    }
+
+    function processDailyBatch(uint64 batchId) external {
+        _delegate(abi.encodeWithSelector(
+            LPVaultModule.processDailyBatch.selector,
+            batchId
+        ));
+    }
+
+    // ============================================================
+    // Claims
+    // ============================================================
+
+    function claimDeposit(uint64 requestId) external returns (uint256) {
+        bytes memory ret = _delegate(abi.encodeWithSelector(
+            LPVaultModule.claimDeposit.selector,
+            requestId
+        ));
+        return abi.decode(ret, (uint256));
+    }
+
+    function claimWithdraw(uint64 requestId) external returns (uint256) {
+        bytes memory ret = _delegate(abi.encodeWithSelector(
+            LPVaultModule.claimWithdraw.selector,
+            requestId
+        ));
+        return abi.decode(ret, (uint256));
+    }
+
+    // ============================================================
+    // View Functions
     // ============================================================
 
     function getVaultNav() external view returns (uint256) {
@@ -108,20 +162,30 @@ contract LPVaultModuleProxy is SignalsCoreStorage {
         return lpVault.isSeeded;
     }
 
-    function getPendingTotals() external view returns (
-        uint256 pendingDeposits,
-        uint256 pendingWithdraws
-    ) {
-        return (vaultQueue.pendingDeposits, vaultQueue.pendingWithdraws);
+    function getCapitalStack() external view returns (uint256 backstopNav, uint256 treasuryNav) {
+        return (capitalStack.backstopNav, capitalStack.treasuryNav);
     }
 
-    function getUserRequest(address user) external view returns (
-        uint256 amount,
-        uint64 requestTimestamp,
-        bool isDeposit
+    function getPendingBatchTotals(uint64 batchId) external view returns (
+        uint256 deposits,
+        uint256 withdraws
     ) {
-        VaultRequest storage req = userRequests[user];
-        return (req.amount, req.requestTimestamp, req.isDeposit);
+        PendingBatchTotal storage totals = _pendingBatchTotals[batchId];
+        return (totals.deposits, totals.withdraws);
+    }
+
+    function getBatchAggregation(uint64 batchId) external view returns (
+        uint256 totalDepositAssets,
+        uint256 totalWithdrawShares,
+        uint256 batchPrice,
+        bool processed
+    ) {
+        BatchAggregation storage agg = _batchAggregations[batchId];
+        return (agg.totalDepositAssets, agg.totalWithdrawShares, agg.batchPrice, agg.processed);
+    }
+
+    function getCurrentBatchId() external view returns (uint64) {
+        return currentBatchId;
     }
 
     // ============================================================
@@ -138,4 +202,3 @@ contract LPVaultModuleProxy is SignalsCoreStorage {
         return ret;
     }
 }
-

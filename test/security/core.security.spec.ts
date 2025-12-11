@@ -1,9 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-import {
-  SignalsPosition,
-} from "../../typechain-types";
+import { SignalsPosition } from "../../typechain-types";
 import { ISignalsCore } from "../../typechain-types/contracts/harness/TradeModuleProxy";
 import { WAD, USDC_DECIMALS, SMALL_QUANTITY } from "../helpers/constants";
 
@@ -30,7 +28,9 @@ describe("Core Security", () => {
     await payment.transfer(user.address, fundAmount);
     await payment.transfer(attacker.address, fundAmount);
 
-    const positionImplFactory = await ethers.getContractFactory("SignalsPosition");
+    const positionImplFactory = await ethers.getContractFactory(
+      "SignalsPosition"
+    );
     const positionImpl = await positionImplFactory.deploy();
     await positionImpl.waitForDeployment();
     const positionInit = positionImplFactory.interface.encodeFunctionData(
@@ -110,7 +110,9 @@ describe("Core Security", () => {
       const { position, attacker } = await loadFixture(deploySecurityFixture);
 
       await expect(
-        position.connect(attacker).mintPosition(attacker.address, 1, 0, 10, 1000)
+        position
+          .connect(attacker)
+          .mintPosition(attacker.address, 1, 0, 10, 1000)
       )
         .to.be.revertedWithCustomError(position, "UnauthorizedCaller")
         .withArgs(attacker.address);
@@ -177,7 +179,9 @@ describe("Core Security", () => {
 
       // Attacker tries to transfer user's position
       await expect(
-        position.connect(attacker).transferFrom(user.address, attacker.address, 1)
+        position
+          .connect(attacker)
+          .transferFrom(user.address, attacker.address, 1)
       ).to.be.revertedWithCustomError(position, "ERC721InsufficientApproval");
     });
 
@@ -271,15 +275,13 @@ describe("Core Security", () => {
 
       // Upper tick beyond market max
       await expect(
-        core
-          .connect(user)
-          .openPosition(
-            1,
-            0,
-            200, // max is 100
-            SMALL_QUANTITY,
-            ethers.parseUnits("1000", USDC_DECIMALS)
-          )
+        core.connect(user).openPosition(
+          1,
+          0,
+          200, // max is 100
+          SMALL_QUANTITY,
+          ethers.parseUnits("1000", USDC_DECIMALS)
+        )
       ).to.be.reverted;
     });
 
@@ -311,4 +313,3 @@ describe("Core Security", () => {
     });
   });
 });
-
