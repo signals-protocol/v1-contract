@@ -69,13 +69,13 @@ abstract contract SignalsCoreStorage {
         uint256 pendingWithdraws;   // Total pending withdraw shares (WAD)
     }
 
-    VaultState public lpVault;
-    BackstopState public backstop;
-    TreasuryState public treasury;
-    VaultQueue public vaultQueue;
+    VaultState internal lpVault;
+    BackstopState internal backstop;
+    TreasuryState internal treasury;
+    VaultQueue internal vaultQueue;
 
     /// @notice User request queue: user => request
-    mapping(address => VaultRequest) public userRequests;
+    mapping(address => VaultRequest) internal userRequests;
 
     /// @notice Withdrawal lag in seconds
     uint64 public withdrawLag;
