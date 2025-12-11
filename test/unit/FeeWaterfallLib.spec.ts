@@ -280,6 +280,27 @@ describe("FeeWaterfallLib", () => {
       ).to.be.revertedWithCustomError(harness, "InvalidDrawdownFloor");
     });
 
+    it("reverts on pdd < -WAD (over 100% drawdown)", async () => {
+      await expect(
+        calculate({
+          Lt: 0n,
+          Ftot: ethers.parseEther("50"),
+          pdd: ethers.parseEther("-1.1"), // Invalid: < -WAD
+        })
+      ).to.be.revertedWithCustomError(harness, "InvalidDrawdownFloor");
+    });
+
+    it("reverts on catastrophic loss (Nraw underflow)", async () => {
+      // Loss exceeds NAV + all fees
+      await expect(
+        calculate({
+          Lt: ethers.parseEther("-2000"), // Loss > Nprev + Ftot
+          Ftot: ethers.parseEther("10"),
+          Nprev: ethers.parseEther("1000"),
+        })
+      ).to.be.revertedWithCustomError(harness, "CatastrophicLoss");
+    });
+
     it("reverts on invalid phi sum", async () => {
       await expect(
         calculate({
@@ -314,14 +335,63 @@ describe("FeeWaterfallLib", () => {
 
     it("Total value is conserved (fees + grant)", async () => {
       const Ftot = ethers.parseEther("100");
-      const result = await calculate({
-        Lt: ethers.parseEther("-500"),
-        Ftot,
-      });
+      const Lt = ethers.parseEther("-300");
+      const result = await calculate({ Lt, Ftot });
 
-      // Total value in = Ftot
-      // Total value out = Ft (to LP via NAV) + (Bnext - Bprev + Gt) (net backstop) + (Tnext - Tprev) (treasury)
-      // Actually: Ftot = Ft + FcoreBS + FcoreTR + Ffill (all accounted for)
+      // Conservation: Ftot flows entirely into system
+      // Floss + Fpool = Ftot (fee split)
+      expect(result.Floss + result.Fpool).to.equal(Ftot);
+
+      // Total system NAV change should equal fees distributed + P&L
+      // Before: Nprev + Bprev + Tprev
+      // After:  Npre + Bnext + Tnext
+      // Delta should equal: Lt + Ftot (P&L + fees absorbed)
+      const before = defaultParams.Nprev + defaultParams.Bprev + defaultParams.Tprev;
+      const after = result.Npre + result.Bnext + result.Tnext;
+      const delta = after > before ? after - before : before - after;
+      const expectedDelta = Lt + Ftot;
+      // Allow 1 wei tolerance for rounding
+      expect(delta).to.be.closeTo(expectedDelta > 0n ? expectedDelta : -expectedDelta, 1n);
+    });
+
+    it("INV: Floss + Fpool == Ftot", async () => {
+      const result = await calculate({
+        Lt: ethers.parseEther("-200"),
+        Ftot: ethers.parseEther("80"),
+      });
+      expect(result.Floss + result.Fpool).to.equal(ethers.parseEther("80"));
+    });
+
+    it("INV: Gt <= deltaEt", async () => {
+      const result = await calculate({
+        Lt: ethers.parseEther("-600"),
+        Ftot: ethers.parseEther("50"),
+        deltaEt: ethers.parseEther("50"), // Limited support
+      });
+      expect(result.Gt).to.be.lte(ethers.parseEther("50"));
+    });
+
+    it("INV: Gt <= Bprev", async () => {
+      const result = await calculate({
+        Lt: ethers.parseEther("-400"),
+        Ftot: ethers.parseEther("50"),
+        Bprev: ethers.parseEther("200"),
+        deltaEt: ethers.parseEther("300"),
+      });
+      expect(result.Gt).to.be.lte(ethers.parseEther("200"));
+    });
+
+    it("INV: Npre - Nprev == Lt + Ft + Gt (pre-batch NAV equation)", async () => {
+      const Lt = ethers.parseEther("-300");
+      const Ftot = ethers.parseEther("100");
+      const result = await calculate({ Lt, Ftot });
+
+      // Npre - Nprev = Lt + Ft + Gt
+      const navDelta = result.Npre > defaultParams.Nprev 
+        ? result.Npre - defaultParams.Nprev 
+        : -(defaultParams.Nprev - result.Npre);
+      const expected = Lt + BigInt(result.Ft) + BigInt(result.Gt);
+      expect(navDelta).to.equal(expected);
     });
   });
 

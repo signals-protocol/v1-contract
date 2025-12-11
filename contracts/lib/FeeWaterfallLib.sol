@@ -21,8 +21,11 @@ library FeeWaterfallLib {
     /// @notice Fee share ratios don't sum to WAD
     error InvalidPhiSum(uint256 sum);
 
-    /// @notice Drawdown floor must be negative
+    /// @notice Drawdown floor must be in range (-WAD, 0)
     error InvalidDrawdownFloor(int256 pdd);
+
+    /// @notice Catastrophic loss: NAV would go negative
+    error CatastrophicLoss(uint256 loss, uint256 navPlusFloss);
 
     // ============================================================
     // Structs
@@ -70,7 +73,8 @@ library FeeWaterfallLib {
     /// @return r Output result
     function calculate(Params memory p) internal pure returns (Result memory r) {
         // Validate inputs
-        if (p.pdd >= 0) revert InvalidDrawdownFloor(p.pdd);
+        // pdd must be in range (-WAD, 0) - i.e., max 100% drawdown
+        if (p.pdd >= 0 || p.pdd < -int256(WAD)) revert InvalidDrawdownFloor(p.pdd);
         
         uint256 phiSum = p.phiLP + p.phiBS + p.phiTR;
         if (phiSum != WAD) revert InvalidPhiSum(phiSum);
@@ -101,9 +105,9 @@ library FeeWaterfallLib {
             if (r.Nraw >= loss) {
                 r.Nraw = r.Nraw - loss;
             } else {
-                // This means loss > Nprev + Floss, which is a catastrophic loss
-                // In practice, this should be prevented by risk limits
-                r.Nraw = 0;
+                // Catastrophic loss: loss > Nprev + Floss
+                // This should never happen if risk limits are enforced
+                revert CatastrophicLoss(loss, r.Nraw);
             }
         }
 

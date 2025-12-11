@@ -53,8 +53,9 @@ export function calculateFeeWaterfall(
   p: FeeWaterfallParams
 ): FeeWaterfallResult {
   // Validate inputs
-  if (p.pdd >= 0n) {
-    throw new Error("InvalidDrawdownFloor: pdd must be negative");
+  // pdd must be in range (-WAD, 0)
+  if (p.pdd >= 0n || p.pdd < -WAD) {
+    throw new Error(`InvalidDrawdownFloor: pdd=${p.pdd} must be in (-WAD, 0)`);
   }
 
   const phiSum = p.phiLP + p.phiBS + p.phiTR;
@@ -76,7 +77,10 @@ export function calculateFeeWaterfall(
   } else {
     const loss = -p.Lt;
     const temp = p.Nprev + Floss;
-    Nraw = temp >= loss ? temp - loss : 0n;
+    if (temp < loss) {
+      throw new Error(`CatastrophicLoss: loss=${loss}, navPlusFloss=${temp}`);
+    }
+    Nraw = temp - loss;
   }
 
   // ========================================

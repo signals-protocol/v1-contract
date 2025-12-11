@@ -113,3 +113,6 @@ plan.md
 scripts/generate_codebase.sh
 test/fixtures/clmsrFixtures.json
 whitepaper.tex
+
+# Internal specs (not tracked)
+docs/
