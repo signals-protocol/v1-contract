@@ -32,10 +32,15 @@ describe("TradeModule flow (minimal parity)", () => {
     const payment = await (
       await ethers.getContractFactory("MockPaymentToken")
     ).deploy();
-    const positionImplFactory = await ethers.getContractFactory("SignalsPosition");
+    const positionImplFactory = await ethers.getContractFactory(
+      "SignalsPosition"
+    );
     const positionImpl = await positionImplFactory.deploy();
     await positionImpl.waitForDeployment();
-    const positionInit = positionImplFactory.interface.encodeFunctionData("initialize", [owner.address]);
+    const positionInit = positionImplFactory.interface.encodeFunctionData(
+      "initialize",
+      [owner.address]
+    );
     const positionProxy = (await (
       await ethers.getContractFactory("TestERC1967Proxy")
     ).deploy(positionImpl.target, positionInit)) as TestERC1967Proxy;

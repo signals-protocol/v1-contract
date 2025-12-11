@@ -117,4 +117,15 @@ contract TradeModuleProxy is SignalsCoreStorage {
         ));
         return abi.decode(ret, (uint256));
     }
+
+    // Test helpers - direct tree access
+    function getMarketBinFactor(uint256 marketId, uint32 bin) external view returns (uint256) {
+        return marketTrees[marketId].getRangeSum(bin, bin);
+    }
+
+    function getMarketTotalSum(uint256 marketId) external view returns (uint256) {
+        LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
+        if (tree.size == 0) return 0;
+        return tree.getRangeSum(0, tree.size - 1);
+    }
 }
