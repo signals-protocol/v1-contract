@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: TypeScript Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Install SDK dependencies
+        working-directory: signals-v0/clmsr-sdk
+        run: yarn install --frozen-lockfile
+
+      - name: Build SDK
+        working-directory: signals-v0/clmsr-sdk
+        run: yarn build
+
+      - name: Compile contracts
+        run: yarn hardhat compile
+
+      - name: Compile v0 contracts (for parity tests)
+        working-directory: signals-v0
+        run: |
+          yarn install --frozen-lockfile
+          yarn hardhat compile
+
+      - name: TypeScript strict check
+        run: npx tsc --noEmit --noUnusedLocals --noUnusedParameters
+
+  test:
+    name: Hardhat Tests
+    runs-on: ubuntu-latest
+    needs: typecheck
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Install SDK dependencies
+        working-directory: signals-v0/clmsr-sdk
+        run: yarn install --frozen-lockfile
+
+      - name: Build SDK
+        working-directory: signals-v0/clmsr-sdk
+        run: yarn build
+
+      - name: Compile contracts
+        run: yarn hardhat compile
+
+      - name: Compile v0 contracts (for parity tests)
+        working-directory: signals-v0
+        run: |
+          yarn install --frozen-lockfile
+          yarn hardhat compile
+
+      - name: Run tests
+        run: yarn test
+
+  solidity-compile:
+    name: Solidity Compile
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Compile contracts
+        run: yarn hardhat compile
+
+      - name: Check contract sizes
+        run: yarn hardhat compile --force
