@@ -45,6 +45,8 @@ function cloneMarket(
     settlementValue: market.settlementValue,
     liquidityParameter: market.liquidityParameter,
     feePolicy: market.feePolicy,
+    initialRootSum: market.initialRootSum,
+    accumulatedFees: market.accumulatedFees,
     ...overrides,
   };
 }

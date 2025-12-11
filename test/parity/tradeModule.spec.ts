@@ -79,6 +79,8 @@ async function deploySystem(
     settlementValue: 0,
     liquidityParameter: WAD,
     feePolicy: ethers.ZeroAddress,
+    initialRootSum: 4n * WAD,
+    accumulatedFees: 0n,
     ...marketOverrides,
   };
   await core.setMarket(1, market);

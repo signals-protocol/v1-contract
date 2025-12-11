@@ -19,17 +19,20 @@ type MarketStruct = {
   settlementValue: number;
   liquidityParameter: bigint;
   feePolicy: string;
+  initialRootSum: bigint;
+  accumulatedFees: bigint;
 };
 
 function buildMarket(
   baseTime: bigint,
   overrides: Partial<MarketStruct> = {}
 ): MarketStruct {
+  const numBins = overrides.numBins ?? 4;
   const market: MarketStruct = {
     isActive: true,
     settled: false,
     snapshotChunksDone: false,
-    numBins: 4,
+    numBins: numBins,
     openPositionCount: 0,
     snapshotChunkCursor: 0,
     startTimestamp: baseTime - 10n,
@@ -42,6 +45,8 @@ function buildMarket(
     settlementValue: 0,
     liquidityParameter: ethers.parseEther("1"),
     feePolicy: ethers.ZeroAddress,
+    initialRootSum: BigInt(numBins) * ethers.parseEther("1"),
+    accumulatedFees: 0n,
   };
   return { ...market, ...overrides };
 }

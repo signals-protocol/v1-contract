@@ -92,6 +92,8 @@ describe("Core Security", () => {
       settlementValue: 0,
       liquidityParameter: WAD,
       feePolicy: feePolicy.target,
+      initialRootSum: 100n * WAD,
+      accumulatedFees: 0n,
     };
     await core.setMarket(1, market);
     await core.seedTree(1, Array(100).fill(WAD));

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "../../lib/FixedPointMathU.sol";
+import "../../lib/FeeWaterfallLib.sol";
 
 /**
  * @title VaultAccountingLib
@@ -28,6 +29,8 @@ library VaultAccountingLib {
     error InsufficientNAV(uint256 requested, uint256 available);
     /// @notice NAV would go negative after applying P&L (Safety Layer should prevent this)
     error NAVUnderflow(uint256 navPrev, uint256 loss);
+    /// @notice Pre-batch NAV consistency check failed
+    error PreBatchNavMismatch(uint256 expected, uint256 actual);
 
     // ============================================================
     // Structs
@@ -60,6 +63,48 @@ library VaultAccountingLib {
     // ============================================================
     // Pre-batch Calculation
     // ============================================================
+
+    /**
+     * @notice Compute batch price from FeeWaterfallLib result
+     * @dev Phase 6: Uses FeeWaterfallLib.Result.Npre directly and validates invariant
+     *      Invariant: Npre == Nprev + Lt + Ft + Gt
+     * 
+     * @param navPrev Previous NAV N_{t-1} (WAD)
+     * @param sharesPrev Previous shares S_{t-1} (WAD)
+     * @param lt CLMSR P&L L_t (signed, WAD)
+     * @param wf FeeWaterfallLib calculation result
+     * @return navPre Pre-batch NAV (WAD) - directly from wf.Npre
+     * @return batchPrice Batch price P^e_t (WAD)
+     */
+    function applyPreBatchFromWaterfall(
+        uint256 navPrev,
+        uint256 sharesPrev,
+        int256 lt,
+        FeeWaterfallLib.Result memory wf
+    ) internal pure returns (uint256 navPre, uint256 batchPrice) {
+        if (sharesPrev == 0) revert ZeroSharesNotAllowed();
+        
+        // Validate invariant: Npre == Nprev + Lt + Ft + Gt
+        int256 pi = lt + int256(wf.Ft) + int256(wf.Gt);
+        uint256 expected;
+        if (pi >= 0) {
+            expected = navPrev + uint256(pi);
+        } else {
+            uint256 loss = uint256(-pi);
+            if (loss > navPrev) {
+                revert NAVUnderflow(navPrev, loss);
+            }
+            expected = navPrev - loss;
+        }
+        
+        // Consistency check: FeeWaterfallLib.Npre should match our calculation
+        if (wf.Npre != expected) {
+            revert PreBatchNavMismatch(expected, wf.Npre);
+        }
+        
+        navPre = wf.Npre;
+        batchPrice = navPre.wDiv(sharesPrev);
+    }
 
     /**
      * @notice Compute pre-batch NAV and batch price

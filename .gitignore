@@ -116,3 +116,4 @@ whitepaper.tex
 
 # Internal specs (not tracked)
 docs/
+.cursor/

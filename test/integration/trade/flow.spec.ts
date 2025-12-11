@@ -93,6 +93,8 @@ describe("TradeModule flow (minimal parity)", () => {
       settlementValue: 0,
       liquidityParameter: WAD,
       feePolicy: ethers.ZeroAddress,
+      initialRootSum: 4n * WAD,
+      accumulatedFees: 0n,
       ...marketOverrides,
     };
     await core.setMarket(1, market);
@@ -192,6 +194,8 @@ describe("TradeModule flow (minimal parity)", () => {
       settlementValue: m.settlementValue,
       liquidityParameter: m.liquidityParameter,
       feePolicy: m.feePolicy,
+      initialRootSum: m.initialRootSum,
+      accumulatedFees: m.accumulatedFees,
     };
     await core.setMarket(1, settledMarket);
 
@@ -229,6 +233,8 @@ describe("TradeModule flow (minimal parity)", () => {
       settlementValue: m.settlementValue,
       liquidityParameter: m.liquidityParameter,
       feePolicy: m.feePolicy,
+      initialRootSum: m.initialRootSum,
+      accumulatedFees: m.accumulatedFees,
     };
     await core.setMarket(1, earlySettleMarket);
     await expect(core.connect(user).claimPayout(1)).to.be.reverted;
@@ -252,6 +258,8 @@ describe("TradeModule flow (minimal parity)", () => {
       settlementValue: m2.settlementValue,
       liquidityParameter: m2.liquidityParameter,
       feePolicy: m2.feePolicy,
+      initialRootSum: m2.initialRootSum,
+      accumulatedFees: m2.accumulatedFees,
     };
     await core.setMarket(1, claimableMarket);
     await core.connect(user).claimPayout(1);
@@ -283,6 +291,8 @@ describe("TradeModule flow (minimal parity)", () => {
       settlementValue: m.settlementValue,
       liquidityParameter: m.liquidityParameter,
       feePolicy: await feePolicy.getAddress(),
+      initialRootSum: m.initialRootSum,
+      accumulatedFees: m.accumulatedFees,
     };
     await core.setMarket(1, feeMarket);
     await expect(

@@ -111,6 +111,8 @@ describe("Boundaries", () => {
       settlementValue: 0,
       liquidityParameter: WAD,
       feePolicy: ethers.ZeroAddress,
+      initialRootSum: BigInt(NUM_BINS) * WAD,
+      accumulatedFees: 0n,
     };
     await core.setMarket(MARKET_ID, market);
 
@@ -408,6 +410,8 @@ describe("Boundaries", () => {
         settlementValue: 0,
         liquidityParameter: WAD,
         feePolicy: ethers.ZeroAddress,
+        initialRootSum: 10n * WAD,
+        accumulatedFees: 0n,
       };
       await core.setMarket(2, market);
       await core.seedTree(2, Array(10).fill(WAD));
@@ -446,6 +450,8 @@ describe("Boundaries", () => {
         settlementValue: 0,
         liquidityParameter: WAD,
         feePolicy: ethers.ZeroAddress,
+        initialRootSum: 10n * WAD,
+        accumulatedFees: 0n,
       };
       await core.setMarket(3, market);
       await core.seedTree(3, Array(10).fill(WAD));
@@ -484,6 +490,8 @@ describe("Boundaries", () => {
         settlementValue: 0,
         liquidityParameter: WAD,
         feePolicy: ethers.ZeroAddress,
+        initialRootSum: 10n * WAD,
+        accumulatedFees: 0n,
       };
       await core.setMarket(4, market);
       await core.seedTree(4, Array(10).fill(WAD));
@@ -573,6 +581,8 @@ describe("Boundaries", () => {
         settlementValue: 0,
         liquidityParameter: WAD,
         feePolicy: ethers.ZeroAddress,
+        initialRootSum: 10n * WAD,
+        accumulatedFees: 0n,
       };
       await core.setMarket(5, market);
       await core.seedTree(5, Array(10).fill(WAD));
@@ -611,6 +621,8 @@ describe("Boundaries", () => {
         settlementValue: 5_000_000,
         liquidityParameter: WAD,
         feePolicy: ethers.ZeroAddress,
+        initialRootSum: 10n * WAD,
+        accumulatedFees: 0n,
       };
       await core.setMarket(6, market);
       await core.seedTree(6, Array(10).fill(WAD));

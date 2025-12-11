@@ -5,12 +5,16 @@ import "../core/storage/SignalsCoreStorage.sol";
 import "../errors/ModuleErrors.sol";
 import "../errors/CLMSRErrors.sol";
 import "../lib/LazyMulSegmentTree.sol";
+import "../lib/FixedPointMathU.sol";
 
 /// @notice Delegate-only lifecycle module (skeleton)
 contract MarketLifecycleModule is SignalsCoreStorage {
     using LazyMulSegmentTree for LazyMulSegmentTree.Tree;
+    using FixedPointMathU for uint256;
 
     address private immutable self;
+
+    uint256 internal constant WAD = 1e18;
 
     event SettlementChunkRequested(uint256 indexed marketId, uint32 indexed chunkIndex);
     event MarketCreated(uint256 indexed marketId);
@@ -19,6 +23,13 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         int256 settlementValue,
         int256 settlementTick,
         uint64 settlementTimestamp
+    );
+    /// @dev Phase 6: P&L recorded to daily batch
+    event MarketPnlRecorded(
+        uint256 indexed marketId,
+        uint64 indexed batchId,
+        int256 lt,
+        uint256 ftot
     );
     event MarketReopened(uint256 indexed marketId);
     event MarketActivationUpdated(uint256 indexed marketId, bool isActive);
@@ -88,6 +99,10 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         }
         tree.seedWithFactors(factors);
 
+        // Phase 6: Store initial root sum for P&L calculation
+        // Z_start = n * WAD (uniform prior, all factors = 1.0)
+        market.initialRootSum = uint256(numBins) * WAD;
+
         emit MarketCreated(marketId);
     }
 
@@ -129,6 +144,13 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         state.candidateValue = 0;
         state.candidatePriceTimestamp = 0;
 
+        // Phase 6: Record P&L to daily batch
+        // Batch ID is based on settlement timestamp (day granularity)
+        uint64 batchId = _getBatchIdForMarket(marketId);
+        (int256 lt, uint256 ftot) = _calculateMarketPnl(marketId);
+        _recordPnlToBatch(batchId, lt, ftot);
+        
+        emit MarketPnlRecorded(marketId, batchId, lt, ftot);
         emit MarketSettled(marketId, market.settlementValue, settlementTick, market.settlementTimestamp);
     }
 
@@ -241,5 +263,94 @@ contract MarketLifecycleModule is SignalsCoreStorage {
     function _calculateTotalChunks(uint32 openPositionCount) internal pure returns (uint32) {
         if (openPositionCount == 0) return 0;
         return (openPositionCount + CHUNK_SIZE - 1) / CHUNK_SIZE;
+    }
+
+    // ============================================================
+    // Phase 6: P&L Recording
+    // ============================================================
+
+    /**
+     * @notice Get batch ID for a market (based on settlement date)
+     * @dev Uses market's settlement timestamp truncated to day
+     * @param marketId Market identifier
+     * @return batchId Batch identifier (day-based)
+     */
+    function _getBatchIdForMarket(uint256 marketId) internal view returns (uint64) {
+        ISignalsCore.Market storage market = markets[marketId];
+        // Use settlement timestamp divided by day (86400 seconds)
+        // This groups all markets settling on the same day into one batch
+        return uint64(market.settlementTimestamp / 86400);
+    }
+
+    /**
+     * @notice Calculate market P&L from CLMSR tree state
+     * @dev Phase 6: Calculates P&L using whitepaper formula:
+     *      L_t = C(q_end) - C(q_start) = α * (ln(Z_end) - ln(Z_start))
+     * 
+     *      Where:
+     *      - Z_start = initialRootSum (stored at market creation)
+     *      - Z_end = current tree root sum
+     *      - α = liquidityParameter
+     * 
+     *      P&L interpretation:
+     *      - Positive: maker loss (Z_end > Z_start, traders net profitable)
+     *      - Negative: maker profit (Z_end < Z_start, traders net losing)
+     * 
+     * @param marketId Market identifier
+     * @return lt Maker P&L (signed: positive = loss, negative = profit)
+     * @return ftot Gross fees collected during trading
+     */
+    function _calculateMarketPnl(uint256 marketId) internal view returns (int256 lt, uint256 ftot) {
+        ISignalsCore.Market storage market = markets[marketId];
+        LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
+        
+        uint256 alpha = market.liquidityParameter;
+        uint256 zStart = market.initialRootSum;
+        
+        // Get current root sum (Z_end)
+        uint256 zEnd = tree.getRangeSum(0, market.numBins - 1);
+        
+        // P&L = α * (ln(Z_end) - ln(Z_start))
+        // Per whitepaper Sec 3.5: L_t = C(q_end) - C(q_start)
+        // where C(q) = α * ln(Z(q))
+        // L_t > 0: cost increased → maker profit (traders net bought)
+        // L_t < 0: cost decreased → maker loss (traders net sold)
+        uint256 lnZEnd = zEnd.wLn();
+        uint256 lnZStart = zStart.wLn();
+        
+        if (lnZEnd >= lnZStart) {
+            // Maker profit: Z increased (cost increased, traders net bought)
+            lt = int256(alpha.wMul(lnZEnd - lnZStart));
+        } else {
+            // Maker loss: Z decreased (cost decreased, traders net sold)
+            lt = -int256(alpha.wMul(lnZStart - lnZEnd));
+        }
+        
+        ftot = market.accumulatedFees;
+    }
+
+    /**
+     * @notice Record P&L to daily batch
+     * @param batchId Batch identifier
+     * @param lt P&L to add
+     * @param ftot Fees to add
+     */
+    function _recordPnlToBatch(uint64 batchId, int256 lt, uint256 ftot) internal {
+        DailyPnlSnapshot storage snap = _dailyPnl[batchId];
+        snap.Lt += lt;
+        snap.Ftot += ftot;
+    }
+
+    /**
+     * @notice Manually record P&L for a batch (admin/testing)
+     * @dev Allows external P&L recording for testing or when trades
+     *      are processed off-chain
+     * @param batchId Batch identifier
+     * @param lt P&L to add
+     * @param ftot Fees to add
+     */
+    function recordBatchPnl(uint64 batchId, int256 lt, uint256 ftot) external onlyDelegated {
+        _recordPnlToBatch(batchId, lt, ftot);
+        emit MarketPnlRecorded(0, batchId, lt, ftot);
     }
 }

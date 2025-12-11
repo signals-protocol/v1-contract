@@ -26,6 +26,12 @@ interface ISignalsCore {
 
         // policy
         address feePolicy;
+
+        // Phase 6: Fee tracking and P&L calculation
+        // Initial root sum for P&L calculation: C_start = α * ln(Z_start)
+        uint256 initialRootSum;
+        // Gross fees collected from trades (CLMSR external)
+        uint256 accumulatedFees;
     }
 
     // Trade / lifecycle entrypoints (signatures preserved for parity)

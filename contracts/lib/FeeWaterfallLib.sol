@@ -185,8 +185,12 @@ library FeeWaterfallLib {
         // Ft = Floss + FcoreLP + Fdust (total to LP)
         r.Ft = r.Floss + FcoreLP + r.Fdust;
         
-        // Npre = Ngrant + FcoreLP (pre-batch NAV for VaultAccountingLib)
-        r.Npre = Ngrant + FcoreLP;
+        // Npre = Ngrant + FcoreLP + Fdust (pre-batch NAV for VaultAccountingLib)
+        // Per whitepaper: N^pre_t = N_{t-1} + L_t + F_t + G_t
+        // where F_t = F_loss + F_LP = F_loss + F_core_LP + F_dust
+        // Ngrant already contains N_{t-1} + L_t + F_loss + G_t
+        // So Npre = Ngrant + FcoreLP + Fdust
+        r.Npre = Ngrant + FcoreLP + r.Fdust;
         
         // Bnext = Bgrant + Ffill + FcoreBS
         r.Bnext = Bgrant + r.Ffill + FcoreBS;

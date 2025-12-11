@@ -154,6 +154,9 @@ export async function deployTradeModuleSystem(
       settlementValue: 0,
       liquidityParameter: config.liquidityParameter ?? WAD,
       feePolicy: ethers.ZeroAddress,
+      // Phase 6: P&L tracking fields
+      initialRootSum: BigInt(config.numBins) * WAD, // n * WAD for uniform prior
+      accumulatedFees: 0n,
     };
     await core.setMarket(marketId, market);
 

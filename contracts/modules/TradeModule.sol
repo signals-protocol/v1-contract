@@ -103,10 +103,15 @@ contract TradeModule is SignalsCoreStorage {
 
         _applyFactorChunked(marketId, lowerTick, upperTick, qtyWad, market.liquidityParameter, true);
 
+        // Phase 6: Accumulate fees (P&L calculated from tree state at settlement)
+        market.accumulatedFees += fee6;
+
         positionId = positionContract.mintPosition(msg.sender, marketId, lowerTick, upperTick, quantity);
         if (!market.settled) {
             market.openPositionCount += 1;
         }
+
+        emit TradeFeeCharged(msg.sender, marketId, positionId, true, cost6, fee6, _resolveFeePolicy(market));
     }
 
     function increasePosition(
@@ -135,8 +140,13 @@ contract TradeModule is SignalsCoreStorage {
 
         _applyFactorChunked(position.marketId, position.lowerTick, position.upperTick, qtyWad, market.liquidityParameter, true);
 
+        // Phase 6: Accumulate fees (P&L calculated from tree state at settlement)
+        market.accumulatedFees += fee6;
+
         uint128 newQuantity = position.quantity + quantity;
         positionContract.updateQuantity(positionId, newQuantity);
+
+        emit TradeFeeCharged(msg.sender, position.marketId, positionId, true, cost6, fee6, _resolveFeePolicy(market));
     }
 
     function decreasePosition(
@@ -410,6 +420,9 @@ contract TradeModule is SignalsCoreStorage {
 
         _applyFactorChunked(position.marketId, position.lowerTick, position.upperTick, qtyWad, market.liquidityParameter, false);
 
+        // Phase 6: Accumulate fees (P&L calculated from tree state at settlement)
+        market.accumulatedFees += fee6;
+
         _pushPayment(msg.sender, netProceeds);
         if (fee6 > 0) _pushPayment(_resolveFeeRecipient(), fee6);
 
@@ -422,6 +435,8 @@ contract TradeModule is SignalsCoreStorage {
         } else {
             positionContract.updateQuantity(positionId, newQuantity);
         }
+
+        emit TradeFeeCharged(msg.sender, position.marketId, positionId, false, baseProceeds, fee6, _resolveFeePolicy(market));
     }
 
     // --- Fee/payment helpers ---

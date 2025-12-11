@@ -49,6 +49,8 @@ describe("TradeModule slippage and bounds", () => {
       settlementValue: 0,
       liquidityParameter: WAD,
       feePolicy: ethers.ZeroAddress,
+      initialRootSum: 4n * WAD,
+      accumulatedFees: 0n,
     };
     await core.setMarket(1, settledMarket);
     

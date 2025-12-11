@@ -80,6 +80,8 @@ describe("OracleModule", () => {
       settlementValue: 0,
       liquidityParameter: ethers.parseEther("1"),
       feePolicy: ethers.ZeroAddress,
+      initialRootSum: 4n * ethers.parseEther("1"),
+      accumulatedFees: 0n,
     };
     await core.harnessSetMarket(1, market);
 
