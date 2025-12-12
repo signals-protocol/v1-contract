@@ -11,6 +11,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./storage/SignalsCoreStorage.sol";
 import "../interfaces/ISignalsCore.sol";
 import "../interfaces/ISignalsPosition.sol";
+import "../errors/CLMSRErrors.sol";
 
 /// @title SignalsCore
 /// @notice Upgradeable entry core that holds storage and delegates to modules
@@ -23,11 +24,19 @@ contract SignalsCore is
     PausableUpgradeable,
     ReentrancyGuardUpgradeable
 {
+    uint256 internal constant WAD = 1e18;
+
     address public tradeModule;
     address public lifecycleModule;
     address public riskModule;
     address public vaultModule;
     address public oracleModule;
+
+    // ============================================================
+    // Errors
+    // ============================================================
+    error ModuleNotSet();
+    error InvalidFeeSplitSum(uint256 phiLP, uint256 phiBS, uint256 phiTR);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -65,6 +74,39 @@ contract SignalsCore is
         riskModule = _riskModule;
         vaultModule = _vaultModule;
         oracleModule = _oracleModule;
+    }
+
+    // ============================================================
+    // Vault configuration (Phase 6)
+    // ============================================================
+
+    function setMinSeedAmount(uint256 amount) external onlyOwner whenNotPaused {
+        if (amount == 0) revert CE.ZeroLimit();
+        minSeedAmount = amount;
+    }
+
+    function setWithdrawalLagBatches(uint64 lag) external onlyOwner whenNotPaused {
+        withdrawalLagBatches = lag;
+    }
+
+    function setFeeWaterfallConfig(
+        int256 pdd,
+        uint256 rhoBS,
+        uint256 phiLP,
+        uint256 phiBS,
+        uint256 phiTR
+    ) external onlyOwner whenNotPaused {
+        if (phiLP + phiBS + phiTR != WAD) revert InvalidFeeSplitSum(phiLP, phiBS, phiTR);
+        feeWaterfallConfig.pdd = pdd;
+        feeWaterfallConfig.rhoBS = rhoBS;
+        feeWaterfallConfig.phiLP = phiLP;
+        feeWaterfallConfig.phiBS = phiBS;
+        feeWaterfallConfig.phiTR = phiTR;
+    }
+
+    function setCapitalStack(uint256 backstopNav, uint256 treasuryNav) external onlyOwner whenNotPaused {
+        capitalStack.backstopNav = backstopNav;
+        capitalStack.treasuryNav = treasuryNav;
     }
 
     // --- External stubs: delegate to modules ---
@@ -307,11 +349,87 @@ contract SignalsCore is
         if (ret.length > 0) emitted = abi.decode(ret, (uint32));
     }
 
+    // ============================================================
+    // Vault entrypoints (delegate to LPVaultModule)
+    // ============================================================
+
+    function seedVault(uint256 seedAmount) external whenNotPaused nonReentrant {
+        _delegate(vaultModule, abi.encodeWithSignature("seedVault(uint256)", seedAmount));
+    }
+
+    function requestDeposit(uint256 amount) external whenNotPaused nonReentrant returns (uint64 requestId) {
+        bytes memory ret = _delegate(vaultModule, abi.encodeWithSignature("requestDeposit(uint256)", amount));
+        if (ret.length > 0) requestId = abi.decode(ret, (uint64));
+    }
+
+    function requestWithdraw(uint256 shares) external whenNotPaused nonReentrant returns (uint64 requestId) {
+        bytes memory ret = _delegate(vaultModule, abi.encodeWithSignature("requestWithdraw(uint256)", shares));
+        if (ret.length > 0) requestId = abi.decode(ret, (uint64));
+    }
+
+    function cancelDeposit(uint64 requestId) external whenNotPaused nonReentrant {
+        _delegate(vaultModule, abi.encodeWithSignature("cancelDeposit(uint64)", requestId));
+    }
+
+    function cancelWithdraw(uint64 requestId) external whenNotPaused nonReentrant {
+        _delegate(vaultModule, abi.encodeWithSignature("cancelWithdraw(uint64)", requestId));
+    }
+
+    function processDailyBatch(uint64 batchId) external whenNotPaused nonReentrant {
+        _delegate(vaultModule, abi.encodeWithSignature("processDailyBatch(uint64)", batchId));
+    }
+
+    function claimDeposit(uint64 requestId) external whenNotPaused nonReentrant returns (uint256 shares) {
+        bytes memory ret = _delegate(vaultModule, abi.encodeWithSignature("claimDeposit(uint64)", requestId));
+        if (ret.length > 0) shares = abi.decode(ret, (uint256));
+    }
+
+    function claimWithdraw(uint64 requestId) external whenNotPaused nonReentrant returns (uint256 assets) {
+        bytes memory ret = _delegate(vaultModule, abi.encodeWithSignature("claimWithdraw(uint64)", requestId));
+        if (ret.length > 0) assets = abi.decode(ret, (uint256));
+    }
+
+    // Views (delegate to LPVaultModule)
+
+    function getVaultNav() external returns (uint256 nav) {
+        bytes memory ret = _delegateView(vaultModule, abi.encodeWithSignature("getVaultNav()"));
+        if (ret.length > 0) nav = abi.decode(ret, (uint256));
+    }
+
+    function getVaultShares() external returns (uint256 shares) {
+        bytes memory ret = _delegateView(vaultModule, abi.encodeWithSignature("getVaultShares()"));
+        if (ret.length > 0) shares = abi.decode(ret, (uint256));
+    }
+
+    function getVaultPrice() external returns (uint256 price) {
+        bytes memory ret = _delegateView(vaultModule, abi.encodeWithSignature("getVaultPrice()"));
+        if (ret.length > 0) price = abi.decode(ret, (uint256));
+    }
+
+    function getDailyPnl(uint64 batchId)
+        external
+        returns (
+            int256 lt,
+            uint256 ftot,
+            uint256 ft,
+            uint256 gt,
+            uint256 npre,
+            uint256 pe,
+            bool processed
+        )
+    {
+        bytes memory ret = _delegateView(vaultModule, abi.encodeWithSignature("getDailyPnl(uint64)", batchId));
+        if (ret.length > 0) (lt, ftot, ft, gt, npre, pe, processed) = abi.decode(
+            ret,
+            (int256, uint256, uint256, uint256, uint256, uint256, bool)
+        );
+    }
+
     // --- Internal: delegate helpers ---
 
     /// @dev Delegate to a module preserving context, bubble up revert
     function _delegate(address module, bytes memory callData) internal returns (bytes memory) {
-        require(module != address(0), "ModuleNotSet");
+        if (module == address(0)) revert ModuleNotSet();
         (bool success, bytes memory ret) = module.delegatecall(callData);
         if (!success) {
             assembly ("memory-safe") {
@@ -323,7 +441,7 @@ contract SignalsCore is
 
     /// @dev Delegate to a module for view paths via staticcall; bubble up reverts.
     function _delegateView(address module, bytes memory callData) internal returns (bytes memory) {
-        require(module != address(0), "ModuleNotSet");
+        if (module == address(0)) revert ModuleNotSet();
         (bool success, bytes memory ret) = module.delegatecall(callData);
         if (!success) {
             assembly ("memory-safe") {
