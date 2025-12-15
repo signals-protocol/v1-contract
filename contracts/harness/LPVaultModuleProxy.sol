@@ -184,6 +184,27 @@ contract LPVaultModuleProxy is SignalsCoreStorage {
         return (agg.totalDepositAssets, agg.totalWithdrawShares, agg.batchPrice, agg.processed);
     }
 
+    function getDailyPnl(uint64 batchId) external view returns (
+        int256 Lt,
+        uint256 Ftot,
+        uint256 Ft,
+        uint256 Gt,
+        uint256 Npre,
+        uint256 Pe,
+        bool processed
+    ) {
+        DailyPnlSnapshot storage snap = _dailyPnl[batchId];
+        return (
+            snap.Lt,
+            snap.Ftot,
+            snap.Ft,
+            snap.Gt,
+            snap.Npre,
+            snap.Pe,
+            snap.processed
+        );
+    }
+
     function getCurrentBatchId() external view returns (uint64) {
         return currentBatchId;
     }

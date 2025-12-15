@@ -99,12 +99,17 @@ contract TradeModule is SignalsCoreStorage {
         if (totalCost > maxCost) revert CE.CostExceedsMaximum(totalCost, maxCost);
 
         _pullPayment(msg.sender, totalCost);
-        if (fee6 > 0) _pushPayment(_resolveFeeRecipient(), fee6);
+        // Phase 6: Fee NOT transferred out during trade (WP v1.0 Sec 4)
+        // Fee stays in core for Waterfall distribution after settlement
 
         _applyFactorChunked(marketId, lowerTick, upperTick, qtyWad, market.liquidityParameter, true);
 
-        // Phase 6: Accumulate fees (P&L calculated from tree state at settlement)
-        market.accumulatedFees += fee6;
+        // Phase 6: Accumulate fees in WAD (internal accounting uses WAD)
+        // Conversion: USDC6 → WAD at entry point
+        market.accumulatedFees += fee6.toWad();
+
+        // Phase 6: Update exposure ledger
+        _addExposure(marketId, lowerTick, upperTick, quantity);
 
         positionId = positionContract.mintPosition(msg.sender, marketId, lowerTick, upperTick, quantity);
         if (!market.settled) {
@@ -136,12 +141,15 @@ contract TradeModule is SignalsCoreStorage {
         if (totalCost > maxCost) revert CE.CostExceedsMaximum(totalCost, maxCost);
 
         _pullPayment(msg.sender, totalCost);
-        if (fee6 > 0) _pushPayment(_resolveFeeRecipient(), fee6);
+        // Phase 6: Fee NOT transferred out during trade (WP v1.0 Sec 4)
 
         _applyFactorChunked(position.marketId, position.lowerTick, position.upperTick, qtyWad, market.liquidityParameter, true);
 
-        // Phase 6: Accumulate fees (P&L calculated from tree state at settlement)
-        market.accumulatedFees += fee6;
+        // Phase 6: Accumulate fees in WAD (internal accounting uses WAD)
+        market.accumulatedFees += fee6.toWad();
+
+        // Phase 6: Update exposure ledger
+        _addExposure(position.marketId, position.lowerTick, position.upperTick, quantity);
 
         uint128 newQuantity = position.quantity + quantity;
         positionContract.updateQuantity(positionId, newQuantity);
@@ -173,6 +181,15 @@ contract TradeModule is SignalsCoreStorage {
         emit PositionClosed(positionId, msg.sender, baseProceeds);
     }
 
+    /**
+     * @notice Claim payout for a winning position after market settlement
+     * @dev Phase 6 (WP v1.0):
+     *      - Claim is gated by time: settlementFinalizedAt + Δ_claim
+     *      - Payout draws from escrow (reserved at settlement finalization)
+     *      - NAV is unaffected because payout was already reserved in escrow at settlement
+     *      - Batch processing status is IRRELEVANT to claim eligibility
+     * @param positionId Position ID to claim payout for
+     */
     function claimPayout(uint256 positionId) external onlyDelegated {
         ISignalsPosition.Position memory position = positionContract.getPosition(positionId);
         if (positionContract.ownerOf(positionId) != msg.sender) revert CE.UnauthorizedCaller(msg.sender);
@@ -180,13 +197,30 @@ contract TradeModule is SignalsCoreStorage {
         ISignalsCore.Market storage market = markets[position.marketId];
         if (!market.settled) revert CE.MarketNotSettled(position.marketId);
 
-        uint64 claimOpen = (market.settlementTimestamp == 0 ? market.endTimestamp : market.settlementTimestamp) +
-            settlementFinalizeDeadline;
+        // Phase 6: Time-based gating (WP v1.0 Oracle & Settlement State Machine)
+        // Claim is allowed after settlementFinalizedAt + Δ_claim
+        // Note: Batch processing status is NOT a gating condition
+        uint64 claimOpen = market.settlementFinalizedAt + settlementFinalizeDeadline;
         if (block.timestamp < claimOpen) revert CE.SettlementTooEarly(claimOpen, uint64(block.timestamp));
 
         uint256 payout = _calculateClaimAmount(position, market);
 
+        // Phase 6: Draw from payout escrow (reserved at settlement finalization)
+        // This ensures NAV is unaffected because:
+        // 1. At settlement, Payout_t was calculated from exposure ledger
+        // 2. Payout_t was reserved in escrow (deducted from core balance)
+        // 3. L_t = ΔC_t - Payout_t was recorded (payout already reflected in P&L)
+        // 4. Claim draws only from escrow, not affecting current NAV/price
         if (payout > 0) {
+            uint256 remaining = _payoutReserveRemaining[position.marketId];
+            if (payout > remaining) {
+                payout = remaining; // Cap at remaining reserve (safety)
+            }
+            _payoutReserveRemaining[position.marketId] = remaining - payout;
+            
+            // Track total payout reserve for free balance calculation
+            _totalPayoutReserve6 -= payout;
+            
             _pushPayment(msg.sender, payout);
         }
 
@@ -420,11 +454,15 @@ contract TradeModule is SignalsCoreStorage {
 
         _applyFactorChunked(position.marketId, position.lowerTick, position.upperTick, qtyWad, market.liquidityParameter, false);
 
-        // Phase 6: Accumulate fees (P&L calculated from tree state at settlement)
-        market.accumulatedFees += fee6;
+        // Phase 6: Accumulate fees in WAD (internal accounting uses WAD)
+        market.accumulatedFees += fee6.toWad();
+
+        // Phase 6: Update exposure ledger (remove exposure for sold quantity)
+        _removeExposure(position.marketId, position.lowerTick, position.upperTick, quantity);
 
         _pushPayment(msg.sender, netProceeds);
-        if (fee6 > 0) _pushPayment(_resolveFeeRecipient(), fee6);
+        // Phase 6: Fee NOT transferred out during trade (WP v1.0 Sec 4)
+        // Fee stays in core for Waterfall distribution
 
         newQuantity = position.quantity - quantity;
         if (newQuantity == 0) {
@@ -525,5 +563,63 @@ contract TradeModule is SignalsCoreStorage {
         if (!winning) return 0;
         // v0 semantics: payout is position quantity (6-dec) when in-range
         return uint256(position.quantity);
+    }
+
+    // --- Exposure Ledger helpers (Phase 6) ---
+
+    /**
+     * @notice Update exposure ledger for position open/increase
+     * @dev Adds quantity to each tick in [lowerTick, upperTick) range
+     *      WP v2 Sec 3.5: Opening/increasing (R, x) adds x to Q_{t,b} for all b ∈ R
+     * @param marketId Market identifier
+     * @param lowerTick Lower bound (inclusive)
+     * @param upperTick Upper bound (exclusive)
+     * @param quantity Position quantity (token units)
+     */
+    function _addExposure(
+        uint256 marketId,
+        int256 lowerTick,
+        int256 upperTick,
+        uint128 quantity
+    ) internal {
+        // Exposure is tracked per tick in [lowerTick, upperTick) range
+        // This represents payout owed if settlement tick falls in this range
+        for (int256 tick = lowerTick; tick < upperTick; tick++) {
+            _exposureLedger[marketId][tick] += quantity;
+        }
+    }
+
+    /**
+     * @notice Update exposure ledger for position decrease/close
+     * @dev Subtracts quantity from each tick in [lowerTick, upperTick) range
+     *      WP v2 Sec 3.5: Decreasing/closing subtracts over the same range
+     * @param marketId Market identifier
+     * @param lowerTick Lower bound (inclusive)
+     * @param upperTick Upper bound (exclusive)
+     * @param quantity Position quantity (token units)
+     */
+    function _removeExposure(
+        uint256 marketId,
+        int256 lowerTick,
+        int256 upperTick,
+        uint128 quantity
+    ) internal {
+        for (int256 tick = lowerTick; tick < upperTick; tick++) {
+            // Safe: exposure should always be >= quantity being removed
+            _exposureLedger[marketId][tick] -= quantity;
+        }
+    }
+
+    /**
+     * @notice Get payout exposure at a specific tick
+     * @param marketId Market identifier
+     * @param tick Settlement tick
+     * @return exposure Total payout owed if settlement tick is `tick`
+     */
+    function _getExposureAtTick(
+        uint256 marketId,
+        int256 tick
+    ) internal view returns (uint256 exposure) {
+        return _exposureLedger[marketId][tick];
     }
 }

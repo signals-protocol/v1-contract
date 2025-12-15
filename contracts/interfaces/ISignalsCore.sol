@@ -32,7 +32,7 @@ interface ISignalsCore {
         // Phase 6: Fee tracking and P&L calculation
         // Initial root sum for P&L calculation: C_start = α * ln(Z_start)
         uint256 initialRootSum;
-        // Gross fees collected from trades (CLMSR external)
+        // Gross fees collected from trades, stored in WAD units (Phase 6)
         uint256 accumulatedFees;
     }
 

@@ -91,4 +91,27 @@ contract MockSignalsPosition is ISignalsPosition {
     function getUserPositionsInMarket(address, uint256) external pure returns (uint256[] memory tokenIds) {
         tokenIds = new uint256[](0);
     }
+
+    /// @notice Test helper to mint a position with a specific ID
+    /// @dev Used in TDD tests to control position IDs
+    function mockMint(
+        address trader,
+        uint256 positionId,
+        uint256 marketId,
+        int256 lowerTick,
+        int256 upperTick,
+        uint128 quantity
+    ) external {
+        _positions[positionId] = MinimalPosition({
+            marketId: marketId,
+            lowerTick: lowerTick,
+            upperTick: upperTick,
+            quantity: quantity,
+            owner: trader
+        });
+        if (positionId >= _nextId) {
+            _nextId = positionId + 1;
+        }
+        emit PositionMinted(positionId, trader);
+    }
 }

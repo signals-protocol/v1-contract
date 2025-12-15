@@ -161,10 +161,18 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         state.candidateValue = 0;
         state.candidatePriceTimestamp = 0;
 
-        // Phase 6: Record P&L to daily batch
-        // Batch ID is based on settlementTimestamp for deterministic day assignment
+        // Phase 6: Calculate P&L with payout reserve
         uint64 batchId = _getBatchIdForMarket(marketId);
-        (int256 lt, uint256 ftot) = _calculateMarketPnl(marketId);
+        (int256 lt, uint256 ftot, uint256 payoutReserve) = _calculateMarketPnlWithPayout(marketId, settlementTick);
+        
+        // Store payout reserve in escrow (WP v2 Sec 3.3)
+        // N_t already reflects payout reserve as deducted liability
+        _payoutReserve[marketId] = payoutReserve;
+        _payoutReserveRemaining[marketId] = payoutReserve;
+        
+        // Track total payout reserve for free balance calculation
+        _totalPayoutReserve6 += payoutReserve;
+        
         _recordPnlToBatch(batchId, lt, ftot);
         
         emit MarketPnlRecorded(marketId, batchId, lt, ftot);
@@ -233,9 +241,17 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         market.snapshotChunkCursor = 0;
         market.snapshotChunksDone = (market.openPositionCount == 0);
 
-        // Record P&L to daily batch
+        // Phase 6: Calculate P&L with payout reserve (same as primary settlement)
         uint64 batchId = _getBatchIdForMarket(marketId);
-        (int256 lt, uint256 ftot) = _calculateMarketPnl(marketId);
+        (int256 lt, uint256 ftot, uint256 payoutReserve) = _calculateMarketPnlWithPayout(marketId, settlementTick);
+        
+        // Store payout reserve in escrow (WP v2 Sec 3.3)
+        _payoutReserve[marketId] = payoutReserve;
+        _payoutReserveRemaining[marketId] = payoutReserve;
+        
+        // Track total payout reserve for free balance calculation
+        _totalPayoutReserve6 += payoutReserve;
+        
         _recordPnlToBatch(batchId, lt, ftot);
 
         emit MarketPnlRecorded(marketId, batchId, lt, ftot);
@@ -416,6 +432,61 @@ contract MarketLifecycleModule is SignalsCoreStorage {
             // Maker loss: Z decreased (cost decreased, traders net sold)
             lt = -int256(alpha.wMul(lnZStart - lnZEnd));
         }
+        
+        ftot = market.accumulatedFees;
+    }
+
+    /**
+     * @notice Calculate market P&L with payout reserve deduction
+     * @dev Phase 6: Whitepaper v2 formula:
+     *      Payout_t := Q_{t,τ_t} (settlement tick exposure)
+     *      L_t := ΔC_t - Payout_t (maker P&L net of payout)
+     * 
+     * @param marketId Market identifier
+     * @param settlementTick The settlement tick τ_t
+     * @return lt Maker P&L after payout deduction
+     * @return ftot Gross fees collected during trading
+     * @return payoutReserve Payout reserve Q_{τ_t} to be escrowed
+     */
+    function _calculateMarketPnlWithPayout(
+        uint256 marketId,
+        int256 settlementTick
+    ) internal view returns (int256 lt, uint256 ftot, uint256 payoutReserve) {
+        ISignalsCore.Market storage market = markets[marketId];
+        LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
+        
+        uint256 alpha = market.liquidityParameter;
+        uint256 zStart = market.initialRootSum;
+        
+        // Get current root sum (Z_end)
+        uint256 zEnd = tree.getRangeSum(0, market.numBins - 1);
+        
+        // ΔC_t = α * (ln(Z_end) - ln(Z_start))
+        // Per whitepaper Sec 3.5: ΔC_t = C(q_end) - C(q_start)
+        int256 deltaC;
+        uint256 lnZEnd = zEnd.wLn();
+        uint256 lnZStart = zStart.wLn();
+        
+        if (lnZEnd >= lnZStart) {
+            // Maker profit: Z increased (cost increased, traders net bought)
+            deltaC = int256(alpha.wMul(lnZEnd - lnZStart));
+        } else {
+            // Maker loss: Z decreased (cost decreased, traders net sold)
+            deltaC = -int256(alpha.wMul(lnZStart - lnZEnd));
+        }
+        
+        // Payout_t := Q_{t,τ_t} (WP v2 Eq. 3.11)
+        // Get payout exposure at settlement tick (token units, convert to WAD)
+        payoutReserve = _exposureLedger[marketId][settlementTick];
+        
+        // L_t := ΔC_t - Payout_t (WP v2 Eq. 3.12)
+        // Note: payoutReserve is in token units (6 decimals), need to convert to WAD for consistency
+        // However, positions use quantity in token units, so payout is also in token units
+        // For internal accounting consistency, we keep payoutReserve in token units
+        // but L_t must be in WAD, so convert payoutReserve to WAD for subtraction
+        uint256 payoutReserveWad = payoutReserve * 1e12; // USDC6 to WAD (1e6 → 1e18)
+        
+        lt = deltaC - int256(payoutReserveWad);
         
         ftot = market.accumulatedFees;
     }
