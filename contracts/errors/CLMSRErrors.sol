@@ -19,6 +19,7 @@ interface CLMSRErrors {
     error MarketAlreadyFailed(uint256 marketId);
     error SettlementWindowNotExpired(uint64 deadline, uint64 currentTime);
     error BatchAlreadyProcessed(uint64 batchId);
+    error BatchNotProcessed(uint64 batchId);
 
     /* Trade params */
     error InvalidTick(int256 tick, int256 minTick, int256 maxTick);
@@ -51,6 +52,9 @@ interface CLMSRErrors {
     /* Position */
     error PositionNotFound(uint256 positionId);
     error InsufficientBalance(address account, uint256 required, uint256 available);
+    
+    /* Free balance / Escrow safety (Phase 6) */
+    error InsufficientFreeBalance(uint256 requested, uint256 available);
 
     /* Trade / math */
     error MathMulOverflow();
@@ -95,6 +99,7 @@ library CE {
     error MarketAlreadyFailed(uint256 marketId);
     error SettlementWindowNotExpired(uint64 deadline, uint64 currentTime);
     error BatchAlreadyProcessed(uint64 batchId);
+    error BatchNotProcessed(uint64 batchId);
 
     /* Trade params */
     error InvalidTick(int256 tick, int256 minTick, int256 maxTick);
@@ -127,6 +132,9 @@ library CE {
     /* Position */
     error PositionNotFound(uint256 positionId);
     error InsufficientBalance(address account, uint256 required, uint256 available);
+    
+    /* Free balance / Escrow safety (Phase 6) */
+    error InsufficientFreeBalance(uint256 requested, uint256 available);
 
     /* Trade / math */
     error MathMulOverflow();

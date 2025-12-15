@@ -6,6 +6,7 @@ import "../vault/lib/VaultAccountingLib.sol";
 import "../lib/FeeWaterfallLib.sol";
 import "../lib/FixedPointMathU.sol";
 import "../errors/ModuleErrors.sol";
+import "../errors/CLMSRErrors.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
@@ -105,7 +106,8 @@ contract LPVaultModule is SignalsCoreStorage {
     /**
      * @notice Seed the vault with initial capital
      * @dev Must be called before any batch processing
-     * @param seedAmount Initial deposit amount
+     *      seedAmount is in payment token decimals (6), converted to WAD (18) for internal accounting
+     * @param seedAmount Initial deposit amount (6 decimals)
      */
     function seedVault(uint256 seedAmount) external onlyDelegated {
         if (lpVault.isSeeded) revert VaultAlreadySeeded();
@@ -115,8 +117,12 @@ contract LPVaultModule is SignalsCoreStorage {
 
         paymentToken.safeTransferFrom(msg.sender, address(this), seedAmount);
 
-        lpVault.nav = seedAmount;
-        lpVault.shares = seedAmount;
+        // Phase 6: Convert 6-decimal token amount to WAD (18) for internal accounting
+        // WP v2 Sec 6.2: "Internal state uses WAD; conversion at entry/exit"
+        uint256 seedAmountWad = seedAmount.toWad();
+        
+        lpVault.nav = seedAmountWad;
+        lpVault.shares = seedAmountWad;
         lpVault.price = VaultAccountingLib.WAD;
         lpVault.pricePeak = VaultAccountingLib.WAD;
         lpVault.lastBatchTimestamp = uint64(block.timestamp);
@@ -130,7 +136,8 @@ contract LPVaultModule is SignalsCoreStorage {
         uint64 todayBatchId = uint64(block.timestamp / uint256(BATCH_SECONDS));
         currentBatchId = todayBatchId == 0 ? 0 : todayBatchId - 1;
 
-        emit VaultSeeded(msg.sender, seedAmount, seedAmount);
+        // Event emits WAD amounts for consistency with internal accounting
+        emit VaultSeeded(msg.sender, seedAmountWad, seedAmountWad);
     }
 
     // ============================================================
@@ -139,15 +146,23 @@ contract LPVaultModule is SignalsCoreStorage {
 
     /**
      * @notice Request a deposit into the vault
-     * @dev Tokens transferred immediately, shares calculated at batch price
-     * @param amount Amount to deposit (in payment token decimals)
+     * @dev Tokens transferred immediately (6 decimals), internally stored as WAD
+     *      WP v2 Sec 6.2: "Convert at entry, internal ops in WAD"
+     * @param amount Amount to deposit (in payment token decimals, 6)
      * @return requestId Unique request identifier
      */
     function requestDeposit(uint256 amount) external onlyDelegated returns (uint64 requestId) {
         if (amount == 0) revert ZeroAmount();
         if (!lpVault.isSeeded) revert VaultNotSeeded();
 
+        // Transfer 6-decimal tokens
         paymentToken.safeTransferFrom(msg.sender, address(this), amount);
+
+        // Phase 6: Track pending deposits for free balance calculation
+        _totalPendingDeposits6 += amount;
+
+        // Phase 6: Convert to WAD for internal accounting
+        uint256 amountWad = amount.toWad();
 
         requestId = nextDepositRequestId++;
         uint64 eligibleBatchId = currentBatchId + 1;
@@ -155,14 +170,14 @@ contract LPVaultModule is SignalsCoreStorage {
         _depositRequests[requestId] = DepositRequest({
             id: requestId,
             owner: msg.sender,
-            amount: amount,
+            amount: amountWad,  // Stored as WAD
             eligibleBatchId: eligibleBatchId,
             status: RequestStatus.Pending
         });
 
-        _pendingBatchTotals[eligibleBatchId].deposits += amount;
+        _pendingBatchTotals[eligibleBatchId].deposits += amountWad;
 
-        emit DepositRequestCreated(requestId, msg.sender, amount, eligibleBatchId);
+        emit DepositRequestCreated(requestId, msg.sender, amountWad, eligibleBatchId);
     }
 
     /**
@@ -193,6 +208,7 @@ contract LPVaultModule is SignalsCoreStorage {
 
     /**
      * @notice Cancel a pending deposit request
+     * @dev Converts WAD amount back to 6 decimals for refund
      * @param requestId Request identifier to cancel
      */
     function cancelDeposit(uint64 requestId) external onlyDelegated {
@@ -202,15 +218,21 @@ contract LPVaultModule is SignalsCoreStorage {
         if (req.owner != msg.sender) revert RequestNotOwned(requestId, req.owner, msg.sender);
         if (req.status != RequestStatus.Pending) revert RequestNotPending(requestId);
 
-        uint256 amount = req.amount;
+        uint256 amountWad = req.amount;  // Stored as WAD
         uint64 eligibleBatchId = req.eligibleBatchId;
 
         req.status = RequestStatus.Cancelled;
-        _pendingBatchTotals[eligibleBatchId].deposits -= amount;
+        _pendingBatchTotals[eligibleBatchId].deposits -= amountWad;
 
-        paymentToken.safeTransfer(msg.sender, amount);
+        // Phase 6: Convert WAD to 6 decimals for token transfer
+        // WP v2 Appendix C: deposit residual refunded to depositor (no dust retained)
+        uint256 amount6 = amountWad.fromWad();
+        
+        // Phase 6: Decrease pending deposits (funds are reserved, no free balance check needed)
+        _totalPendingDeposits6 -= amount6;
+        paymentToken.safeTransfer(msg.sender, amount6);
 
-        emit DepositRequestCancelled(requestId, msg.sender, amount);
+        emit DepositRequestCancelled(requestId, msg.sender, amountWad);
     }
 
     /**
@@ -322,6 +344,8 @@ contract LPVaultModule is SignalsCoreStorage {
                 batchPrice,
                 totalDeposits
             );
+            // Phase 6: Release pending deposits (now converted to shares)
+            _totalPendingDeposits6 -= totalDeposits.fromWad();
         }
 
         // Step 6: Compute final state
@@ -387,6 +411,28 @@ contract LPVaultModule is SignalsCoreStorage {
         return capitalStack.backstopNav;
     }
 
+    /**
+     * @notice Calculate free balance available for withdrawals and payouts
+     * @dev Free balance = token balance - pending deposits - payout reserves
+     *      Ensures pending deposits are isolated and cannot be used for other payments
+     * @return Free balance in 6-decimal token units
+     */
+    function _getFreeBalance() internal view returns (uint256) {
+        uint256 balance = paymentToken.balanceOf(address(this));
+        uint256 reserved = _totalPendingDeposits6 + _totalPayoutReserve6;
+        return balance > reserved ? balance - reserved : 0;
+    }
+
+    /**
+     * @notice Revert if requested amount exceeds free balance
+     * @dev Phase 6 escrow safety: prevents use of pending deposits for payouts
+     * @param amount6 Amount requested in 6-decimal token units
+     */
+    function _requireFreeBalance(uint256 amount6) internal view {
+        uint256 free = _getFreeBalance();
+        if (amount6 > free) revert CE.InsufficientFreeBalance(amount6, free);
+    }
+
     // ============================================================
     // Claims
     // ============================================================
@@ -417,9 +463,10 @@ contract LPVaultModule is SignalsCoreStorage {
 
     /**
      * @notice Claim assets from a processed withdrawal request
-     * @dev Calculates assets = shares * batchPrice
+     * @dev Calculates assets = shares * batchPrice (WAD), converts to 6 decimals for transfer
+     *      WP v2 Appendix C: withdrawal dust stays in vault (LP benefit) - truncate
      * @param requestId Withdraw request identifier
-     * @return assets Amount of assets claimable
+     * @return assets Amount of assets claimable (in WAD for return value)
      */
     function claimWithdraw(uint64 requestId) external onlyDelegated returns (uint256 assets) {
         WithdrawRequest storage req = _withdrawRequests[requestId];
@@ -431,10 +478,17 @@ contract LPVaultModule is SignalsCoreStorage {
         BatchAggregation storage agg = _batchAggregations[req.eligibleBatchId];
         if (!agg.processed) revert BatchNotProcessed(req.eligibleBatchId);
 
-        assets = req.shares.wMul(agg.batchPrice);
+        assets = req.shares.wMul(agg.batchPrice);  // WAD result
         req.status = RequestStatus.Claimed;
 
-        paymentToken.safeTransfer(msg.sender, assets);
+        // Phase 6: Convert WAD to 6 decimals for token transfer
+        // WP v2 Appendix C: "Withdrawal dust stays in vault (LP benefit)" - truncate (round down)
+        uint256 assets6 = assets.fromWad();
+        
+        // Phase 6: Verify free balance (escrow safety)
+        // Withdrawals must not use pending deposits or payout reserves
+        _requireFreeBalance(assets6);
+        paymentToken.safeTransfer(msg.sender, assets6);
 
         emit WithdrawClaimed(requestId, msg.sender, req.shares, assets);
     }

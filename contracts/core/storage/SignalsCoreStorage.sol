@@ -223,6 +223,39 @@ abstract contract SignalsCoreStorage {
     /// @dev Request made at batch N is eligible at batch N + withdrawalLagBatches
     uint64 public withdrawalLagBatches;
 
+    // ============================================================
+    // Phase 6: Exposure Ledger & Payout Reserve
+    // ============================================================
+
+    /// @notice Market ID → (tick index → exposure amount in token units)
+    /// @dev Exposure Ledger Q_t: tracks payout liability per settlement tick
+    ///      Q_{t,b} = total payout owed if settlement tick τ_t = b
+    ///      Open/increase: adds quantity to [lowerTick, upperTick) range
+    ///      Decrease/close: subtracts quantity from [lowerTick, upperTick) range
+    mapping(uint256 => mapping(int256 => uint256)) internal _exposureLedger;
+
+    /// @notice Market ID → payout reserve (escrow) for settled markets
+    /// @dev Set at settleMarket time, equals Q_{τ_t} (exposure at settlement tick)
+    ///      Subsequent claims draw from this reserve without affecting NAV
+    mapping(uint256 => uint256) internal _payoutReserve;
+
+    /// @notice Market ID → remaining payout reserve (decremented on each claim)
+    mapping(uint256 => uint256) internal _payoutReserveRemaining;
+
+    // ============================================================
+    // Phase 6: Free Balance Accounting (Escrow Safety)
+    // ============================================================
+
+    /// @notice Total pending deposits in 6-decimal token units
+    /// @dev Incremented on requestDeposit, decremented on cancelDeposit or processDailyBatch
+    ///      Used for free balance calculation to ensure deposit funds are isolated
+    uint256 internal _totalPendingDeposits6;
+
+    /// @notice Total payout reserve in 6-decimal token units
+    /// @dev Sum of all _payoutReserveRemaining across all markets
+    ///      Incremented at settlement, decremented on claimPayout
+    uint256 internal _totalPayoutReserve6;
+
     // Reserve ample slots for future upgrades; do not change after first deployment.
-    uint256[20] internal __gap;
+    uint256[15] internal __gap;
 }
