@@ -109,6 +109,20 @@ contract SignalsCore is
         capitalStack.treasuryNav = treasuryNav;
     }
 
+    /// @notice Configure risk parameters for α Safety Bounds (Phase 7)
+    /// @param lambda λ: Safety parameter (WAD), e.g., 0.3e18 = 30% max drawdown
+    /// @param kDrawdown k: Drawdown sensitivity factor (WAD), typically 1.0e18
+    /// @param enforceAlpha Whether to enforce α limits on trades
+    function setRiskConfig(
+        uint256 lambda,
+        uint256 kDrawdown,
+        bool enforceAlpha
+    ) external onlyOwner whenNotPaused {
+        riskConfig.lambda = lambda;
+        riskConfig.kDrawdown = kDrawdown;
+        riskConfig.enforceAlpha = enforceAlpha;
+    }
+
     // --- External stubs: delegate to modules ---
 
     function openPosition(

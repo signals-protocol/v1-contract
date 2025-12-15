@@ -78,6 +78,9 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         uint32 expectedBins = uint32(uint256((maxTick - minTick) / tickSpacing));
         if (expectedBins != numBins) revert CE.InvalidMarketParameters(minTick, maxTick, tickSpacing);
         if (liquidityParameter == 0) revert CE.InvalidLiquidityParameter();
+        
+        // Phase 7: α Safety enforcement (WP v2 Sec 4.5)
+        _validateAlphaForMarket(liquidityParameter, numBins);
 
         marketId = ++nextMarketId;
         ISignalsCore.Market storage market = markets[marketId];
@@ -515,5 +518,66 @@ contract MarketLifecycleModule is SignalsCoreStorage {
     function recordBatchPnl(uint64 batchId, int256 lt, uint256 ftot) external onlyDelegated {
         _recordPnlToBatch(batchId, lt, ftot);
         emit MarketPnlRecorded(0, batchId, lt, ftot);
+    }
+
+    // ============================================================
+    // Phase 7: α Safety Enforcement
+    // ============================================================
+
+    /**
+     * @notice Validate α against safety limit for market creation
+     * @dev Per WP v2 Sec 4.5: α ≤ αlimit where αlimit depends on NAV and drawdown
+     * @param liquidityParameter Market α to validate
+     * @param numBins Number of outcome bins for the market
+     */
+    function _validateAlphaForMarket(uint256 liquidityParameter, uint32 numBins) internal view {
+        if (!riskConfig.enforceAlpha) return; // Skip if not enforced
+        if (lpVault.nav == 0) return; // Skip if vault not seeded
+        
+        // Calculate αbase = λ * E_t / ln(n)
+        uint256 lnN = _lnWad(numBins);
+        if (lnN == 0) return; // Edge case: n <= 1
+        
+        uint256 alphaBase = riskConfig.lambda.wMul(lpVault.nav).wDiv(lnN);
+        
+        // Calculate drawdown: DD = 1 - P / P^peak
+        uint256 drawdown = 0;
+        if (lpVault.pricePeak > 0 && lpVault.price < lpVault.pricePeak) {
+            drawdown = WAD - lpVault.price.wDiv(lpVault.pricePeak);
+        }
+        
+        // Calculate αlimit = max{0, αbase * (1 - k * DD)}
+        uint256 kDD = riskConfig.kDrawdown.wMul(drawdown);
+        uint256 alphaLimit = kDD >= WAD ? 0 : alphaBase.wMul(WAD - kDD);
+        
+        if (liquidityParameter > alphaLimit) {
+            revert CE.AlphaExceedsLimit(liquidityParameter, alphaLimit);
+        }
+    }
+
+    /**
+     * @notice Calculate natural log of n in WAD
+     * @dev Uses lookup table for common values
+     */
+    function _lnWad(uint256 n) internal pure returns (uint256) {
+        if (n <= 1) return 0;
+        if (n == 2) return 693147180559945309;   // ln(2)
+        if (n == 10) return 2302585092994045684;  // ln(10)
+        if (n == 100) return 4605170185988091368; // ln(100)
+        if (n == 1000) return 6907755278982137052; // ln(1000)
+        
+        // Approximation for other values
+        uint256 digits = 0;
+        uint256 temp = n;
+        while (temp >= 10) {
+            temp /= 10;
+            digits++;
+        }
+        
+        uint256 baseLn = digits * 2302585092994045684; // digits * ln(10)
+        if (temp > 1) {
+            baseLn += ((temp - 1) * 2302585092994045684) / 9;
+        }
+        return baseLn;
     }
 }

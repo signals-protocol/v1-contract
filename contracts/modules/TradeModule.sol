@@ -20,6 +20,8 @@ interface IOwnableLite {
 /// @notice Delegate-only trade module (skeleton)
 contract TradeModule is SignalsCoreStorage {
     address private immutable self;
+    
+    uint256 internal constant WAD = 1e18;
 
     // Events mirrored from v0 for parity
     event PositionOpened(
@@ -88,6 +90,10 @@ contract TradeModule is SignalsCoreStorage {
         if (quantity == 0) revert CE.InvalidQuantity(quantity);
         ISignalsCore.Market storage market = _loadAndValidateMarket(marketId);
         _validateTickRange(lowerTick, upperTick, market);
+        
+        // Phase 7: α Safety enforcement (WP v2 Sec 4.5)
+        // Opening new positions requires α ≤ αlimit
+        _validateAlpha(market);
 
         uint256 qtyWad = uint256(quantity).toWad();
         uint256 costWad = _calculateTradeCostInternal(marketId, lowerTick, upperTick, qtyWad);
@@ -130,6 +136,10 @@ contract TradeModule is SignalsCoreStorage {
 
         ISignalsCore.Market storage market = _loadAndValidateMarket(position.marketId);
         _validateTickRange(position.lowerTick, position.upperTick, market);
+        
+        // Phase 7: α Safety enforcement (WP v2 Sec 4.5)
+        // Increasing positions requires α ≤ αlimit
+        _validateAlpha(market);
 
         uint256 qtyWad = uint256(quantity).toWad();
         uint256 costWad = _calculateTradeCostInternal(position.marketId, position.lowerTick, position.upperTick, qtyWad);
@@ -548,7 +558,6 @@ contract TradeModule is SignalsCoreStorage {
         (uint32 loBin, uint32 hiBin) = _ticksToBins(market, lowerTick, upperTick);
         uint256 factor = SignalsClmsrMath._safeExp(qtyWad, alpha);
         if (!isBuy) {
-            uint256 WAD = 1e18;
             factor = WAD.wDivUp(factor);
         }
         marketTrees[marketId].applyRangeFactor(loBin, hiBin, factor);
@@ -563,6 +572,63 @@ contract TradeModule is SignalsCoreStorage {
         if (!winning) return 0;
         // v0 semantics: payout is position quantity (6-dec) when in-range
         return uint256(position.quantity);
+    }
+
+    // --- α Safety enforcement helpers (Phase 7) ---
+
+    /// @notice Validate market α against safety limit
+    /// @dev Per WP v2 Sec 4.5: αlimit,t = max{0, αbase,t * (1 - k * DD_t)}
+    ///      Only called for open/increase (close/decrease always allowed)
+    function _validateAlpha(ISignalsCore.Market storage market) internal view {
+        if (!riskConfig.enforceAlpha) return; // Skip if not enforced
+        if (lpVault.nav == 0) return; // Skip if vault not seeded
+        
+        uint256 alpha = market.liquidityParameter;
+        uint256 numBins = market.numBins;
+        
+        // Calculate αbase = λ * E_t / ln(n)
+        uint256 lnN = _lnWad(numBins);
+        if (lnN == 0) return; // Edge case: n <= 1
+        
+        uint256 alphaBase = riskConfig.lambda.wMul(lpVault.nav).wDiv(lnN);
+        
+        // Calculate drawdown: DD = 1 - P / P^peak
+        uint256 drawdown = 0;
+        if (lpVault.pricePeak > 0 && lpVault.price < lpVault.pricePeak) {
+            drawdown = WAD - lpVault.price.wDiv(lpVault.pricePeak);
+        }
+        
+        // Calculate αlimit = max{0, αbase * (1 - k * DD)}
+        uint256 kDD = riskConfig.kDrawdown.wMul(drawdown);
+        uint256 alphaLimit = kDD >= WAD ? 0 : alphaBase.wMul(WAD - kDD);
+        
+        if (alpha > alphaLimit) {
+            revert CE.AlphaExceedsLimit(alpha, alphaLimit);
+        }
+    }
+
+    /// @notice Calculate natural log of n in WAD
+    /// @dev Uses lookup table for common values
+    function _lnWad(uint256 n) internal pure returns (uint256) {
+        if (n <= 1) return 0;
+        if (n == 2) return 693147180559945309;   // ln(2)
+        if (n == 10) return 2302585092994045684;  // ln(10)
+        if (n == 100) return 4605170185988091368; // ln(100)
+        if (n == 1000) return 6907755278982137052; // ln(1000)
+        
+        // Approximation for other values
+        uint256 digits = 0;
+        uint256 temp = n;
+        while (temp >= 10) {
+            temp /= 10;
+            digits++;
+        }
+        
+        uint256 baseLn = digits * 2302585092994045684; // digits * ln(10)
+        if (temp > 1) {
+            baseLn += ((temp - 1) * 2302585092994045684) / 9;
+        }
+        return baseLn;
     }
 
     // --- Exposure Ledger helpers (Phase 6) ---

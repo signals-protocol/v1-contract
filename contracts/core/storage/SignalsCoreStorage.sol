@@ -256,6 +256,20 @@ abstract contract SignalsCoreStorage {
     ///      Incremented at settlement, decremented on claimPayout
     uint256 internal _totalPayoutReserve6;
 
+    // ============================================================
+    // Phase 7: Risk Configuration
+    // ============================================================
+
+    /// @notice Risk parameters for α Safety Bounds (WP v2 Sec 4.3-4.5)
+    struct RiskConfig {
+        uint256 lambda;      // λ: Safety parameter (WAD), e.g., 0.3e18 = 30% max drawdown
+        uint256 kDrawdown;   // k: Drawdown sensitivity factor (WAD), typically 1.0e18
+        bool enforceAlpha;   // Whether to enforce α limits on trades
+    }
+
+    /// @notice Risk configuration (Phase 7)
+    RiskConfig internal riskConfig;
+
     // Reserve ample slots for future upgrades; do not change after first deployment.
-    uint256[15] internal __gap;
+    uint256[14] internal __gap;
 }

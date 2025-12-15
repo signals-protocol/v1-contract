@@ -55,6 +55,9 @@ interface CLMSRErrors {
     
     /* Free balance / Escrow safety (Phase 6) */
     error InsufficientFreeBalance(uint256 requested, uint256 available);
+    
+    /* Risk / α Safety (Phase 7) */
+    error AlphaExceedsLimit(uint256 marketAlpha, uint256 alphaLimit);
 
     /* Trade / math */
     error MathMulOverflow();
@@ -135,6 +138,9 @@ library CE {
     
     /* Free balance / Escrow safety (Phase 6) */
     error InsufficientFreeBalance(uint256 requested, uint256 available);
+    
+    /* Risk / α Safety (Phase 7) */
+    error AlphaExceedsLimit(uint256 marketAlpha, uint256 alphaLimit);
 
     /* Trade / math */
     error MathMulOverflow();
