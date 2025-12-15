@@ -1,25 +1,22 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { FeeWaterfallLibHarness } from "../../typechain-types";
-import {
-  calculateFeeWaterfall,
-  generateRandomParams,
-} from "../helpers/feeWaterfallReference";
+import { FeeWaterfallLibHarness } from "../../../typechain-types";
+import { calculateFeeWaterfall, generateRandomParams } from "../../helpers/feeWaterfallReference";
 
 describe("FeeWaterfallLib", () => {
   let harness: FeeWaterfallLibHarness;
 
   // Default test parameters
   const defaultParams = {
-    Nprev: ethers.parseEther("1000"), // 1000 NAV
-    Bprev: ethers.parseEther("200"), // 200 Backstop
-    Tprev: ethers.parseEther("50"), // 50 Treasury
-    deltaEt: ethers.parseEther("100"), // 100 available support
-    pdd: ethers.parseEther("-0.3"), // -30% drawdown floor
-    rhoBS: ethers.parseEther("0.2"), // 20% backstop coverage
-    phiLP: ethers.parseEther("0.7"), // 70% to LP
-    phiBS: ethers.parseEther("0.2"), // 20% to Backstop
-    phiTR: ethers.parseEther("0.1"), // 10% to Treasury
+    Nprev: ethers.parseEther("1000"),    // 1000 NAV
+    Bprev: ethers.parseEther("200"),      // 200 Backstop
+    Tprev: ethers.parseEther("50"),       // 50 Treasury
+    deltaEt: ethers.parseEther("100"),    // 100 available support
+    pdd: ethers.parseEther("-0.3"),       // -30% drawdown floor
+    rhoBS: ethers.parseEther("0.2"),      // 20% backstop coverage
+    phiLP: ethers.parseEther("0.7"),      // 70% to LP
+    phiBS: ethers.parseEther("0.2"),      // 20% to Backstop
+    phiTR: ethers.parseEther("0.1"),      // 10% to Treasury
   };
 
   beforeEach(async () => {
@@ -111,8 +108,8 @@ describe("FeeWaterfallLib", () => {
     it("case 3: grant needed and available", async () => {
       // Large loss that requires grant
       const result = await calculate({
-        Lt: ethers.parseEther("-500"), // 500 loss
-        Ftot: ethers.parseEther("50"), // only 50 fees
+        Lt: ethers.parseEther("-500"),    // 500 loss
+        Ftot: ethers.parseEther("50"),     // only 50 fees
         Nprev: ethers.parseEther("1000"),
         Bprev: ethers.parseEther("200"),
         deltaEt: ethers.parseEther("100"),
@@ -129,10 +126,10 @@ describe("FeeWaterfallLib", () => {
     it("case 4: reverts when grant exceeds backstop", async () => {
       await expect(
         calculate({
-          Lt: ethers.parseEther("-900"), // Massive loss
-          Ftot: ethers.parseEther("10"), // Tiny fees
+          Lt: ethers.parseEther("-900"),    // Massive loss
+          Ftot: ethers.parseEther("10"),     // Tiny fees
           Nprev: ethers.parseEther("1000"),
-          Bprev: ethers.parseEther("50"), // Small backstop
+          Bprev: ethers.parseEther("50"),    // Small backstop
           deltaEt: ethers.parseEther("500"), // High limit but Bprev is low
         })
       ).to.be.revertedWithCustomError(harness, "InsufficientBackstopForGrant");
@@ -350,16 +347,12 @@ describe("FeeWaterfallLib", () => {
       // Before: Nprev + Bprev + Tprev
       // After:  Npre + Bnext + Tnext
       // Delta should equal: Lt + Ftot (P&L + fees absorbed)
-      const before =
-        defaultParams.Nprev + defaultParams.Bprev + defaultParams.Tprev;
+      const before = defaultParams.Nprev + defaultParams.Bprev + defaultParams.Tprev;
       const after = result.Npre + result.Bnext + result.Tnext;
       const delta = after > before ? after - before : before - after;
       const expectedDelta = Lt + Ftot;
       // Allow 1 wei tolerance for rounding
-      expect(delta).to.be.closeTo(
-        expectedDelta > 0n ? expectedDelta : -expectedDelta,
-        1n
-      );
+      expect(delta).to.be.closeTo(expectedDelta > 0n ? expectedDelta : -expectedDelta, 1n);
     });
 
     it("INV: Floss + Fpool == Ftot", async () => {
@@ -395,10 +388,9 @@ describe("FeeWaterfallLib", () => {
       const result = await calculate({ Lt, Ftot });
 
       // Npre - Nprev = Lt + Ft + Gt
-      const navDelta =
-        result.Npre > defaultParams.Nprev
-          ? result.Npre - defaultParams.Nprev
-          : -(defaultParams.Nprev - result.Npre);
+      const navDelta = result.Npre > defaultParams.Nprev 
+        ? result.Npre - defaultParams.Nprev 
+        : -(defaultParams.Nprev - result.Npre);
       const expected = Lt + BigInt(result.Ft) + BigInt(result.Gt);
       expect(navDelta).to.equal(expected);
     });
@@ -421,17 +413,8 @@ describe("FeeWaterfallLib", () => {
       };
 
       const onchain = await harness.calculate(
-        params.Lt,
-        params.Ftot,
-        params.Nprev,
-        params.Bprev,
-        params.Tprev,
-        params.deltaEt,
-        params.pdd,
-        params.rhoBS,
-        params.phiLP,
-        params.phiBS,
-        params.phiTR
+        params.Lt, params.Ftot, params.Nprev, params.Bprev, params.Tprev,
+        params.deltaEt, params.pdd, params.rhoBS, params.phiLP, params.phiBS, params.phiTR
       );
 
       const offchain = calculateFeeWaterfall(params);
@@ -460,17 +443,8 @@ describe("FeeWaterfallLib", () => {
       };
 
       const onchain = await harness.calculate(
-        params.Lt,
-        params.Ftot,
-        params.Nprev,
-        params.Bprev,
-        params.Tprev,
-        params.deltaEt,
-        params.pdd,
-        params.rhoBS,
-        params.phiLP,
-        params.phiBS,
-        params.phiTR
+        params.Lt, params.Ftot, params.Nprev, params.Bprev, params.Tprev,
+        params.deltaEt, params.pdd, params.rhoBS, params.phiLP, params.phiBS, params.phiTR
       );
 
       const offchain = calculateFeeWaterfall(params);
@@ -486,15 +460,14 @@ describe("FeeWaterfallLib", () => {
     it("matches JS reference for 10 random cases", async () => {
       for (let i = 0; i < 10; i++) {
         const params = generateRandomParams();
-
+        
         // Skip cases that would revert
         if (params.Lt < 0n) {
           const Lneg = -params.Lt;
           const Floss = Lneg < params.Ftot ? Lneg : params.Ftot;
           const Nraw = params.Nprev + params.Lt + Floss;
           const wadPlusPdd = 10n ** 18n + params.pdd;
-          const Nfloor =
-            wadPlusPdd > 0n ? (params.Nprev * wadPlusPdd) / 10n ** 18n : 0n;
+          const Nfloor = wadPlusPdd > 0n ? (params.Nprev * wadPlusPdd) / (10n ** 18n) : 0n;
           const grantNeed = Nfloor > Nraw ? Nfloor - Nraw : 0n;
           const Gt = grantNeed < params.deltaEt ? grantNeed : params.deltaEt;
           if (Gt > params.Bprev) continue; // Skip - would revert
@@ -502,17 +475,8 @@ describe("FeeWaterfallLib", () => {
 
         try {
           const onchain = await harness.calculate(
-            params.Lt,
-            params.Ftot,
-            params.Nprev,
-            params.Bprev,
-            params.Tprev,
-            params.deltaEt,
-            params.pdd,
-            params.rhoBS,
-            params.phiLP,
-            params.phiBS,
-            params.phiTR
+            params.Lt, params.Ftot, params.Nprev, params.Bprev, params.Tprev,
+            params.deltaEt, params.pdd, params.rhoBS, params.phiLP, params.phiBS, params.phiTR
           );
 
           const offchain = calculateFeeWaterfall(params);
@@ -546,8 +510,7 @@ describe("FeeWaterfallLib", () => {
           if (Nraw < 0n) continue; // Would cause CatastrophicLoss
 
           const wadPlusPdd = WAD + params.pdd;
-          const Nfloor =
-            wadPlusPdd > 0n ? (params.Nprev * wadPlusPdd) / WAD : 0n;
+          const Nfloor = wadPlusPdd > 0n ? (params.Nprev * wadPlusPdd) / WAD : 0n;
           const grantNeed = Nfloor > Nraw ? Nfloor - Nraw : 0n;
           const Gt = grantNeed < params.deltaEt ? grantNeed : params.deltaEt;
           if (Gt > params.Bprev) continue; // Would revert
@@ -555,17 +518,8 @@ describe("FeeWaterfallLib", () => {
 
         try {
           const onchain = await harness.calculate(
-            params.Lt,
-            params.Ftot,
-            params.Nprev,
-            params.Bprev,
-            params.Tprev,
-            params.deltaEt,
-            params.pdd,
-            params.rhoBS,
-            params.phiLP,
-            params.phiBS,
-            params.phiTR
+            params.Lt, params.Ftot, params.Nprev, params.Bprev, params.Tprev,
+            params.deltaEt, params.pdd, params.rhoBS, params.phiLP, params.phiBS, params.phiTR
           );
 
           // INV-FW1: Floss + Fpool == Ftot
@@ -596,3 +550,4 @@ describe("FeeWaterfallLib", () => {
     }).timeout(60000);
   });
 });
+
