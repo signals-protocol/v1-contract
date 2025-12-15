@@ -37,10 +37,11 @@ describe("VaultWithMarkets E2E", () => {
 
     // Use 18-decimal token for vault accounting tests (WAD-aligned)
     const MockERC20Factory = await ethers.getContractFactory("MockERC20");
+    // Phase 6: Use 6-decimal token as per WP v2 Sec 6.2 (paymentToken = USDC6)
     const payment = (await MockERC20Factory.deploy(
       "MockVaultToken",
       "MVT",
-      18
+      6
     )) as MockERC20;
 
     const position = (await (

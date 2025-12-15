@@ -4,6 +4,12 @@ import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { LPVaultModuleProxy, MockERC20 } from "../../../typechain-types";
 import { WAD } from "../../helpers/constants";
 
+// Phase 6: Helper for 6-decimal token amounts
+// paymentToken is USDC6 (6 decimals), internal accounting uses WAD (18 decimals)
+function usdc(amount: string | number): bigint {
+  return ethers.parseUnits(String(amount), 6);
+}
+
 /**
  * VaultBatchFlow Integration Tests
  *
@@ -16,10 +22,11 @@ describe("VaultBatchFlow Integration", () => {
     const [owner, userA, userB, userC] = await ethers.getSigners();
 
     const MockERC20 = await ethers.getContractFactory("MockERC20");
+    // Phase 6: Use 6-decimal token as per WP v2 Sec 6.2 (paymentToken = USDC6)
     const payment = (await MockERC20.deploy(
       "MockVaultToken",
       "MVT",
-      18
+      6
     )) as MockERC20;
 
     const moduleFactory = await ethers.getContractFactory("LPVaultModule");
@@ -31,11 +38,12 @@ describe("VaultBatchFlow Integration", () => {
     )) as LPVaultModuleProxy;
 
     await proxy.setPaymentToken(payment.target);
-    await proxy.setMinSeedAmount(ethers.parseEther("100"));
+    // minSeedAmount is in token units (6 decimals)
+    await proxy.setMinSeedAmount(usdc("100"));
     await proxy.setWithdrawLag(0);
     await proxy.setWithdrawalLagBatches(0); // Immediate withdrawals for testing
 
-    // Configure FeeWaterfall for batch processing
+    // Configure FeeWaterfall for batch processing (WAD ratios, not affected by token decimals)
     await proxy.setFeeWaterfallConfig(
       ethers.parseEther("-0.2"), // pdd = -20%
       0n, // rhoBS
@@ -44,7 +52,8 @@ describe("VaultBatchFlow Integration", () => {
       ethers.parseEther("0.1") // phiTR = 10%
     );
 
-    const fundAmount = ethers.parseEther("100000");
+    // Fund with 6-decimal token amounts
+    const fundAmount = usdc("100000");
     await payment.mint(userA.address, fundAmount);
     await payment.mint(userB.address, fundAmount);
     await payment.mint(userC.address, fundAmount);
@@ -58,7 +67,8 @@ describe("VaultBatchFlow Integration", () => {
   async function deploySeededVaultFixture() {
     const fixture = await deployVaultFixture();
     const { proxy, userA } = fixture;
-    await proxy.connect(userA).seedVault(ethers.parseEther("1000"));
+    // Seed with 6-decimal token amount (converts to 1000 WAD internally)
+    await proxy.connect(userA).seedVault(usdc("1000"));
     const currentBatchId = await proxy.getCurrentBatchId();
     const firstBatchId = currentBatchId + 1n;
     return { ...fixture, currentBatchId, firstBatchId };
@@ -82,12 +92,14 @@ describe("VaultBatchFlow Integration", () => {
     it("seeds vault with initial capital", async () => {
       const { proxy, userA } = await loadFixture(deployVaultFixture);
 
-      const seedAmount = ethers.parseEther("1000");
-      await proxy.connect(userA).seedVault(seedAmount);
+      // Seed with 6-decimal amount, internal state stored as WAD
+      const seedAmount6 = usdc("1000");
+      const seedAmountWad = ethers.parseEther("1000"); // Expected internal WAD value
+      await proxy.connect(userA).seedVault(seedAmount6);
 
       expect(await proxy.isVaultSeeded()).to.be.true;
-      expect(await proxy.getVaultNav()).to.equal(seedAmount);
-      expect(await proxy.getVaultShares()).to.equal(seedAmount);
+      expect(await proxy.getVaultNav()).to.equal(seedAmountWad);
+      expect(await proxy.getVaultShares()).to.equal(seedAmountWad);
       expect(await proxy.getVaultPrice()).to.equal(WAD);
       expect(await proxy.getVaultPricePeak()).to.equal(WAD);
     });
@@ -96,7 +108,7 @@ describe("VaultBatchFlow Integration", () => {
       const { proxy, userA, module } = await loadFixture(deployVaultFixture);
 
       await expect(
-        proxy.connect(userA).seedVault(ethers.parseEther("50"))
+        proxy.connect(userA).seedVault(usdc("50"))
       ).to.be.revertedWithCustomError(module, "InsufficientSeedAmount");
     });
 
@@ -106,7 +118,7 @@ describe("VaultBatchFlow Integration", () => {
       );
 
       await expect(
-        proxy.connect(userA).seedVault(ethers.parseEther("1000"))
+        proxy.connect(userA).seedVault(usdc("1000"))
       ).to.be.revertedWithCustomError(module, "VaultAlreadySeeded");
     });
   });
@@ -116,7 +128,9 @@ describe("VaultBatchFlow Integration", () => {
   // ============================================================
   describe("processDailyBatch", () => {
     it("computes preBatchNav from P&L inputs", async () => {
-      const { proxy, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       // Initial: N=1000, S=1000
       // P&L: L=-50, F=30 → Π varies by waterfall
@@ -133,19 +147,28 @@ describe("VaultBatchFlow Integration", () => {
     });
 
     it("calculates batch price from preBatchNav and shares", async () => {
-      const { proxy, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       // N_pre ≈ 990, S = 1000 → P_e ≈ 0.99
-      await processBatchWithPnl(proxy, firstBatchId, ethers.parseEther("-10"), 0n);
+      await processBatchWithPnl(
+        proxy,
+        firstBatchId,
+        ethers.parseEther("-10"),
+        0n
+      );
 
       const price = await proxy.getVaultPrice();
       expect(price).to.be.lt(WAD);
     });
 
     it("updates NAV and shares correctly after deposit", async () => {
-      const { proxy, userB, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, userB, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
-      await proxy.connect(userB).requestDeposit(ethers.parseEther("100"));
+      await proxy.connect(userB).requestDeposit(usdc("100"));
       await processBatchWithPnl(proxy, firstBatchId, 0n, 0n);
 
       // Claim deposit
@@ -156,10 +179,17 @@ describe("VaultBatchFlow Integration", () => {
     });
 
     it("updates price and peak after batch", async () => {
-      const { proxy, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       // Positive P&L increases price
-      await processBatchWithPnl(proxy, firstBatchId, ethers.parseEther("100"), 0n);
+      await processBatchWithPnl(
+        proxy,
+        firstBatchId,
+        ethers.parseEther("100"),
+        0n
+      );
 
       const price = await proxy.getVaultPrice();
       const peak = await proxy.getVaultPricePeak();
@@ -168,7 +198,9 @@ describe("VaultBatchFlow Integration", () => {
     });
 
     it("emits DailyBatchProcessed event", async () => {
-      const { proxy, module, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, module, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       const moduleAtProxy = module.attach(proxy.target);
 
@@ -185,34 +217,57 @@ describe("VaultBatchFlow Integration", () => {
   // ============================================================
   describe("P&L scenarios", () => {
     it("handles positive P&L (L_t > 0, maker profit)", async () => {
-      const { proxy, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       // Positive P&L = maker profit (traders lost)
-      await processBatchWithPnl(proxy, firstBatchId, ethers.parseEther("100"), 0n);
+      await processBatchWithPnl(
+        proxy,
+        firstBatchId,
+        ethers.parseEther("100"),
+        0n
+      );
 
       expect(await proxy.getVaultNav()).to.be.gt(ethers.parseEther("1000"));
     });
 
     it("handles negative P&L (L_t < 0, maker loss)", async () => {
-      const { proxy, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
-      await processBatchWithPnl(proxy, firstBatchId, ethers.parseEther("-200"), 0n);
+      await processBatchWithPnl(
+        proxy,
+        firstBatchId,
+        ethers.parseEther("-200"),
+        0n
+      );
 
       expect(await proxy.getVaultNav()).to.be.lt(ethers.parseEther("1000"));
     });
 
     it("handles fee income (F_t > 0)", async () => {
-      const { proxy, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       // Fees get split per waterfall, LP portion increases NAV
-      await processBatchWithPnl(proxy, firstBatchId, 0n, ethers.parseEther("50"));
+      await processBatchWithPnl(
+        proxy,
+        firstBatchId,
+        0n,
+        ethers.parseEther("50")
+      );
 
       // LP gets 80% of fees
       expect(await proxy.getVaultNav()).to.be.gte(ethers.parseEther("1000"));
     });
 
     it("handles combined P&L components", async () => {
-      const { proxy, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       // L=-50, F=30 → waterfall applies
       await processBatchWithPnl(
@@ -232,12 +287,19 @@ describe("VaultBatchFlow Integration", () => {
   // ============================================================
   describe("Deposit flow", () => {
     it("mints shares at batch price", async () => {
-      const { proxy, userB, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, userB, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
-      await proxy.connect(userB).requestDeposit(ethers.parseEther("100"));
+      await proxy.connect(userB).requestDeposit(usdc("100"));
 
       // Process batch with P&L that changes price
-      await processBatchWithPnl(proxy, firstBatchId, ethers.parseEther("100"), 0n);
+      await processBatchWithPnl(
+        proxy,
+        firstBatchId,
+        ethers.parseEther("100"),
+        0n
+      );
 
       // Claim and verify shares
       await proxy.connect(userB).claimDeposit(0n);
@@ -248,9 +310,11 @@ describe("VaultBatchFlow Integration", () => {
     });
 
     it("preserves price within tolerance after deposit", async () => {
-      const { proxy, userB, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, userB, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
-      await proxy.connect(userB).requestDeposit(ethers.parseEther("500"));
+      await proxy.connect(userB).requestDeposit(usdc("500"));
       await processBatchWithPnl(proxy, firstBatchId, 0n, 0n);
       await proxy.connect(userB).claimDeposit(0n);
 
@@ -262,7 +326,9 @@ describe("VaultBatchFlow Integration", () => {
 
   describe("Withdraw flow", () => {
     it("burns shares at batch price", async () => {
-      const { proxy, userA, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, userA, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       await proxy.connect(userA).requestWithdraw(ethers.parseEther("100"));
       await processBatchWithPnl(proxy, firstBatchId, 0n, 0n);
@@ -273,7 +339,9 @@ describe("VaultBatchFlow Integration", () => {
     });
 
     it("preserves price within tolerance after withdraw", async () => {
-      const { proxy, userA, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, userA, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       await proxy.connect(userA).requestWithdraw(ethers.parseEther("200"));
       await processBatchWithPnl(proxy, firstBatchId, 0n, 0n);
@@ -290,7 +358,9 @@ describe("VaultBatchFlow Integration", () => {
   // ============================================================
   describe("Multi-day sequences", () => {
     it("processes consecutive batches correctly", async () => {
-      const { proxy, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
       const day1 = firstBatchId;
       const day2 = day1 + 1n;
       const day3 = day1 + 2n;
@@ -310,7 +380,9 @@ describe("VaultBatchFlow Integration", () => {
     });
 
     it("peak tracks highest price across days", async () => {
-      const { proxy, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
       const day1 = firstBatchId;
       const day2 = day1 + 1n;
       const day3 = day1 + 2n;
@@ -336,7 +408,9 @@ describe("VaultBatchFlow Integration", () => {
   // ============================================================
   describe("Edge cases", () => {
     it("handles batch with no P&L and no queue", async () => {
-      const { proxy, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       const navBefore = await proxy.getVaultNav();
       await processBatchWithPnl(proxy, firstBatchId, 0n, 0n);
@@ -346,9 +420,16 @@ describe("VaultBatchFlow Integration", () => {
     });
 
     it("handles empty batch (no deposits, no withdrawals)", async () => {
-      const { proxy, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
-      await processBatchWithPnl(proxy, firstBatchId, ethers.parseEther("50"), 0n);
+      await processBatchWithPnl(
+        proxy,
+        firstBatchId,
+        ethers.parseEther("50"),
+        0n
+      );
 
       // Should process without error
       expect(await proxy.getVaultNav()).to.be.gt(ethers.parseEther("1000"));
@@ -364,9 +445,9 @@ describe("VaultBatchFlow Integration", () => {
         deploySeededVaultFixture
       );
 
-      await proxy.connect(userA).requestDeposit(ethers.parseEther("100"));
-      await proxy.connect(userB).requestDeposit(ethers.parseEther("200"));
-      await proxy.connect(userC).requestDeposit(ethers.parseEther("300"));
+      await proxy.connect(userA).requestDeposit(usdc("100"));
+      await proxy.connect(userB).requestDeposit(usdc("200"));
+      await proxy.connect(userC).requestDeposit(usdc("300"));
 
       await processBatchWithPnl(proxy, firstBatchId, 0n, 0n);
 
@@ -387,8 +468,8 @@ describe("VaultBatchFlow Integration", () => {
       // userA withdraws (has shares from seed)
       await proxy.connect(userA).requestWithdraw(ethers.parseEther("200"));
       // userB and userC deposit
-      await proxy.connect(userB).requestDeposit(ethers.parseEther("150"));
-      await proxy.connect(userC).requestDeposit(ethers.parseEther("100"));
+      await proxy.connect(userB).requestDeposit(usdc("150"));
+      await proxy.connect(userC).requestDeposit(usdc("100"));
 
       await processBatchWithPnl(proxy, firstBatchId, 0n, 0n);
 
@@ -411,13 +492,14 @@ describe("VaultBatchFlow Integration", () => {
         deploySeededVaultFixture
       );
 
-      await proxy.connect(userB).requestDeposit(ethers.parseEther("100"));
+      await proxy.connect(userB).requestDeposit(usdc("100"));
 
       const balanceBefore = await payment.balanceOf(userB.address);
       await proxy.connect(userB).cancelDeposit(0n);
       const balanceAfter = await payment.balanceOf(userB.address);
 
-      expect(balanceAfter - balanceBefore).to.equal(ethers.parseEther("100"));
+      // Token transfer is in 6 decimals
+      expect(balanceAfter - balanceBefore).to.equal(usdc("100"));
     });
 
     it("prevents cancel after claim", async () => {
@@ -425,7 +507,7 @@ describe("VaultBatchFlow Integration", () => {
         deploySeededVaultFixture
       );
 
-      await proxy.connect(userB).requestDeposit(ethers.parseEther("100"));
+      await proxy.connect(userB).requestDeposit(usdc("100"));
       await processBatchWithPnl(proxy, firstBatchId, 0n, 0n);
       await proxy.connect(userB).claimDeposit(0n);
 
@@ -441,33 +523,37 @@ describe("VaultBatchFlow Integration", () => {
   // ============================================================
   describe("Batch sequence enforcement", () => {
     it("rejects out-of-sequence batch", async () => {
-      const { proxy, module, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, module, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       // Try to process far-future batch when expecting firstBatchId
       const badBatchId = firstBatchId + 4n;
       await proxy.recordDailyPnl(badBatchId, 0n, 0n);
-      await expect(proxy.processDailyBatch(badBatchId)).to.be.revertedWithCustomError(
-        module,
-        "BatchNotReady"
-      );
+      await expect(
+        proxy.processDailyBatch(badBatchId)
+      ).to.be.revertedWithCustomError(module, "BatchNotReady");
     });
 
     it("prevents duplicate batch processing", async () => {
-      const { proxy, module, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, module, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       await processBatchWithPnl(proxy, firstBatchId, 0n, 0n);
 
       // Try to process same batch again
       // This fails with BatchNotReady because currentBatchId is now firstBatchId,
       // and we're trying to process firstBatchId again (expects firstBatchId + 1)
-      await expect(proxy.processDailyBatch(firstBatchId)).to.be.revertedWithCustomError(
-        module,
-        "BatchNotReady"
-      );
+      await expect(
+        proxy.processDailyBatch(firstBatchId)
+      ).to.be.revertedWithCustomError(module, "BatchNotReady");
     });
 
     it("allows sequential batches", async () => {
-      const { proxy, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
       const day1 = firstBatchId;
       const day2 = day1 + 1n;
       const day3 = day1 + 2n;
@@ -485,17 +571,31 @@ describe("VaultBatchFlow Integration", () => {
   // ============================================================
   describe("Invariant assertions", () => {
     it("NAV >= 0 after any batch", async () => {
-      const { proxy, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
-      await processBatchWithPnl(proxy, firstBatchId, ethers.parseEther("-500"), 0n);
+      await processBatchWithPnl(
+        proxy,
+        firstBatchId,
+        ethers.parseEther("-500"),
+        0n
+      );
 
       expect(await proxy.getVaultNav()).to.be.gte(0n);
     });
 
     it("shares >= 0 after any batch", async () => {
-      const { proxy, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
-      await processBatchWithPnl(proxy, firstBatchId, ethers.parseEther("100"), 0n);
+      await processBatchWithPnl(
+        proxy,
+        firstBatchId,
+        ethers.parseEther("100"),
+        0n
+      );
 
       expect(await proxy.getVaultShares()).to.be.gte(0n);
     });
@@ -510,7 +610,9 @@ describe("VaultBatchFlow Integration", () => {
     });
 
     it("peak >= price always", async () => {
-      const { proxy, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
       const day1 = firstBatchId;
       const day2 = day1 + 1n;
 
@@ -523,7 +625,9 @@ describe("VaultBatchFlow Integration", () => {
     });
 
     it("0 <= drawdown <= 100%", async () => {
-      const { proxy, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
       const day1 = firstBatchId;
       const day2 = day1 + 1n;
 
@@ -548,11 +652,13 @@ describe("VaultBatchFlow Integration", () => {
         deploySeededVaultFixture
       );
 
-      await proxy.connect(userA).requestDeposit(ethers.parseEther("100"));
-      await proxy.connect(userB).requestDeposit(ethers.parseEther("200"));
-      await proxy.connect(userC).requestDeposit(ethers.parseEther("300"));
+      await proxy.connect(userA).requestDeposit(usdc("100"));
+      await proxy.connect(userB).requestDeposit(usdc("200"));
+      await proxy.connect(userC).requestDeposit(usdc("300"));
 
-      const [deposits, withdraws] = await proxy.getPendingBatchTotals(firstBatchId);
+      const [deposits, withdraws] = await proxy.getPendingBatchTotals(
+        firstBatchId
+      );
       expect(deposits).to.equal(ethers.parseEther("600"));
       expect(withdraws).to.equal(0n);
     });
@@ -562,8 +668,8 @@ describe("VaultBatchFlow Integration", () => {
         deploySeededVaultFixture
       );
 
-      await proxy.connect(userA).requestDeposit(ethers.parseEther("100"));
-      await proxy.connect(userB).requestDeposit(ethers.parseEther("200"));
+      await proxy.connect(userA).requestDeposit(usdc("100"));
+      await proxy.connect(userB).requestDeposit(usdc("200"));
 
       // Cancel userA
       await proxy.connect(userA).cancelDeposit(0n);

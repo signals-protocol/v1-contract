@@ -4,6 +4,11 @@ import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { LPVaultModuleProxy, MockERC20 } from "../../../typechain-types";
 import { WAD } from "../../helpers/constants";
 
+// Phase 6: Helper for 6-decimal token amounts
+function usdc(amount: string | number): bigint {
+  return ethers.parseUnits(String(amount), 6);
+}
+
 /**
  * LP Vault Integration Scenarios
  *
@@ -13,13 +18,15 @@ import { WAD } from "../../helpers/constants";
 
 describe("LP Vault Scenarios", () => {
   async function deployVaultFixture() {
-    const [owner, userA, userB, userC, userD, userE] = await ethers.getSigners();
+    const [owner, userA, userB, userC, userD, userE] =
+      await ethers.getSigners();
 
     const MockERC20 = await ethers.getContractFactory("MockERC20");
+    // Phase 6: Use 6-decimal token as per WP v2 Sec 6.2 (paymentToken = USDC6)
     const payment = (await MockERC20.deploy(
       "MockVaultToken",
       "MVT",
-      18
+      6
     )) as MockERC20;
 
     const moduleFactory = await ethers.getContractFactory("LPVaultModule");
@@ -31,11 +38,11 @@ describe("LP Vault Scenarios", () => {
     )) as LPVaultModuleProxy;
 
     await proxy.setPaymentToken(payment.target);
-    await proxy.setMinSeedAmount(ethers.parseEther("100"));
+    await proxy.setMinSeedAmount(usdc("100"));
     await proxy.setWithdrawLag(0);
     await proxy.setWithdrawalLagBatches(1); // D_lag = 1 batch
 
-    // FeeWaterfall config
+    // FeeWaterfall config (WAD ratios, not token amounts)
     // pdd = -20%, phiLP = 80%, phiBS = 10%, phiTR = 10%
     await proxy.setFeeWaterfallConfig(
       ethers.parseEther("-0.2"),
@@ -45,13 +52,14 @@ describe("LP Vault Scenarios", () => {
       ethers.parseEther("0.1")
     );
 
-    // Initialize capital stack with backstop
+    // Initialize capital stack with backstop (WAD amounts)
     await proxy.setCapitalStack(
-      ethers.parseEther("500"), // backstopNav
-      ethers.parseEther("100") // treasuryNav
+      ethers.parseEther("500"), // backstopNav (WAD)
+      ethers.parseEther("100") // treasuryNav (WAD)
     );
 
-    const fundAmount = ethers.parseEther("1000000");
+    // Fund with 6-decimal token amounts
+    const fundAmount = usdc("1000000");
     for (const user of [userA, userB, userC, userD, userE]) {
       await payment.mint(user.address, fundAmount);
       await payment.connect(user).approve(proxy.target, ethers.MaxUint256);
@@ -63,7 +71,7 @@ describe("LP Vault Scenarios", () => {
   async function deploySeededVaultFixture() {
     const fixture = await deployVaultFixture();
     const { proxy, userA } = fixture;
-    await proxy.connect(userA).seedVault(ethers.parseEther("10000"));
+    await proxy.connect(userA).seedVault(usdc("10000"));
     const currentBatchId = await proxy.getCurrentBatchId();
     const firstBatchId = currentBatchId + 1n;
     return { ...fixture, currentBatchId, firstBatchId };
@@ -78,7 +86,7 @@ describe("LP Vault Scenarios", () => {
      * Day 1: Users deposit, market has profit (L=+500), batch processed
      * Day 2: More deposits, market has loss (L=-200), fees (F=100)
      * Day 3: Users withdraw, market profit (L=+300)
-     * 
+     *
      * Verify: NAV tracks correctly, claims work, price reflects P&L
      */
     it("completes full 3-day deposit/trade/withdraw cycle", async () => {
@@ -96,7 +104,7 @@ describe("LP Vault Scenarios", () => {
 
       // === Day 1 ===
       // userB deposits 1000
-      await proxy.connect(userB).requestDeposit(ethers.parseEther("1000"));
+      await proxy.connect(userB).requestDeposit(usdc("1000"));
 
       // Market profit: L = +500
       await proxy.recordDailyPnl(day1, ethers.parseEther("500"), 0n);
@@ -118,10 +126,14 @@ describe("LP Vault Scenarios", () => {
 
       // === Day 2 ===
       // userC deposits 2000
-      await proxy.connect(userC).requestDeposit(ethers.parseEther("2000"));
+      await proxy.connect(userC).requestDeposit(usdc("2000"));
 
       // Market loss: L = -200, Fees: F = 100
-      await proxy.recordDailyPnl(day2, ethers.parseEther("-200"), ethers.parseEther("100"));
+      await proxy.recordDailyPnl(
+        day2,
+        ethers.parseEther("-200"),
+        ethers.parseEther("100")
+      );
       await proxy.processDailyBatch(day2);
 
       await proxy.connect(userC).claimDeposit(1n);
@@ -164,14 +176,16 @@ describe("LP Vault Scenarios", () => {
   describe("Scenario: Drawdown + Grant", () => {
     /**
      * Vault experiences significant loss that triggers backstop grant.
-     * 
+     *
      * Day 1: Large market loss (L = -2000) on 10000 NAV = -20%
      * Drawdown floor (pdd) = -20%, so backstop grant should activate
-     * 
+     *
      * Verify: Grant limits loss, backstop NAV decreases, LP protected
      */
     it("backstop grant protects LP from excessive drawdown", async () => {
-      const { proxy, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
       const day1 = firstBatchId;
 
       const navBefore = await proxy.getVaultNav();
@@ -206,7 +220,9 @@ describe("LP Vault Scenarios", () => {
     });
 
     it("recovery from drawdown updates peak correctly", async () => {
-      const { proxy, firstBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, firstBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
       const day1 = firstBatchId;
       const day2 = day1 + 1n;
 
@@ -238,21 +254,20 @@ describe("LP Vault Scenarios", () => {
     /**
      * Multiple users simultaneously request large withdrawals.
      * System should handle gracefully without DoS.
-     * 
+     *
      * Setup: 5 users each have deposited
      * Event: All 5 request withdrawal simultaneously
      * Verify: All requests processed, NAV/shares remain consistent
      */
     it("handles simultaneous large withdrawal requests", async () => {
-      const { proxy, userA, userB, userC, userD, userE, firstBatchId } = await loadFixture(
-        deploySeededVaultFixture
-      );
+      const { proxy, userA, userB, userC, userD, userE, firstBatchId } =
+        await loadFixture(deploySeededVaultFixture);
       const day1 = firstBatchId;
       const day2 = day1 + 1n;
       const day3 = day1 + 2n;
 
       // Setup: Multiple users deposit
-      const depositAmount = ethers.parseEther("2000");
+      const depositAmount = usdc("2000");
       await proxy.connect(userB).requestDeposit(depositAmount);
       await proxy.connect(userC).requestDeposit(depositAmount);
       await proxy.connect(userD).requestDeposit(depositAmount);
@@ -317,7 +332,7 @@ describe("LP Vault Scenarios", () => {
       const day3 = day1 + 2n;
 
       // Users deposit
-      await proxy.connect(userB).requestDeposit(ethers.parseEther("5000"));
+      await proxy.connect(userB).requestDeposit(usdc("5000"));
       await proxy.recordDailyPnl(day1, 0n, 0n);
       await proxy.processDailyBatch(day1);
       await proxy.connect(userB).claimDeposit(0n);
@@ -350,9 +365,9 @@ describe("LP Vault Scenarios", () => {
       const day3 = day1 + 2n;
 
       // Setup deposits
-      await proxy.connect(userB).requestDeposit(ethers.parseEther("3000"));
-      await proxy.connect(userC).requestDeposit(ethers.parseEther("3000"));
-      await proxy.connect(userD).requestDeposit(ethers.parseEther("3000"));
+      await proxy.connect(userB).requestDeposit(usdc("3000"));
+      await proxy.connect(userC).requestDeposit(usdc("3000"));
+      await proxy.connect(userD).requestDeposit(usdc("3000"));
 
       await proxy.recordDailyPnl(day1, ethers.parseEther("500"), 0n); // Some profit
       await proxy.processDailyBatch(day1);
@@ -389,4 +404,3 @@ describe("LP Vault Scenarios", () => {
     });
   });
 });
-

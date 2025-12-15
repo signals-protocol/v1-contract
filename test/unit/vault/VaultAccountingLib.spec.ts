@@ -584,6 +584,56 @@ describe("VaultAccountingLib", () => {
       // Allow slightly more tolerance due to multiple operations
       expect(diff).to.be.lte(5n);
     });
+
+    it("withdraw-first-then-deposit preserves N/S ratio at batch price", async () => {
+      // Whitepaper requirement: process order (withdraw → deposit) must preserve P^e
+      const initialNav = ethers.parseEther("1000");
+      const initialShares = ethers.parseEther("1000");
+      const batchPrice = ethers.parseEther("1.2"); // P^e = 1.2
+
+      const withdrawShares = ethers.parseEther("100");
+      const depositAmount = ethers.parseEther("120");
+
+      // Order 1: withdraw first, then deposit
+      let [nav1, shares1, ] = await lib.applyWithdraw(
+        initialNav,
+        initialShares,
+        batchPrice,
+        withdrawShares
+      );
+      let [finalNav1, finalShares1, , ] = await lib.applyDeposit(
+        nav1,
+        shares1,
+        batchPrice,
+        depositAmount
+      );
+
+      // Order 2: deposit first, then withdraw
+      let [nav2, shares2, , ] = await lib.applyDeposit(
+        initialNav,
+        initialShares,
+        batchPrice,
+        depositAmount
+      );
+      let [finalNav2, finalShares2, ] = await lib.applyWithdraw(
+        nav2,
+        shares2,
+        batchPrice,
+        withdrawShares
+      );
+
+      // Both orders should result in same final state (N/S = P^e preserved)
+      const price1 = finalShares1 > 0n ? (finalNav1 * WAD) / finalShares1 : WAD;
+      const price2 = finalShares2 > 0n ? (finalNav2 * WAD) / finalShares2 : WAD;
+
+      // Allow 2 wei tolerance for rounding
+      const priceDiff = price1 > price2 ? price1 - price2 : price2 - price1;
+      expect(priceDiff).to.be.lte(2n);
+
+      // Final states should be identical (same amounts processed)
+      expect(finalNav1).to.equal(finalNav2);
+      expect(finalShares1).to.equal(finalShares2);
+    });
   });
 
   describe("Property: arithmetic bounds", () => {
