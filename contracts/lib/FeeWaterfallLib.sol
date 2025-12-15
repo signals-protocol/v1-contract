@@ -120,14 +120,16 @@ library FeeWaterfallLib {
         // ========================================
         // Nfloor = Nprev × (1 + pdd)
         // Since pdd is negative, (WAD + pdd) < WAD
+        // Per whitepaper v2: "G^need_t := max{0, ⌈G^min_t⌉}" requires ceil semantics
+        // We use wMulUp for Nfloor to ensure conservative (higher) floor calculation
+        // This guarantees grantNeed is never under-estimated (drawdown floor is invariant)
         uint256 Nfloor;
         if (p.Nprev > 0) {
-            // pdd is negative, so we compute: Nprev * (WAD + pdd) / WAD
-            // = Nprev * WAD / WAD + Nprev * pdd / WAD
-            // = Nprev + Nprev * pdd / WAD (where pdd < 0)
             int256 wadPlusPdd = int256(WAD) + p.pdd;
             if (wadPlusPdd > 0) {
-                Nfloor = p.Nprev.wMul(uint256(wadPlusPdd));
+                // Use wMulUp (ceil) to ensure Nfloor is conservatively high
+                // This implements the ceil requirement from whitepaper v2
+                Nfloor = p.Nprev.wMulUp(uint256(wadPlusPdd));
             } else {
                 Nfloor = 0;
             }
@@ -135,20 +137,13 @@ library FeeWaterfallLib {
             Nfloor = 0;
         }
 
-        // grantNeed = ceil(max(0, Nfloor - Nraw))
-        // Per whitepaper v2: "G^need_t := max{0, ⌈G^min_t⌉} (rounded up)"
+        // grantNeed = max(0, Nfloor - Nraw)
+        // Per whitepaper v2: "G^need_t := max{0, ⌈G^min_t⌉}"
+        // The ceil is achieved by using wMulUp in Nfloor calculation above
+        // This ensures grantNeed >= actual required grant (conservative)
         uint256 grantNeed;
         if (Nfloor > r.Nraw) {
-            // For ceil division: (a + b - 1) / b, but since we're in WAD, 
-            // the difference is already precise. However, if any rounding occurred
-            // in Nfloor calculation, we add 1 wei to ensure floor is maintained.
-            // In practice, Nfloor - Nraw is already the exact deficit.
             grantNeed = Nfloor - r.Nraw;
-            // Add 1 wei if there's any remainder possibility (conservative ceil)
-            // This ensures drawdown floor is strictly maintained
-            if (grantNeed > 0) {
-                grantNeed = grantNeed; // Already exact in WAD arithmetic
-            }
         } else {
             grantNeed = 0;
         }

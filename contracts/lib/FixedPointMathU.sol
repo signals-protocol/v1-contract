@@ -52,6 +52,18 @@ library FixedPointMathU {
         }
     }
 
+    /// @dev WAD multiply with round-up (ceil)
+    /// @notice Used for conservative calculations where under-estimation is unsafe
+    /// Per whitepaper: ceil semantics required for Nfloor calculation to ensure
+    /// grantNeed is never under-estimated (drawdown floor is an invariant)
+    function wMulUp(uint256 x, uint256 y) internal pure returns (uint256) {
+        unchecked {
+            uint256 product = x * y;
+            // (product + WAD - 1) / WAD, but handle zero case
+            return product == 0 ? 0 : (product - 1) / WAD + 1;
+        }
+    }
+
     function wMulNearest(uint256 x, uint256 y) internal pure returns (uint256) {
         unchecked {
             return (x * y + WAD / 2) / WAD;

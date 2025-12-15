@@ -41,6 +41,16 @@ function wMul(a: bigint, b: bigint): bigint {
   return (a * b) / WAD;
 }
 
+/**
+ * WAD multiply with round-up (ceil)
+ * Per whitepaper v2: ceil semantics required for Nfloor calculation
+ * to ensure grantNeed is never under-estimated (drawdown floor is invariant)
+ */
+function wMulUp(a: bigint, b: bigint): bigint {
+  const product = a * b;
+  return product === 0n ? 0n : (product - 1n) / WAD + 1n;
+}
+
 function min(a: bigint, b: bigint): bigint {
   return a < b ? a : b;
 }
@@ -82,23 +92,27 @@ export function calculateFeeWaterfall(
   // ========================================
   // Step 2: Drawdown Floor & Grant
   // ========================================
+  // Per whitepaper v2: "G^need_t := max{0, ⌈G^min_t⌉}" requires ceil semantics
+  // We use wMulUp for Nfloor to ensure conservative (higher) floor calculation
+  // This guarantees grantNeed is never under-estimated (drawdown floor is invariant)
   let Nfloor: bigint;
   if (p.Nprev > 0n) {
     const wadPlusPdd = WAD + p.pdd;
-    Nfloor = wadPlusPdd > 0n ? wMul(p.Nprev, wadPlusPdd) : 0n;
+    // Use wMulUp (ceil) to ensure Nfloor is conservatively high
+    Nfloor = wadPlusPdd > 0n ? wMulUp(p.Nprev, wadPlusPdd) : 0n;
   } else {
     Nfloor = 0n;
   }
 
   const grantNeed = Nfloor > Nraw ? Nfloor - Nraw : 0n;
-  
+
   // WP v2: if grantNeed > deltaEt, batch must revert (drawdown floor invariant)
   if (grantNeed > p.deltaEt) {
     throw new Error(
       `GrantExceedsTailBudget: grantNeed=${grantNeed}, deltaEt=${p.deltaEt}`
     );
   }
-  
+
   // Gt = grantNeed (no capping - either we can afford it or we revert)
   const Gt = grantNeed;
 

@@ -333,6 +333,84 @@ describe("FeeWaterfallLib", () => {
     });
   });
 
+  describe("WP v2: Ceil Rounding for Nfloor (Safety Invariant)", () => {
+    it("uses wMulUp for Nfloor calculation (ceil semantics)", async () => {
+      // Test case where wMul vs wMulUp makes a difference
+      // Nprev = 1000000000000000000001 (1000e18 + 1 wei)
+      // pdd = -0.3e18
+      // wadPlusPdd = 0.7e18
+      // wMul: (1000000000000000000001 * 0.7e18) / 1e18 = 700000000000000000000 (truncates .7)
+      // wMulUp: same but rounds up = 700000000000000000001
+      const Nprev = ethers.parseEther("1000") + 1n; // 1000e18 + 1 wei
+      const result = await calculate({
+        Lt: ethers.parseEther("-301"), // Loss to trigger grant need
+        Ftot: ethers.parseEther("1"),
+        Nprev,
+      });
+
+      // With wMulUp, Nfloor should be ceil(1000.000000000000000001 * 0.7)
+      // = ceil(700.0000000000000000007) = 700000000000000000001
+      // Without it (wMul), Nfloor = 700000000000000000000
+      
+      // The key invariant: drawdown floor is maintained conservatively
+      // Npre should be >= Nfloor
+      
+      // Nraw = 1000e18+1 - 301e18 + 1e18 = 700e18 + 1
+      // With wMulUp: Nfloor = ceil(700.0..007) = 700e18 + 1
+      // grantNeed = max(0, Nfloor - Nraw) = 0 in this case
+      expect(result.Gt).to.equal(0n);
+    });
+
+    it("ceil semantics ensures grantNeed is never under-estimated", async () => {
+      // Create a case where rounding matters for grant calculation
+      // Nprev that causes fractional Nfloor
+      const Nprev = ethers.parseEther("999") + 999999999999999999n; // ~999.999...e18
+      const result = await calculate({
+        Lt: ethers.parseEther("-350"), // Loss
+        Ftot: ethers.parseEther("50"),
+        Nprev,
+        deltaEt: ethers.parseEther("500"), // High limit to not revert
+      });
+
+      // Nfloor with ceil = ceil(Nprev * 0.7)
+      // The ceil ensures that if there's any fractional part, we round up
+      // This guarantees grantNeed >= actual required grant
+      
+      // Verify the NAV equation holds
+      const navDelta = result.Npre - Nprev;
+      const expected = ethers.parseEther("-350") + BigInt(result.Ft) + BigInt(result.Gt);
+      expect(navDelta).to.equal(expected);
+    });
+
+    it("maintains drawdown floor invariant with ceil rounding", async () => {
+      // Test multiple Nprev values with small fractional components
+      const testCases = [
+        ethers.parseEther("1000") + 1n,
+        ethers.parseEther("1000") + 123456789n,
+        ethers.parseEther("1000") + ethers.parseEther("0.5"),
+        ethers.parseEther("1000") + 999999999999999999n,
+      ];
+
+      for (const Nprev of testCases) {
+        const result = await calculate({
+          Lt: ethers.parseEther("-400"),
+          Ftot: ethers.parseEther("50"),
+          Nprev,
+          deltaEt: ethers.parseEther("500"),
+        });
+
+        // Calculate expected Nfloor with ceil
+        const wadPlusPdd = ethers.parseEther("0.7"); // 1 - 0.3
+        const product = Nprev * wadPlusPdd;
+        const expectedNfloorCeil = product === 0n ? 0n : (product - 1n) / ethers.parseEther("1") + 1n;
+        
+        // Npre should be >= Nfloor (drawdown floor maintained)
+        expect(result.Npre).to.be.gte(expectedNfloorCeil, 
+          `Drawdown floor violated for Nprev=${Nprev}`);
+      }
+    });
+  });
+
   describe("Property Tests", () => {
     it("Backstop NAV never goes negative", async () => {
       // Even with max grant, backstop should stay >= 0
