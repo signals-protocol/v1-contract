@@ -91,9 +91,8 @@ contract TradeModule is SignalsCoreStorage {
         ISignalsCore.Market storage market = _loadAndValidateMarket(marketId);
         _validateTickRange(lowerTick, upperTick, market);
         
-        // Phase 7: α Safety enforcement (WP v2 Sec 4.5)
-        // Opening new positions requires α ≤ αlimit
-        _validateAlpha(market);
+        // α/prior are fixed at Zero-Hour (createMarket).
+        // No per-trade α gate here - bettors trade freely within configured α.
 
         uint256 qtyWad = uint256(quantity).toWad();
         uint256 costWad = _calculateTradeCostInternal(marketId, lowerTick, upperTick, qtyWad);
@@ -137,9 +136,8 @@ contract TradeModule is SignalsCoreStorage {
         ISignalsCore.Market storage market = _loadAndValidateMarket(position.marketId);
         _validateTickRange(position.lowerTick, position.upperTick, market);
         
-        // Phase 7: α Safety enforcement (WP v2 Sec 4.5)
-        // Increasing positions requires α ≤ αlimit
-        _validateAlpha(market);
+        // α/prior are fixed at Zero-Hour (createMarket).
+        // No per-trade α gate here - bettors trade freely within configured α.
 
         uint256 qtyWad = uint256(quantity).toWad();
         uint256 costWad = _calculateTradeCostInternal(position.marketId, position.lowerTick, position.upperTick, qtyWad);
@@ -572,42 +570,6 @@ contract TradeModule is SignalsCoreStorage {
         if (!winning) return 0;
         // v0 semantics: payout is position quantity (6-dec) when in-range
         return uint256(position.quantity);
-    }
-
-    // --- α Safety enforcement helpers (Phase 7) ---
-
-    /// @notice Validate market α against safety limit
-    /// @dev Per WP v2 Sec 4.5: αlimit,t = max{0, αbase,t * (1 - k * DD_t)}
-    ///      Only called for open/increase (close/decrease always allowed)
-    ///      
-    ///      SAFETY: Uses lnWadUp for conservative α_base calculation.
-    ///      Over-estimating ln(n) → under-estimating α_base → safer bounds.
-    function _validateAlpha(ISignalsCore.Market storage market) internal view {
-        if (!riskConfig.enforceAlpha) return; // Skip if not enforced
-        if (lpVault.nav == 0) return; // Skip if vault not seeded
-        
-        uint256 alpha = market.liquidityParameter;
-        uint256 numBins = market.numBins;
-        
-        // Calculate αbase = λ * E_t / ln(n) with safe (upward-rounded) ln
-        uint256 lnN = FixedPointMathU.lnWadUp(numBins);
-        if (lnN == 0) return; // Edge case: n <= 1
-        
-        uint256 alphaBase = riskConfig.lambda.wMul(lpVault.nav).wDiv(lnN);
-        
-        // Calculate drawdown: DD = 1 - P / P^peak
-        uint256 drawdown = 0;
-        if (lpVault.pricePeak > 0 && lpVault.price < lpVault.pricePeak) {
-            drawdown = WAD - lpVault.price.wDiv(lpVault.pricePeak);
-        }
-        
-        // Calculate αlimit = max{0, αbase * (1 - k * DD)}
-        uint256 kDD = riskConfig.kDrawdown.wMul(drawdown);
-        uint256 alphaLimit = kDD >= WAD ? 0 : alphaBase.wMul(WAD - kDD);
-        
-        if (alpha > alphaLimit) {
-            revert CE.AlphaExceedsLimit(alpha, alphaLimit);
-        }
     }
 
     // --- Exposure Ledger helpers (Phase 6) ---

@@ -11,7 +11,7 @@ import "../errors/ModuleErrors.sol";
 ///      - ΔEₜ (tail budget) calculation from prior
 ///      - αbase/αlimit calculation
 ///      - Prior admissibility check
-///      - Trade α enforcement hooks
+///      (No per-trade α hooks; α is enforced only at market creation)
 contract RiskModule is SignalsCoreStorage {
     using FixedPointMathU for uint256;
 
@@ -214,54 +214,6 @@ contract RiskModule is SignalsCoreStorage {
     ) external pure {
         if (deltaEt > effectiveBackstop) {
             revert PriorNotAdmissible(deltaEt, effectiveBackstop);
-        }
-    }
-
-    // ============================================================
-    // Trade Hooks - α Enforcement
-    // ============================================================
-
-    /**
-     * @notice Pre-trade hook: validate market α against limit
-     * @dev Called before createMarket/reopenMarket/openPosition/increasePosition
-     *      close/decreasePosition always allowed (reducing exposure)
-     * 
-     * @param marketAlpha Market liquidity parameter α (WAD)
-     * @param numBins Number of outcome bins
-     * @param lambda Safety parameter λ (WAD)
-     * @param k Drawdown sensitivity factor (WAD)
-     */
-    function validateAlpha(
-        uint256 marketAlpha,
-        uint256 numBins,
-        uint256 lambda,
-        uint256 k
-    ) external view onlyDelegated {
-        // Calculate current αlimit
-        uint256 Et = lpVault.nav;
-        if (Et == 0) {
-            // No NAV → cannot assess risk, block all trades
-            revert AlphaExceedsLimit(marketAlpha, 0);
-        }
-        
-        // Use safe (upward-rounded) ln for conservative α calculation
-        uint256 lnN = FixedPointMathU.lnWadUp(numBins);
-        if (lnN == 0) return; // Edge case
-        
-        uint256 alphaBase = lambda.wMul(Et).wDiv(lnN);
-        
-        // Get drawdown
-        uint256 drawdown = 0;
-        if (lpVault.pricePeak > 0 && lpVault.price < lpVault.pricePeak) {
-            drawdown = WAD - lpVault.price.wDiv(lpVault.pricePeak);
-        }
-        
-        // Calculate limit
-        uint256 kDD = k.wMul(drawdown);
-        uint256 alphaLimit = kDD >= WAD ? 0 : alphaBase.wMul(WAD - kDD);
-        
-        if (marketAlpha > alphaLimit) {
-            revert AlphaExceedsLimit(marketAlpha, alphaLimit);
         }
     }
 
