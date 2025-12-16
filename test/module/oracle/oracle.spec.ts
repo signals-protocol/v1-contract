@@ -27,16 +27,24 @@ function buildDigest(
 describe("OracleModule", () => {
   async function setup() {
     const [owner, oracleSigner, other] = await ethers.getSigners();
-    const payment = await (await ethers.getContractFactory("MockPaymentToken")).deploy();
-    const position = await (await ethers.getContractFactory("MockSignalsPosition")).deploy();
-    const lazyLib = await (await ethers.getContractFactory("LazyMulSegmentTree")).deploy();
+    const payment = await (
+      await ethers.getContractFactory("MockPaymentToken")
+    ).deploy();
+    const position = await (
+      await ethers.getContractFactory("MockSignalsPosition")
+    ).deploy();
+    const lazyLib = await (
+      await ethers.getContractFactory("LazyMulSegmentTree")
+    ).deploy();
 
     const lifecycleImpl = (await (
       await ethers.getContractFactory("MarketLifecycleModule", {
         libraries: { LazyMulSegmentTree: lazyLib.target },
       })
     ).deploy()) as MarketLifecycleModule;
-    const oracleModule = (await (await ethers.getContractFactory("OracleModule")).deploy()) as OracleModule;
+    const oracleModule = (await (
+      await ethers.getContractFactory("OracleModule")
+    ).deploy()) as OracleModule;
 
     const coreImpl = (await (
       await ethers.getContractFactory("SignalsCoreHarness", {
@@ -50,8 +58,13 @@ describe("OracleModule", () => {
       120,
       300,
     ]);
-    const proxy = await (await ethers.getContractFactory("TestERC1967Proxy")).deploy(coreImpl.target, initData);
-    const core = (await ethers.getContractAt("SignalsCoreHarness", proxy.target)) as SignalsCoreHarness;
+    const proxy = await (
+      await ethers.getContractFactory("TestERC1967Proxy")
+    ).deploy(coreImpl.target, initData);
+    const core = (await ethers.getContractAt(
+      "SignalsCoreHarness",
+      proxy.target
+    )) as SignalsCoreHarness;
 
     await core.setModules(
       ethers.ZeroAddress,
@@ -63,6 +76,7 @@ describe("OracleModule", () => {
     await core.setOracleConfig(oracleSigner.address);
 
     const now = BigInt(await time.latest());
+    const WAD = ethers.parseEther("1");
     const market: ISignalsCore.MarketStruct = {
       isActive: true,
       settled: false,
@@ -80,14 +94,20 @@ describe("OracleModule", () => {
       tickSpacing: 1,
       settlementTick: 0,
       settlementValue: 0,
-      liquidityParameter: ethers.parseEther("1"),
+      liquidityParameter: WAD,
       feePolicy: ethers.ZeroAddress,
-      initialRootSum: 4n * ethers.parseEther("1"),
+      initialRootSum: 4n * WAD,
       accumulatedFees: 0n,
+      minFactor: WAD, // Phase 7: uniform prior
     };
     await core.harnessSetMarket(1, market);
     // Seed tree for manualSettleFailedMarket tests that need P&L calculation
-    await core.harnessSeedTree(1, [ethers.parseEther("1"), ethers.parseEther("1"), ethers.parseEther("1"), ethers.parseEther("1")]);
+    await core.harnessSeedTree(1, [
+      ethers.parseEther("1"),
+      ethers.parseEther("1"),
+      ethers.parseEther("1"),
+      ethers.parseEther("1"),
+    ]);
 
     const { chainId } = await ethers.provider.getNetwork();
 
@@ -109,7 +129,13 @@ describe("OracleModule", () => {
     const priceTimestamp = BigInt(market.settlementTimestamp) + 10n;
     await time.setNextBlockTimestamp(Number(priceTimestamp + 1n));
 
-    const digest = buildDigest(chainId, await core.getAddress(), 1, 2n, priceTimestamp);
+    const digest = buildDigest(
+      chainId,
+      await core.getAddress(),
+      1,
+      2n,
+      priceTimestamp
+    );
     const signature = await oracleSigner.signMessage(ethers.getBytes(digest));
 
     await expect(core.submitSettlementPrice(1, 2n, priceTimestamp, signature))
@@ -127,11 +153,22 @@ describe("OracleModule", () => {
     const priceTimestamp = BigInt(market.settlementTimestamp) + 5n;
     await time.setNextBlockTimestamp(Number(priceTimestamp + 1n));
 
-    const digest = buildDigest(chainId, await core.getAddress(), 1, 3n, priceTimestamp);
+    const digest = buildDigest(
+      chainId,
+      await core.getAddress(),
+      1,
+      3n,
+      priceTimestamp
+    );
     const badSignature = await other.signMessage(ethers.getBytes(digest));
 
-    await expect(core.submitSettlementPrice(1, 3n, priceTimestamp, badSignature))
-      .to.be.revertedWithCustomError(oracleModule, "SettlementOracleSignatureInvalid")
+    await expect(
+      core.submitSettlementPrice(1, 3n, priceTimestamp, badSignature)
+    )
+      .to.be.revertedWithCustomError(
+        oracleModule,
+        "SettlementOracleSignatureInvalid"
+      )
       .withArgs(other.address);
   });
 
@@ -140,21 +177,36 @@ describe("OracleModule", () => {
     // Tset = settlementTimestamp, price before Tset should revert
     const tooEarlyTs = BigInt(market.settlementTimestamp) - 1n;
     await time.setNextBlockTimestamp(Number(tooEarlyTs + 1n));
-    const earlyDigest = buildDigest(chainId, await core.getAddress(), 1, 1n, tooEarlyTs);
-    const earlySig = await oracleSigner.signMessage(ethers.getBytes(earlyDigest));
-
-    await expect(core.submitSettlementPrice(1, 1n, tooEarlyTs, earlySig)).to.be.revertedWithCustomError(
-      oracleModule,
-      "SettlementTooEarly"
+    const earlyDigest = buildDigest(
+      chainId,
+      await core.getAddress(),
+      1,
+      1n,
+      tooEarlyTs
     );
+    const earlySig = await oracleSigner.signMessage(
+      ethers.getBytes(earlyDigest)
+    );
+
+    await expect(
+      core.submitSettlementPrice(1, 1n, tooEarlyTs, earlySig)
+    ).to.be.revertedWithCustomError(oracleModule, "SettlementTooEarly");
 
     // submitWindow = 120, price after Tset + 120 should revert
     const lateTs = BigInt(market.settlementTimestamp) + 121n;
     await time.setNextBlockTimestamp(Number(lateTs + 1n));
-    const lateDigest = buildDigest(chainId, await core.getAddress(), 1, 1n, lateTs);
+    const lateDigest = buildDigest(
+      chainId,
+      await core.getAddress(),
+      1,
+      1n,
+      lateTs
+    );
     const lateSig = await oracleSigner.signMessage(ethers.getBytes(lateDigest));
 
-    await expect(core.submitSettlementPrice(1, 1n, lateTs, lateSig)).to.be.revertedWithCustomError(
+    await expect(
+      core.submitSettlementPrice(1, 1n, lateTs, lateSig)
+    ).to.be.revertedWithCustomError(
       oracleModule,
       "SettlementFinalizeWindowClosed"
     );
@@ -174,11 +226,17 @@ describe("OracleModule", () => {
       const tSet = BigInt(market.settlementTimestamp);
       const ts1 = tSet + 50n;
       await time.setNextBlockTimestamp(Number(ts1 + 1n));
-      
-      const digest = buildDigest(chainId, await core.getAddress(), 1, 100n, ts1);
+
+      const digest = buildDigest(
+        chainId,
+        await core.getAddress(),
+        1,
+        100n,
+        ts1
+      );
       const sig = await oracleSigner.signMessage(ethers.getBytes(digest));
       await core.submitSettlementPrice(1, 100n, ts1, sig);
-      
+
       const [price, priceTs] = await core.getSettlementPrice.staticCall(1);
       expect(price).to.equal(100);
       expect(priceTs).to.equal(ts1);
@@ -187,21 +245,33 @@ describe("OracleModule", () => {
     it("updates candidate if new one is strictly closer to Tset", async () => {
       const { core, oracleSigner, chainId, market } = await setup();
       const tSet = BigInt(market.settlementTimestamp);
-      
+
       // First submission: Tset + 50
       const ts1 = tSet + 50n;
       await time.setNextBlockTimestamp(Number(ts1 + 1n));
-      const digest1 = buildDigest(chainId, await core.getAddress(), 1, 100n, ts1);
+      const digest1 = buildDigest(
+        chainId,
+        await core.getAddress(),
+        1,
+        100n,
+        ts1
+      );
       const sig1 = await oracleSigner.signMessage(ethers.getBytes(digest1));
       await core.submitSettlementPrice(1, 100n, ts1, sig1);
-      
+
       // Second submission: Tset + 20 (closer, but block time must be after first block)
       const ts2 = tSet + 20n;
       await time.setNextBlockTimestamp(Number(ts1 + 100n)); // Must be after first submission's block
-      const digest2 = buildDigest(chainId, await core.getAddress(), 1, 200n, ts2);
+      const digest2 = buildDigest(
+        chainId,
+        await core.getAddress(),
+        1,
+        200n,
+        ts2
+      );
       const sig2 = await oracleSigner.signMessage(ethers.getBytes(digest2));
       await core.submitSettlementPrice(1, 200n, ts2, sig2);
-      
+
       const [price, priceTs] = await core.getSettlementPrice.staticCall(1);
       expect(price).to.equal(200); // Updated to closer one
       expect(priceTs).to.equal(ts2);
@@ -210,21 +280,33 @@ describe("OracleModule", () => {
     it("ignores candidate if new one is farther from Tset", async () => {
       const { core, oracleSigner, chainId, market } = await setup();
       const tSet = BigInt(market.settlementTimestamp);
-      
+
       // First submission: Tset + 20
       const ts1 = tSet + 20n;
       await time.setNextBlockTimestamp(Number(ts1 + 1n));
-      const digest1 = buildDigest(chainId, await core.getAddress(), 1, 100n, ts1);
+      const digest1 = buildDigest(
+        chainId,
+        await core.getAddress(),
+        1,
+        100n,
+        ts1
+      );
       const sig1 = await oracleSigner.signMessage(ethers.getBytes(digest1));
       await core.submitSettlementPrice(1, 100n, ts1, sig1);
-      
+
       // Second submission: Tset + 50 (farther)
       const ts2 = tSet + 50n;
       await time.setNextBlockTimestamp(Number(ts2 + 1n));
-      const digest2 = buildDigest(chainId, await core.getAddress(), 1, 200n, ts2);
+      const digest2 = buildDigest(
+        chainId,
+        await core.getAddress(),
+        1,
+        200n,
+        ts2
+      );
       const sig2 = await oracleSigner.signMessage(ethers.getBytes(digest2));
       await core.submitSettlementPrice(1, 200n, ts2, sig2);
-      
+
       const [price, priceTs] = await core.getSettlementPrice.staticCall(1);
       expect(price).to.equal(100); // Still the first one
       expect(priceTs).to.equal(ts1);
@@ -233,20 +315,32 @@ describe("OracleModule", () => {
     it("ignores candidate on tie (prefers earlier submission)", async () => {
       const { core, oracleSigner, chainId, market } = await setup();
       const tSet = BigInt(market.settlementTimestamp);
-      
+
       // First submission: Tset + 30
       const ts1 = tSet + 30n;
       await time.setNextBlockTimestamp(Number(ts1 + 1n));
-      const digest1 = buildDigest(chainId, await core.getAddress(), 1, 100n, ts1);
+      const digest1 = buildDigest(
+        chainId,
+        await core.getAddress(),
+        1,
+        100n,
+        ts1
+      );
       const sig1 = await oracleSigner.signMessage(ethers.getBytes(digest1));
       await core.submitSettlementPrice(1, 100n, ts1, sig1);
-      
+
       // Second submission: also Tset + 30 (same distance)
       await time.setNextBlockTimestamp(Number(ts1 + 2n));
-      const digest2 = buildDigest(chainId, await core.getAddress(), 1, 200n, ts1);
+      const digest2 = buildDigest(
+        chainId,
+        await core.getAddress(),
+        1,
+        200n,
+        ts1
+      );
       const sig2 = await oracleSigner.signMessage(ethers.getBytes(digest2));
       await core.submitSettlementPrice(1, 200n, ts1, sig2);
-      
+
       const [price, priceTs] = await core.getSettlementPrice.staticCall(1);
       expect(price).to.equal(100); // Still the first one (tie-break)
       expect(priceTs).to.equal(ts1);
@@ -260,7 +354,7 @@ describe("OracleModule", () => {
         "MarketLifecycleModule",
         await core.getAddress()
       );
-      
+
       // Try to mark failed immediately (window not expired)
       await expect(core.markFailed(1)).to.be.revertedWithCustomError(
         lifecycle,
@@ -274,14 +368,16 @@ describe("OracleModule", () => {
         "MarketLifecycleModule",
         await core.getAddress()
       );
-      
+
       const tSet = BigInt(market.settlementTimestamp);
       // submitWindow=120, finalizeDeadline=300 => deadline = tSet + 420
       const deadline = tSet + 420n;
       await time.setNextBlockTimestamp(Number(deadline + 1n));
-      
-      await expect(core.markFailed(1)).to.emit(lifecycle, "MarketFailed").withArgs(1, Number(deadline + 1n));
-      
+
+      await expect(core.markFailed(1))
+        .to.emit(lifecycle, "MarketFailed")
+        .withArgs(1, Number(deadline + 1n));
+
       const m = await core.markets(1);
       expect(m.failed).to.equal(true);
       expect(m.isActive).to.equal(false);
@@ -293,11 +389,10 @@ describe("OracleModule", () => {
         "MarketLifecycleModule",
         await core.getAddress()
       );
-      
-      await expect(core.manualSettleFailedMarket(1, 100n)).to.be.revertedWithCustomError(
-        lifecycle,
-        "MarketNotFailed"
-      );
+
+      await expect(
+        core.manualSettleFailedMarket(1, 100n)
+      ).to.be.revertedWithCustomError(lifecycle, "MarketNotFailed");
     });
 
     it("allows manualSettleFailedMarket on failed market", async () => {
@@ -306,17 +401,19 @@ describe("OracleModule", () => {
         "MarketLifecycleModule",
         await core.getAddress()
       );
-      
+
       const tSet = BigInt(market.settlementTimestamp);
       // submitWindow=120, finalizeDeadline=300 => deadline = tSet + 420
       const deadline = tSet + 420n;
       await time.setNextBlockTimestamp(Number(deadline + 1n));
       await core.markFailed(1);
-      
+
       await time.setNextBlockTimestamp(Number(deadline + 2n));
-      await expect(core.manualSettleFailedMarket(1, 2n))
-        .to.emit(lifecycle, "MarketSettledSecondary");
-      
+      await expect(core.manualSettleFailedMarket(1, 2n)).to.emit(
+        lifecycle,
+        "MarketSettledSecondary"
+      );
+
       const m = await core.markets(1);
       expect(m.settled).to.equal(true);
       expect(m.failed).to.equal(true);
@@ -328,10 +425,10 @@ describe("OracleModule", () => {
   // 1. OracleModule.toTick() conversion logic is NOT yet implemented
   // 2. These tests would fail now and only pass after Phase 5 (Settlement) implementation
   // 3. Per user's instruction: "Phase 4-6 구현하면 깨질 테스트들 추가하지 말라"
-  // 
+  //
   // When implementing Phase 5, add tests for:
   // - Price at L → tick 0
-  // - Price below L → clamped to tick 0  
+  // - Price below L → clamped to tick 0
   // - Price at/above U → clamped to tick n-1
   // - Tick boundary floor division
 });

@@ -159,6 +159,8 @@ export async function deployTradeModuleSystem(
       // Phase 6: P&L tracking fields
       initialRootSum: BigInt(config.numBins) * WAD, // n * WAD for uniform prior
       accumulatedFees: 0n,
+      // Phase 7: Prior-based ΔEₜ calculation
+      minFactor: WAD, // Uniform prior: minFactor = 1 WAD
     };
     await core.setMarket(marketId, market);
 

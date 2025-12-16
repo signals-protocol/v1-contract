@@ -53,6 +53,7 @@ describe("TradeModule slippage and bounds", () => {
       feePolicy: ethers.ZeroAddress,
       initialRootSum: 4n * WAD,
       accumulatedFees: 0n,
+      minFactor: WAD, // Phase 7: uniform prior
     };
     await core.setMarket(1, settledMarket);
     

@@ -116,6 +116,7 @@ describe("CLMSR Invariants", () => {
       feePolicy: ethers.ZeroAddress,
       initialRootSum: BigInt(NUM_BINS) * WAD,
       accumulatedFees: 0n,
+      minFactor: WAD, // Phase 7: uniform prior
     };
     await core.setMarket(MARKET_ID, market);
 
@@ -507,6 +508,7 @@ describe("CLMSR Invariants", () => {
         feePolicy: ethers.ZeroAddress,
         initialRootSum: BigInt(NUM_BINS) * WAD,
         accumulatedFees: 0n,
+      minFactor: WAD, // Phase 7: uniform prior
       };
       await core.setMarket(2, market2);
       await core.seedTree(2, Array(NUM_BINS).fill(WAD));

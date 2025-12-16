@@ -134,7 +134,7 @@ describe("VaultWithMarkets E2E", () => {
     const start = tSet - 200n;
     const end = tSet - 20n;
 
-    const marketId = await core.createMarket.staticCall(
+    const marketId = await core.createMarketUniform.staticCall(
       0,
       4,
       1,
@@ -145,7 +145,7 @@ describe("VaultWithMarkets E2E", () => {
       WAD,
       ethers.ZeroAddress
     );
-    await core.createMarket(0, 4, 1, Number(start), Number(end), Number(tSet), 4, WAD, ethers.ZeroAddress);
+    await core.createMarketUniform(0, 4, 1, Number(start), Number(end), Number(tSet), 4, WAD, ethers.ZeroAddress);
 
     // Manipulate tree state to create non-zero P&L at settlement
     // Z_start = 4e18, Z_end = 5e18 → L_t > 0

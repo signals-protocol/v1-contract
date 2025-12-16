@@ -2,6 +2,8 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 
+const WAD = ethers.parseEther("1");
+
 type MarketStruct = {
   isActive: boolean;
   settled: boolean;
@@ -23,6 +25,7 @@ type MarketStruct = {
   feePolicy: string;
   initialRootSum: bigint;
   accumulatedFees: bigint;
+  minFactor: bigint; // Phase 7
 };
 
 function buildMarket(
@@ -51,6 +54,7 @@ function buildMarket(
     feePolicy: ethers.ZeroAddress,
     initialRootSum: BigInt(numBins) * ethers.parseEther("1"),
     accumulatedFees: 0n,
+      minFactor: WAD, // Phase 7: uniform prior
   };
   return { ...market, ...overrides };
 }

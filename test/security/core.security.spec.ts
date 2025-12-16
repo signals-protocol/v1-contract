@@ -96,6 +96,7 @@ describe("Core Security", () => {
       feePolicy: feePolicy.target,
       initialRootSum: 100n * WAD,
       accumulatedFees: 0n,
+      minFactor: WAD, // Phase 7: uniform prior
     };
     await core.setMarket(1, market);
     await core.seedTree(1, Array(100).fill(WAD));

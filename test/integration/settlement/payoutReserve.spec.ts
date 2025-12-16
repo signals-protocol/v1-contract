@@ -181,7 +181,7 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
 
     // Advance time to create market
     await time.setNextBlockTimestamp(Number(seedTime + 10n));
-    const marketId = await core.createMarket.staticCall(
+    const marketId = await core.createMarketUniform.staticCall(
       0, // minTick
       4, // maxTick
       1, // tickSpacing
@@ -193,7 +193,7 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
       ethers.ZeroAddress // feePolicy
     );
 
-    await core.createMarket(
+    await core.createMarketUniform(
       0,
       4,
       1,
@@ -204,9 +204,6 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
       WAD,
       ethers.ZeroAddress
     );
-
-    // Initialize tree with uniform distribution
-    await core.harnessSeedTree(marketId, [WAD, WAD, WAD, WAD]);
 
     return {
       marketId,

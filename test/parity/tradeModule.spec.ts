@@ -98,6 +98,7 @@ async function deploySystem(
     feePolicy: ethers.ZeroAddress,
     initialRootSum: 4n * WAD,
     accumulatedFees: 0n,
+    minFactor: WAD, // Phase 7: uniform prior
     ...marketOverrides,
   };
   await core.setMarket(1, market);

@@ -1,20 +1,20 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
-import { 
-  SignalsCoreHarness, 
-  MockPaymentToken, 
-  MockSignalsPosition 
+import {
+  SignalsCoreHarness,
+  MockPaymentToken,
+  MockSignalsPosition,
 } from "../../typechain-types";
 
 /**
  * Phase 7 Integration Test: α Safety Bound Enforcement
- * 
- * Tests α enforcement through actual trade paths:
- * 1. openPosition with α > αlimit → revert
- * 2. increasePosition with α > αlimit → revert
- * 3. close/decrease always allowed regardless of α
- * 4. Drawdown reduces αlimit
+ *
+ * Tests α enforcement at market creation time:
+ * 1. createMarket with α > αlimit → revert
+ * 2. createMarket with α ≤ αlimit → success
+ * 3. open/increase/close/decrease freely within configured α (no per-trade gate)
+ * 4. Drawdown reduces αlimit for new market creation
  */
 
 // Constants (unused but kept for reference)
@@ -32,10 +32,18 @@ describe("α Safety Bound Enforcement (Integration)", () => {
     owner = _owner;
     trader = _trader;
 
-    payment = await (await ethers.getContractFactory("MockPaymentToken")).deploy();
-    position = await (await ethers.getContractFactory("MockSignalsPosition")).deploy();
-    const lazyLib = await (await ethers.getContractFactory("LazyMulSegmentTree")).deploy();
-    const riskModule = await (await ethers.getContractFactory("RiskModule")).deploy();
+    payment = await (
+      await ethers.getContractFactory("MockPaymentToken")
+    ).deploy();
+    position = await (
+      await ethers.getContractFactory("MockSignalsPosition")
+    ).deploy();
+    const lazyLib = await (
+      await ethers.getContractFactory("LazyMulSegmentTree")
+    ).deploy();
+    const riskModule = await (
+      await ethers.getContractFactory("RiskModule")
+    ).deploy();
 
     const coreImpl = await (
       await ethers.getContractFactory("SignalsCoreHarness", {
@@ -47,14 +55,16 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       payment.target,
       position.target,
       120, // settlementSubmitWindow
-      60,  // settlementFinalizeDeadline
+      60, // settlementFinalizeDeadline
     ]);
 
-    const proxy = await (await ethers.getContractFactory("TestERC1967Proxy")).deploy(
-      coreImpl.target,
-      initData
-    );
-    core = (await ethers.getContractAt("SignalsCoreHarness", proxy.target)) as SignalsCoreHarness;
+    const proxy = await (
+      await ethers.getContractFactory("TestERC1967Proxy")
+    ).deploy(coreImpl.target, initData);
+    core = (await ethers.getContractAt(
+      "SignalsCoreHarness",
+      proxy.target
+    )) as SignalsCoreHarness;
 
     // Deploy modules
     const lifecycleImpl = await (
@@ -86,10 +96,10 @@ describe("α Safety Bound Enforcement (Integration)", () => {
     await core.setMinSeedAmount(ethers.parseUnits("100", 6));
     await core.setFeeWaterfallConfig(
       ethers.parseEther("-0.3"), // pdd = -30%
-      ethers.parseEther("0.2"),  // rhoBS = 20%
-      ethers.parseEther("0.7"),  // phiLP = 70%
-      ethers.parseEther("0.2"),  // phiBS = 20%
-      ethers.parseEther("0.1")   // phiTR = 10%
+      ethers.parseEther("0.2"), // rhoBS = 20%
+      ethers.parseEther("0.7"), // phiLP = 70%
+      ethers.parseEther("0.2"), // phiBS = 20%
+      ethers.parseEther("0.1") // phiTR = 10%
     );
 
     // Seed vault
@@ -100,15 +110,15 @@ describe("α Safety Bound Enforcement (Integration)", () => {
     // Setup Backstop
     await core.setCapitalStack(
       ethers.parseEther("2000"), // backstopNav
-      ethers.parseEther("500")  // treasuryNav
+      ethers.parseEther("500") // treasuryNav
     );
 
     // Configure risk parameters
     // λ = 0.3 (30%), k = 1.0
     await core.setRiskConfig(
       ethers.parseEther("0.3"), // lambda
-      ethers.parseEther("1"),   // kDrawdown
-      true                      // enforceAlpha = true
+      ethers.parseEther("1"), // kDrawdown
+      true // enforceAlpha = true
     );
 
     // Setup trader
@@ -125,22 +135,22 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       // With NAV = 10000, λ = 0.3, n = 100:
       // αbase = 0.3 * 10000 / ln(100) = 3000 / 4.605 ≈ 651.5
       // No drawdown → αlimit = αbase ≈ 651.5
-      
+
       const now = await time.latest();
       const startTimestamp = now + 60;
       const endTimestamp = now + 3600;
       const settlementTimestamp = now + 3660;
-      
+
       // Create market with α = 500 (< αlimit ≈ 651.5)
       await expect(
-        core.createMarket(
-          0,      // minTick
-          1000,   // maxTick
-          10,     // tickSpacing
+        core.createMarketUniform(
+          0, // minTick
+          1000, // maxTick
+          10, // tickSpacing
           startTimestamp,
           endTimestamp,
           settlementTimestamp,
-          100,    // numBins
+          100, // numBins
           ethers.parseEther("500"), // liquidityParameter (α)
           ethers.ZeroAddress
         )
@@ -152,11 +162,11 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       const startTimestamp = now + 60;
       const endTimestamp = now + 3600;
       const settlementTimestamp = now + 3660;
-      
+
       // Create market with α = 1000 (> αlimit ≈ 651.5)
       // This should revert because α exceeds limit
       await expect(
-        core.createMarket(
+        core.createMarketUniform(
           0,
           1000,
           10,
@@ -171,7 +181,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
     });
   });
 
-  describe("Trade Enforcement", () => {
+  describe("Trading Freedom within Configured α", () => {
     let marketId: bigint;
 
     beforeEach(async () => {
@@ -180,8 +190,8 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       const startTimestamp = now + 10;
       const endTimestamp = now + 3600;
       const settlementTimestamp = now + 3660;
-      
-      await core.createMarket(
+
+      await core.createMarketUniform(
         0,
         1000,
         10,
@@ -189,41 +199,38 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         endTimestamp,
         settlementTimestamp,
         100,
-        ethers.parseEther("500"), // Valid α
+        ethers.parseEther("500"), // Valid α at creation
         ethers.ZeroAddress
       );
       // marketId starts from 1 (++nextMarketId)
       marketId = 1n;
-      
+
       // Advance time to market start
       await time.increase(15);
     });
 
-    it("allows openPosition when α ≤ αlimit", async () => {
-      // Market α = 500 < αlimit ≈ 651.5, should succeed
+    it("allows openPosition freely (no per-trade α check)", async () => {
+      // α/prior are fixed at Zero-Hour (createMarket)
+      // Bettors trade freely within configured α - no per-trade gate
       await expect(
         core.connect(trader).openPosition(
           marketId,
-          100,  // lowerTick
-          200,  // upperTick
-          100,  // quantity
+          100, // lowerTick
+          200, // upperTick
+          100, // quantity
           ethers.parseUnits("1000", 6) // maxCost
         )
       ).to.not.be.reverted;
     });
 
-    it("allows increasePosition when α ≤ αlimit", async () => {
-      // Open initial position (positionId starts from 1)
-      await core.connect(trader).openPosition(
-        marketId,
-        100,
-        200,
-        100,
-        ethers.parseUnits("1000", 6)
-      );
+    it("allows increasePosition freely (no per-trade α check)", async () => {
+      // Open initial position
+      await core
+        .connect(trader)
+        .openPosition(marketId, 100, 200, 100, ethers.parseUnits("1000", 6));
       const positionId = 1n;
 
-      // Increase should succeed
+      // Increase is allowed - α enforcement only at market creation
       await expect(
         core.connect(trader).increasePosition(
           positionId,
@@ -233,60 +240,50 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       ).to.not.be.reverted;
     });
 
-    it("allows closePosition regardless of α limit status", async () => {
-      // Open position (positionId starts from 1)
-      await core.connect(trader).openPosition(
-        marketId,
-        100,
-        200,
-        100,
-        ethers.parseUnits("1000", 6)
-      );
+    it("allows closePosition freely", async () => {
+      // Open position
+      await core
+        .connect(trader)
+        .openPosition(marketId, 100, 200, 100, ethers.parseUnits("1000", 6));
       const positionId = 1n;
 
-      // Close should always be allowed (even if α > limit due to drawdown)
+      // Close is allowed
       await expect(
         core.connect(trader).closePosition(
           positionId,
-          0  // minProceeds
+          0 // minProceeds
         )
       ).to.not.be.reverted;
     });
 
-    it("allows decreasePosition regardless of α limit status", async () => {
-      // Open position (positionId starts from 1)
-      await core.connect(trader).openPosition(
-        marketId,
-        100,
-        200,
-        100,
-        ethers.parseUnits("1000", 6)
-      );
+    it("allows decreasePosition freely", async () => {
+      // Open position
+      await core
+        .connect(trader)
+        .openPosition(marketId, 100, 200, 100, ethers.parseUnits("1000", 6));
       const positionId = 1n;
 
-      // Decrease should always be allowed
+      // Decrease is allowed
       await expect(
         core.connect(trader).decreasePosition(
           positionId,
           50, // quantity to decrease
-          0  // minProceeds
+          0 // minProceeds
         )
       ).to.not.be.reverted;
     });
   });
 
   describe("Drawdown Impact on α Limit", () => {
-    it("reduces αlimit proportionally to drawdown", async () => {
+    it("reduces αlimit proportionally to drawdown for new market creation", async () => {
       // This is a conceptual test - in practice we'd need to simulate
       // vault losses to trigger drawdown
-      
       // Initial state: no drawdown
       // αlimit = αbase * (1 - k * DD) = αbase * 1 = αbase
-      
       // With 50% drawdown:
       // αlimit = αbase * (1 - 1 * 0.5) = αbase * 0.5
-      
-      // This would cause previously valid markets to become invalid for new trades
+      // This affects NEW market creation, not existing trades
+      // Existing markets continue trading freely at their configured α
     });
   });
 
@@ -303,10 +300,10 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       const startTimestamp = now + 60;
       const endTimestamp = now + 3600;
       const settlementTimestamp = now + 3660;
-      
+
       // Should succeed even with high α because enforcement is off
       await expect(
-        core.createMarket(
+        core.createMarketUniform(
           0,
           1000,
           10,
@@ -321,4 +318,3 @@ describe("α Safety Bound Enforcement (Integration)", () => {
     });
   });
 });
-

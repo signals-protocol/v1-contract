@@ -36,4 +36,8 @@ export const LOOSE_TOLERANCE = ethers.parseEther("0.0001"); // 1e-4 WAD
 export const ONE_DAY = 86400;
 export const ONE_HOUR = 3600;
 
-
+// Phase 7: Create uniform prior factors (all 1 WAD)
+// Use this for createMarket calls to get ΔEₜ = 0
+export function uniformFactors(numBins: number): bigint[] {
+  return Array(numBins).fill(WAD);
+}

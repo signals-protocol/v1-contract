@@ -113,6 +113,7 @@ describe("Events & Position Lifecycle", () => {
       feePolicy: ethers.ZeroAddress,
       initialRootSum: BigInt(NUM_BINS) * WAD,
       accumulatedFees: 0n,
+      minFactor: WAD, // Phase 7: uniform prior
     };
     await core.setMarket(MARKET_ID, market);
 

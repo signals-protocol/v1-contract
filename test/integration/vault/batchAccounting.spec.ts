@@ -37,7 +37,9 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
     const module = await moduleFactory.deploy();
 
     const proxyFactory = await ethers.getContractFactory("LPVaultModuleProxy");
-    const proxy = (await proxyFactory.deploy(module.target)) as LPVaultModuleProxy;
+    const proxy = (await proxyFactory.deploy(
+      module.target
+    )) as LPVaultModuleProxy;
 
     await proxy.setPaymentToken(payment.target);
     await proxy.setMinSeedAmount(usdc("100"));
@@ -92,7 +94,10 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       const sharesAfter = await proxy.getVaultShares();
 
       expect(navAfter).to.equal(navBefore, "NAV changed on requestDeposit");
-      expect(sharesAfter).to.equal(sharesBefore, "Shares changed on requestDeposit");
+      expect(sharesAfter).to.equal(
+        sharesBefore,
+        "Shares changed on requestDeposit"
+      );
     });
 
     it("requestWithdraw does NOT change NAV or Shares", async () => {
@@ -107,11 +112,16 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       const sharesAfter = await proxy.getVaultShares();
 
       expect(navAfter).to.equal(navBefore, "NAV changed on requestWithdraw");
-      expect(sharesAfter).to.equal(sharesBefore, "Shares changed on requestWithdraw");
+      expect(sharesAfter).to.equal(
+        sharesBefore,
+        "Shares changed on requestWithdraw"
+      );
     });
 
     it("claimDeposit does NOT change NAV or Shares", async () => {
-      const { proxy, userA, currentBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, userA, currentBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       await proxy.connect(userA).requestDeposit(usdc("500"));
       await proxy.recordDailyPnl(currentBatchId + 1n, 0n, 0n);
@@ -127,12 +137,20 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       const navAfterClaim = await proxy.getVaultNav();
       const sharesAfterClaim = await proxy.getVaultShares();
 
-      expect(navAfterClaim).to.equal(navAfterBatch, "NAV changed on claimDeposit");
-      expect(sharesAfterClaim).to.equal(sharesAfterBatch, "Shares changed on claimDeposit");
+      expect(navAfterClaim).to.equal(
+        navAfterBatch,
+        "NAV changed on claimDeposit"
+      );
+      expect(sharesAfterClaim).to.equal(
+        sharesAfterBatch,
+        "Shares changed on claimDeposit"
+      );
     });
 
     it("claimWithdraw does NOT change NAV or Shares", async () => {
-      const { proxy, owner, currentBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, owner, currentBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       await proxy.connect(owner).requestWithdraw(ethers.parseEther("200"));
       await proxy.recordDailyPnl(currentBatchId + 1n, 0n, 0n);
@@ -146,12 +164,20 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       const navAfterClaim = await proxy.getVaultNav();
       const sharesAfterClaim = await proxy.getVaultShares();
 
-      expect(navAfterClaim).to.equal(navAfterBatch, "NAV changed on claimWithdraw");
-      expect(sharesAfterClaim).to.equal(sharesAfterBatch, "Shares changed on claimWithdraw");
+      expect(navAfterClaim).to.equal(
+        navAfterBatch,
+        "NAV changed on claimWithdraw"
+      );
+      expect(sharesAfterClaim).to.equal(
+        sharesAfterBatch,
+        "Shares changed on claimWithdraw"
+      );
     });
 
     it("processDailyBatch is called exactly once per batch", async () => {
-      const { proxy, module, currentBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, module, currentBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       const batchId = currentBatchId + 1n;
 
@@ -172,7 +198,9 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
   // ================================================================
   describe("SPEC-2: Pre-batch NAV equation (INV-NAV)", () => {
     it("N^pre_t - N_{t-1} = L_t + F_t + G_t (positive P&L)", async () => {
-      const { proxy, currentBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, currentBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       const N_prev = await proxy.getVaultNav();
       const batchId = currentBatchId + 1n;
@@ -194,7 +222,9 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
     });
 
     it("N^pre_t - N_{t-1} = L_t + F_t + G_t (negative P&L with grant)", async () => {
-      const { proxy, currentBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, currentBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       // Initialize backstop for grant capability
       await proxy.setCapitalStack(ethers.parseEther("500"), 0n);
@@ -219,7 +249,9 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
     });
 
     it("N^pre_t - N_{t-1} = L_t + F_t + G_t (zero P&L)", async () => {
-      const { proxy, currentBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, currentBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       const N_prev = await proxy.getVaultNav();
       const batchId = currentBatchId + 1n;
@@ -242,7 +274,9 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
   // ================================================================
   describe("SPEC-3: Batch price equation", () => {
     it("P^e_t = N^pre_t / S_{t-1}", async () => {
-      const { proxy, currentBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, currentBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       const S_prev = await proxy.getVaultShares();
       const batchId = currentBatchId + 1n;
@@ -261,7 +295,9 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
     });
 
     it("batch price used for all deposits and withdrawals in same batch", async () => {
-      const { proxy, userA, userB, owner, currentBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, userA, userB, owner, currentBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       // Multiple users request deposits/withdrawals
       await proxy.connect(userA).requestDeposit(usdc("100"));
@@ -273,7 +309,8 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       await proxy.processDailyBatch(batchId);
 
       // Get batch aggregation
-      const [totalDeposits, totalWithdraws, batchPrice] = await proxy.getBatchAggregation(batchId);
+      const [totalDeposits, totalWithdraws, batchPrice] =
+        await proxy.getBatchAggregation(batchId);
 
       expect(totalDeposits).to.equal(ethers.parseEther("300")); // 100 + 200
       expect(totalWithdraws).to.equal(ethers.parseEther("50"));
@@ -290,7 +327,9 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
   // ================================================================
   describe("SPEC-4: Price invariance during batch processing", () => {
     it("price preserved after deposit processing", async () => {
-      const { proxy, userA, currentBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, userA, currentBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       await proxy.connect(userA).requestDeposit(usdc("500"));
 
@@ -302,12 +341,17 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       const finalPrice = await proxy.getVaultPrice();
 
       // Final price should equal batch price (within tolerance)
-      const diff = finalPrice > batchPrice ? finalPrice - batchPrice : batchPrice - finalPrice;
+      const diff =
+        finalPrice > batchPrice
+          ? finalPrice - batchPrice
+          : batchPrice - finalPrice;
       expect(diff).to.be.lte(10n, "Price not preserved after deposit");
     });
 
     it("price preserved after withdrawal processing", async () => {
-      const { proxy, owner, currentBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, owner, currentBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       await proxy.connect(owner).requestWithdraw(ethers.parseEther("200"));
 
@@ -318,12 +362,17 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       const [, , batchPrice] = await proxy.getBatchAggregation(batchId);
       const finalPrice = await proxy.getVaultPrice();
 
-      const diff = finalPrice > batchPrice ? finalPrice - batchPrice : batchPrice - finalPrice;
+      const diff =
+        finalPrice > batchPrice
+          ? finalPrice - batchPrice
+          : batchPrice - finalPrice;
       expect(diff).to.be.lte(10n, "Price not preserved after withdrawal");
     });
 
     it("price preserved after mixed deposit/withdrawal", async () => {
-      const { proxy, owner, userA, currentBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, owner, userA, currentBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       await proxy.connect(userA).requestDeposit(usdc("300"));
       await proxy.connect(owner).requestWithdraw(ethers.parseEther("100"));
@@ -335,7 +384,10 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       const [, , batchPrice] = await proxy.getBatchAggregation(batchId);
       const finalPrice = await proxy.getVaultPrice();
 
-      const diff = finalPrice > batchPrice ? finalPrice - batchPrice : batchPrice - finalPrice;
+      const diff =
+        finalPrice > batchPrice
+          ? finalPrice - batchPrice
+          : batchPrice - finalPrice;
       expect(diff).to.be.lte(10n, "Price not preserved after mixed ops");
     });
   });
@@ -347,7 +399,9 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
   // ================================================================
   describe("SPEC-5: Same market underwriters get same return", () => {
     it("shares existing at batch start all receive same P&L", async () => {
-      const { proxy, currentBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, currentBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       // Initial shares = 1000 WAD (from seed)
       const initialPrice = await proxy.getVaultPrice();
@@ -369,7 +423,9 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
     });
 
     it("new deposits don't dilute existing shares", async () => {
-      const { proxy, userA, currentBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, userA, currentBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       // UserA deposits, processed at batch price
       await proxy.connect(userA).requestDeposit(usdc("500"));
@@ -396,13 +452,23 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
   // ================================================================
   describe("SPEC-6: No duplicate state updates", () => {
     it("recordDailyPnl accumulates, doesn't overwrite", async () => {
-      const { proxy, currentBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, currentBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       const batchId = currentBatchId + 1n;
 
       // Record P&L from multiple markets
-      await proxy.recordDailyPnl(batchId, ethers.parseEther("30"), ethers.parseEther("5"));
-      await proxy.recordDailyPnl(batchId, ethers.parseEther("20"), ethers.parseEther("3"));
+      await proxy.recordDailyPnl(
+        batchId,
+        ethers.parseEther("30"),
+        ethers.parseEther("5")
+      );
+      await proxy.recordDailyPnl(
+        batchId,
+        ethers.parseEther("20"),
+        ethers.parseEther("3")
+      );
 
       const [lt, ftot] = await proxy.getDailyPnl(batchId);
 
@@ -412,7 +478,9 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
     });
 
     it("processDailyBatch updates state exactly once", async () => {
-      const { proxy, currentBatchId } = await loadFixture(deploySeededVaultFixture);
+      const { proxy, currentBatchId } = await loadFixture(
+        deploySeededVaultFixture
+      );
 
       const batchId = currentBatchId + 1n;
       const navBefore = await proxy.getVaultNav();
@@ -427,10 +495,7 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       expect(navAfter).to.be.gt(navBefore);
 
       // Trying to process again fails (no duplicate update)
-      await expect(
-        proxy.processDailyBatch(batchId)
-      ).to.be.reverted;
+      await expect(proxy.processDailyBatch(batchId)).to.be.reverted;
     });
   });
 });
-

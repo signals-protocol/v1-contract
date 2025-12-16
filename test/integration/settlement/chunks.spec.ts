@@ -4,7 +4,7 @@ import { time } from "@nomicfoundation/hardhat-network-helpers";
 import {
   MarketLifecycleModule,
   SignalsPosition,
-  SignalsCore,
+  SignalsCoreHarness,
   TradeModule,
   OracleModule,
   TestERC1967Proxy,
@@ -36,7 +36,7 @@ async function deploySystem() {
   ).deploy()) as MarketLifecycleModule;
   const oracleModule = (await (await ethers.getContractFactory("OracleModule")).deploy()) as OracleModule;
 
-  const coreImpl = (await (await ethers.getContractFactory("SignalsCore")).deploy()) as SignalsCore;
+  const coreImpl = (await (await ethers.getContractFactory("SignalsCoreHarness", { libraries: { LazyMulSegmentTree: lazy.target } })).deploy()) as SignalsCoreHarness;
   const submitWindow = 200;
   const finalizeDeadline = 60;
   const initCore = coreImpl.interface.encodeFunctionData("initialize", [
@@ -48,7 +48,7 @@ async function deploySystem() {
   const coreProxy = (await (
     await ethers.getContractFactory("TestERC1967Proxy")
   ).deploy(coreImpl.target, initCore)) as TestERC1967Proxy;
-  const core = (await ethers.getContractAt("SignalsCore", await coreProxy.getAddress())) as SignalsCore;
+  const core = (await ethers.getContractAt("SignalsCoreHarness", await coreProxy.getAddress())) as SignalsCoreHarness;
 
   await core.setModules(tradeModule.target, lifecycleModule.target, ethers.ZeroAddress, ethers.ZeroAddress, oracleModule.target);
   await core.setOracleConfig(oracleSigner.address);
@@ -73,7 +73,7 @@ describe("Settlement chunks and claim totals", () => {
     const start = now - 10n;
     const end = now + 100n;
     const settleTs = end + 10n;
-    await core.createMarket(0, 4, 1, Number(start), Number(end), Number(settleTs), 4, WAD, ethers.ZeroAddress);
+    await core.createMarketUniform(0, 4, 1, Number(start), Number(end), Number(settleTs), 4, WAD, ethers.ZeroAddress);
 
     // open positions: 3 users, 4 positions -> ensure openPositionCount drives multiple chunks
     await core.connect(u1).openPosition(1, 0, 2, 1_000, 10_000_000); // winning

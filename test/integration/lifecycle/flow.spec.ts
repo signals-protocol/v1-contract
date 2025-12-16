@@ -5,7 +5,7 @@ import {
   MarketLifecycleModule,
   OracleModule,
   TradeModule,
-  SignalsCore,
+  SignalsCoreHarness,
   SignalsPosition,
   TestERC1967Proxy,
 } from "../../../typechain-types";
@@ -56,7 +56,7 @@ describe("Lifecycle + Trade integration", () => {
     ).deploy()) as MarketLifecycleModule;
     const oracleModule = (await (await ethers.getContractFactory("OracleModule")).deploy()) as OracleModule;
 
-    const coreImpl = (await (await ethers.getContractFactory("SignalsCore")).deploy()) as SignalsCore;
+    const coreImpl = (await (await ethers.getContractFactory("SignalsCoreHarness", { libraries: { LazyMulSegmentTree: lazyLib.target } })).deploy()) as SignalsCoreHarness;
     const submitWindow = 300;
     const finalizeDeadline = 60;
     const initData = coreImpl.interface.encodeFunctionData("initialize", [
@@ -68,7 +68,7 @@ describe("Lifecycle + Trade integration", () => {
     const proxy = (await (
       await ethers.getContractFactory("TestERC1967Proxy")
     ).deploy(coreImpl.target, initData)) as TestERC1967Proxy;
-    const core = (await ethers.getContractAt("SignalsCore", await proxy.getAddress())) as SignalsCore;
+    const core = (await ethers.getContractAt("SignalsCoreHarness", await proxy.getAddress())) as SignalsCoreHarness;
     await core.setModules(tradeModule.target, lifecycleModule.target, ethers.ZeroAddress, ethers.ZeroAddress, oracleModule.target);
     await core.setOracleConfig(oracleSigner.address);
     await position.connect(owner).setCore(await core.getAddress());
@@ -109,7 +109,7 @@ describe("Lifecycle + Trade integration", () => {
     const start = now - 50n;
     const end = now + 200n;
     const settlementTs = end + 10n;
-    const marketId = await core.createMarket.staticCall(
+    const marketId = await core.createMarketUniform.staticCall(
       0,
       4,
       1,
@@ -121,7 +121,7 @@ describe("Lifecycle + Trade integration", () => {
       ethers.ZeroAddress
     );
     await expect(
-      core.createMarket(0, 4, 1, Number(start), Number(end), Number(settlementTs), 4, ethers.parseEther("1"), ethers.ZeroAddress)
+      core.createMarketUniform(0, 4, 1, Number(start), Number(end), Number(settlementTs), 4, ethers.parseEther("1"), ethers.ZeroAddress)
     ).to.emit(lifecycleEvents, "MarketCreated");
 
     // fund and approve user
@@ -181,7 +181,7 @@ describe("Lifecycle + Trade integration", () => {
     const start = now - 50n;
     const end = now + 200n;
     const settlementTs = end + 10n;
-    await core.createMarket(0, 4, 1, Number(start), Number(end), Number(settlementTs), 4, ethers.parseEther("1"), ethers.ZeroAddress);
+    await core.createMarketUniform(0, 4, 1, Number(start), Number(end), Number(settlementTs), 4, ethers.parseEther("1"), ethers.ZeroAddress);
 
     await payment.transfer(user.address, 10_000_000n);
     await payment.connect(user).approve(await core.getAddress(), ethers.MaxUint256);
@@ -222,7 +222,7 @@ describe("Lifecycle + Trade integration", () => {
     const start = now + 100n;
     const end = start + 100n;
     const settlementTs = end + 50n;
-    await core.createMarket(0, 4, 1, Number(start), Number(end), Number(settlementTs), 4, ethers.parseEther("1"), ethers.ZeroAddress);
+    await core.createMarketUniform(0, 4, 1, Number(start), Number(end), Number(settlementTs), 4, ethers.parseEther("1"), ethers.ZeroAddress);
 
     await payment.transfer(user.address, 10_000_000n);
     await payment.connect(user).approve(await core.getAddress(), ethers.MaxUint256);

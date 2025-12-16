@@ -24,6 +24,8 @@ function buildDigest(
   return ethers.keccak256(encoded);
 }
 
+const WAD = ethers.parseEther("1");
+
 function cloneMarket(
   market: ISignalsCore.MarketStruct,
   overrides: Partial<ISignalsCore.MarketStruct> = {}
@@ -49,6 +51,7 @@ function cloneMarket(
     feePolicy: market.feePolicy,
     initialRootSum: market.initialRootSum,
     accumulatedFees: market.accumulatedFees,
+    minFactor: market.minFactor ?? WAD, // Phase 7: Default to uniform prior
     ...overrides,
   };
 }
@@ -56,16 +59,24 @@ function cloneMarket(
 describe("MarketLifecycleModule", () => {
   async function setup() {
     const [owner, oracleSigner] = await ethers.getSigners();
-    const payment = await (await ethers.getContractFactory("MockPaymentToken")).deploy();
-    const position = await (await ethers.getContractFactory("MockSignalsPosition")).deploy();
-    const lazyLib = await (await ethers.getContractFactory("LazyMulSegmentTree")).deploy();
+    const payment = await (
+      await ethers.getContractFactory("MockPaymentToken")
+    ).deploy();
+    const position = await (
+      await ethers.getContractFactory("MockSignalsPosition")
+    ).deploy();
+    const lazyLib = await (
+      await ethers.getContractFactory("LazyMulSegmentTree")
+    ).deploy();
 
     const lifecycleImpl = (await (
       await ethers.getContractFactory("MarketLifecycleModule", {
         libraries: { LazyMulSegmentTree: lazyLib.target },
       })
     ).deploy()) as MarketLifecycleModule;
-    const oracleModule = (await (await ethers.getContractFactory("OracleModule")).deploy()) as OracleModule;
+    const oracleModule = (await (
+      await ethers.getContractFactory("OracleModule")
+    ).deploy()) as OracleModule;
 
     const coreImpl = (await (
       await ethers.getContractFactory("SignalsCoreHarness", {
@@ -79,8 +90,13 @@ describe("MarketLifecycleModule", () => {
       120,
       60,
     ]);
-    const proxy = await (await ethers.getContractFactory("TestERC1967Proxy")).deploy(coreImpl.target, initData);
-    const core = (await ethers.getContractAt("SignalsCoreHarness", proxy.target)) as SignalsCoreHarness;
+    const proxy = await (
+      await ethers.getContractFactory("TestERC1967Proxy")
+    ).deploy(coreImpl.target, initData);
+    const core = (await ethers.getContractAt(
+      "SignalsCoreHarness",
+      proxy.target
+    )) as SignalsCoreHarness;
 
     await core.setModules(
       ethers.ZeroAddress,
@@ -108,7 +124,7 @@ describe("MarketLifecycleModule", () => {
     const now = BigInt(await time.latest());
     const start = now - 100n;
     const end = now + 200n;
-    await core.createMarket(
+    await core.createMarketUniform(
       0,
       4,
       1,
@@ -131,7 +147,7 @@ describe("MarketLifecycleModule", () => {
 
     const lifecycleEvents = lifecycle.attach(await core.getAddress());
 
-    const marketId = await core.createMarket.staticCall(
+    const marketId = await core.createMarketUniform.staticCall(
       0,
       4,
       1,
@@ -143,7 +159,17 @@ describe("MarketLifecycleModule", () => {
       ethers.ZeroAddress
     );
     await expect(
-      core.createMarket(0, 4, 1, Number(start), Number(end), Number(settlementTs), 4, ethers.parseEther("1"), ethers.ZeroAddress)
+      core.createMarketUniform(
+        0,
+        4,
+        1,
+        Number(start),
+        Number(end),
+        Number(settlementTs),
+        4,
+        ethers.parseEther("1"),
+        ethers.ZeroAddress
+      )
     ).to.emit(lifecycleEvents, "MarketCreated");
 
     const market = await core.markets(marketId);
@@ -157,43 +183,96 @@ describe("MarketLifecycleModule", () => {
   it("rejects invalid market parameters and time ranges", async () => {
     const { core, lifecycle } = await setup();
     await expect(
-      core.createMarket(0, 0, 1, 0, 1, 1, 1, ethers.parseEther("1"), ethers.ZeroAddress)
+      core.createMarketUniform(
+        0,
+        0,
+        1,
+        0,
+        1,
+        1,
+        1,
+        ethers.parseEther("1"),
+        ethers.ZeroAddress
+      )
     ).to.be.revertedWithCustomError(lifecycle, "InvalidMarketParameters");
 
     await expect(
-      core.createMarket(0, 4, 0, 0, 1, 1, 1, ethers.parseEther("1"), ethers.ZeroAddress)
+      core.createMarketUniform(
+        0,
+        4,
+        0,
+        0,
+        1,
+        1,
+        1,
+        ethers.parseEther("1"),
+        ethers.ZeroAddress
+      )
     ).to.be.revertedWithCustomError(lifecycle, "InvalidMarketParameters");
 
     await expect(
-      core.createMarket(0, 4, 1, 10, 5, 5, 4, ethers.parseEther("1"), ethers.ZeroAddress)
+      core.createMarketUniform(
+        0,
+        4,
+        1,
+        10,
+        5,
+        5,
+        4,
+        ethers.parseEther("1"),
+        ethers.ZeroAddress
+      )
     ).to.be.revertedWithCustomError(lifecycle, "InvalidTimeRange");
 
     await expect(
-      core.createMarket(0, 4, 1, 0, 10, 5, 4, ethers.parseEther("1"), ethers.ZeroAddress)
+      core.createMarketUniform(
+        0,
+        4,
+        1,
+        0,
+        10,
+        5,
+        4,
+        ethers.parseEther("1"),
+        ethers.ZeroAddress
+      )
     ).to.be.revertedWithCustomError(lifecycle, "InvalidTimeRange");
 
     await expect(
-      core.createMarket(0, 4, 1, 0, 10, 10, 4, 0, ethers.ZeroAddress)
+      core.createMarketUniform(0, 4, 1, 0, 10, 10, 4, 0, ethers.ZeroAddress)
     ).to.be.revertedWithCustomError(lifecycle, "InvalidLiquidityParameter");
   });
 
   it("settles market when candidate exists and marks snapshot state", async () => {
-    const { core, lifecycle, oracleModule, oracleSigner, chainId } = await setup();
+    const { core, lifecycle, oracleModule, oracleSigner, chainId } =
+      await setup();
     const { end } = await createDefaultMarket(core);
     const lifecycleEvents = lifecycle.attach(await core.getAddress());
 
     const candidateTs = end + 10n;
     await time.setNextBlockTimestamp(Number(candidateTs + 1n));
-    const digest = buildDigest(chainId, await core.getAddress(), 1, 2n, candidateTs);
+    const digest = buildDigest(
+      chainId,
+      await core.getAddress(),
+      1,
+      2n,
+      candidateTs
+    );
     const sig = await oracleSigner.signMessage(ethers.getBytes(digest));
     await core.submitSettlementPrice(1, 2n, candidateTs, sig);
 
     // set open positions to keep snapshotChunksDone false
     const marketBefore = await core.markets(1);
-    await core.harnessSetMarket(1, cloneMarket(marketBefore, { openPositionCount: 10 }));
+    await core.harnessSetMarket(
+      1,
+      cloneMarket(marketBefore, { openPositionCount: 10 })
+    );
 
     await time.setNextBlockTimestamp(Number(candidateTs + 5n));
-    await expect(core.settleMarket(1)).to.emit(lifecycleEvents, "MarketSettled");
+    await expect(core.settleMarket(1)).to.emit(
+      lifecycleEvents,
+      "MarketSettled"
+    );
 
     const market = await core.markets(1);
     expect(market.settled).to.equal(true);
@@ -209,26 +288,31 @@ describe("MarketLifecycleModule", () => {
   });
 
   it("settleMarket enforces candidate and window checks", async () => {
-    const { core, lifecycle, oracleModule, oracleSigner, chainId } = await setup();
+    const { core, lifecycle, oracleModule, oracleSigner, chainId } =
+      await setup();
     const { end } = await createDefaultMarket(core);
     lifecycle.attach(await core.getAddress()); // Attach for event access
 
-    await expect(core.settleMarket(1)).to.be.revertedWithCustomError(lifecycle, "SettlementOracleCandidateMissing");
+    await expect(core.settleMarket(1)).to.be.revertedWithCustomError(
+      lifecycle,
+      "SettlementOracleCandidateMissing"
+    );
 
     // too early candidate timestamp
     const earlyTs = end - 5n;
     let digest = buildDigest(chainId, await core.getAddress(), 1, 1n, earlyTs);
     let sig = await oracleSigner.signMessage(ethers.getBytes(digest));
-    await expect(core.submitSettlementPrice(1, 1n, earlyTs, sig)).to.be.revertedWithCustomError(
-      oracleModule,
-      "SettlementTooEarly"
-    );
+    await expect(
+      core.submitSettlementPrice(1, 1n, earlyTs, sig)
+    ).to.be.revertedWithCustomError(oracleModule, "SettlementTooEarly");
 
     // too late candidate
     const lateTs = end + 130n; // submit window 120
     digest = buildDigest(chainId, await core.getAddress(), 1, 1n, lateTs);
     sig = await oracleSigner.signMessage(ethers.getBytes(digest));
-    await expect(core.submitSettlementPrice(1, 1n, lateTs, sig)).to.be.revertedWithCustomError(
+    await expect(
+      core.submitSettlementPrice(1, 1n, lateTs, sig)
+    ).to.be.revertedWithCustomError(
       oracleModule,
       "SettlementFinalizeWindowClosed"
     );
@@ -284,10 +368,9 @@ describe("MarketLifecycleModule", () => {
 
     await expect(core.setMarketActive(1, true)).not.to.be.reverted;
 
-    await expect(core.updateMarketTiming(1, 10, 5, 5)).to.be.revertedWithCustomError(
-      lifecycle,
-      "InvalidTimeRange"
-    );
+    await expect(
+      core.updateMarketTiming(1, 10, 5, 5)
+    ).to.be.revertedWithCustomError(lifecycle, "InvalidTimeRange");
 
     await core.updateMarketTiming(1, 5, 10, 15);
     market = await core.markets(1);
@@ -302,25 +385,31 @@ describe("MarketLifecycleModule", () => {
     const lifecycleEvents = lifecycle.attach(await core.getAddress());
 
     const market = await core.markets(1);
-    await core.harnessSetMarket(1, cloneMarket(market, { settled: true, openPositionCount: 1000 }));
+    await core.harnessSetMarket(
+      1,
+      cloneMarket(market, { settled: true, openPositionCount: 1000 })
+    );
 
     const totalChunks = 2; // ceil(1000/512)
     const tx1 = await core.requestSettlementChunks(1, 1);
-    await expect(tx1).to.emit(lifecycleEvents, "SettlementChunkRequested").withArgs(1, 0);
+    await expect(tx1)
+      .to.emit(lifecycleEvents, "SettlementChunkRequested")
+      .withArgs(1, 0);
     let updated = await core.markets(1);
     expect(updated.snapshotChunkCursor).to.equal(1);
     expect(updated.snapshotChunksDone).to.equal(false);
 
     const tx2 = await core.requestSettlementChunks(1, 5);
-    await expect(tx2).to.emit(lifecycleEvents, "SettlementChunkRequested").withArgs(1, 1);
+    await expect(tx2)
+      .to.emit(lifecycleEvents, "SettlementChunkRequested")
+      .withArgs(1, 1);
     updated = await core.markets(1);
     expect(updated.snapshotChunkCursor).to.equal(totalChunks);
     expect(updated.snapshotChunksDone).to.equal(true);
 
-    await expect(core.requestSettlementChunks(1, 1)).to.be.revertedWithCustomError(
-      lifecycle,
-      "SnapshotAlreadyCompleted"
-    );
+    await expect(
+      core.requestSettlementChunks(1, 1)
+    ).to.be.revertedWithCustomError(lifecycle, "SnapshotAlreadyCompleted");
   });
 
   it("rejects re-settlement and supports multi-chunk ordering", async () => {
@@ -340,17 +429,26 @@ describe("MarketLifecycleModule", () => {
       })
     );
 
-    await expect(core.settleMarket(1)).to.be.revertedWithCustomError(lifecycle, "MarketAlreadySettled");
+    await expect(core.settleMarket(1)).to.be.revertedWithCustomError(
+      lifecycle,
+      "MarketAlreadySettled"
+    );
 
     const tx1 = await core.requestSettlementChunks(1, 2);
-    await expect(tx1).to.emit(lifecycleEvents, "SettlementChunkRequested").withArgs(1, 0);
-    await expect(tx1).to.emit(lifecycleEvents, "SettlementChunkRequested").withArgs(1, 1);
+    await expect(tx1)
+      .to.emit(lifecycleEvents, "SettlementChunkRequested")
+      .withArgs(1, 0);
+    await expect(tx1)
+      .to.emit(lifecycleEvents, "SettlementChunkRequested")
+      .withArgs(1, 1);
     let updated = await core.markets(1);
     expect(updated.snapshotChunkCursor).to.equal(2);
     expect(updated.snapshotChunksDone).to.equal(false);
 
     const tx2 = await core.requestSettlementChunks(1, 2);
-    await expect(tx2).to.emit(lifecycleEvents, "SettlementChunkRequested").withArgs(1, 2);
+    await expect(tx2)
+      .to.emit(lifecycleEvents, "SettlementChunkRequested")
+      .withArgs(1, 2);
     updated = await core.markets(1);
     expect(updated.snapshotChunkCursor).to.equal(3);
     expect(updated.snapshotChunksDone).to.equal(true);
@@ -361,19 +459,26 @@ describe("MarketLifecycleModule", () => {
     await createDefaultMarket(core);
     const lifecycleEvents = lifecycle.attach(await core.getAddress());
     const market = await core.markets(1);
-    await core.harnessSetMarket(1, cloneMarket(market, { settled: true, openPositionCount: 0 }));
+    await core.harnessSetMarket(
+      1,
+      cloneMarket(market, { settled: true, openPositionCount: 0 })
+    );
 
-    await expect(core.requestSettlementChunks(1, 0)).to.be.revertedWithCustomError(lifecycle, "ZeroLimit");
+    await expect(
+      core.requestSettlementChunks(1, 0)
+    ).to.be.revertedWithCustomError(lifecycle, "ZeroLimit");
 
     const emitted = await core.requestSettlementChunks(1, 5);
-    await expect(emitted).to.not.emit(lifecycleEvents, "SettlementChunkRequested");
+    await expect(emitted).to.not.emit(
+      lifecycleEvents,
+      "SettlementChunkRequested"
+    );
     const updated = await core.markets(1);
     expect(updated.snapshotChunksDone).to.equal(true);
 
     await core.harnessSetMarket(1, cloneMarket(market, { settled: false }));
-    await expect(core.requestSettlementChunks(1, 1)).to.be.revertedWithCustomError(
-      lifecycle,
-      "MarketNotSettled"
-    );
+    await expect(
+      core.requestSettlementChunks(1, 1)
+    ).to.be.revertedWithCustomError(lifecycle, "MarketNotSettled");
   });
 });

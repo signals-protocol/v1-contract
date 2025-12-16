@@ -93,6 +93,7 @@ describe("Rounding Invariants", () => {
       feePolicy: ethers.ZeroAddress,
       initialRootSum: BigInt(NUM_BINS) * WAD,
       accumulatedFees: 0n,
+      minFactor: WAD, // Phase 7: uniform prior
     };
     await core.setMarket(MARKET_ID, market);
     await core.seedTree(MARKET_ID, Array(NUM_BINS).fill(WAD));
