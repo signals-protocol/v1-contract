@@ -104,7 +104,18 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         uint256 deltaEt = _calculateDeltaEt(liquidityParameter, numBins, rootSum, minFactor);
         _validatePriorAdmissibility(deltaEt);
 
+        // Phase 7: One market per batch invariant (WP v2)
+        // Each batch processes exactly one market to simplify ΔEₜ admissibility
+        uint64 batchId = uint64(settlementTimestamp / BATCH_SECONDS);
+        uint256 existingMarket = _batchIdToMarketId[batchId];
+        if (existingMarket != 0) {
+            revert CE.BatchAlreadyHasMarket(batchId, existingMarket);
+        }
+
         marketId = ++nextMarketId;
+        
+        // Register market for this batch
+        _batchIdToMarketId[batchId] = marketId;
         ISignalsCore.Market storage market = markets[marketId];
         market.isActive = true;
         market.settled = false;
@@ -285,6 +296,13 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         if (!_marketExists(marketId)) revert CE.MarketNotFound(marketId);
         // Can reopen either settled or failed markets
         if (!market.settled && !market.failed) revert CE.MarketNotSettled(marketId);
+
+        // Phase 7: Re-validate α safety (drawdown may have increased since creation)
+        // Per WP v2: αlimit decreases with drawdown, so reopen must re-check
+        _validateAlphaForMarket(market.liquidityParameter, market.numBins);
+        
+        // Phase 7: Re-validate prior admissibility (backstopNav may have changed)
+        _validatePriorAdmissibility(market.deltaEt);
 
         market.settled = false;
         market.failed = false;
@@ -515,6 +533,13 @@ contract MarketLifecycleModule is SignalsCoreStorage {
 
     /**
      * @notice Record P&L and ΔEₜ to daily batch
+     * @dev Phase 7: Multi-market prior admissibility check (WP v2 Sec 4.1)
+     *      When multiple markets settle in the same batch, their ΔEₜ values are summed.
+     *      The batch's total ΔEₜ acts as the grant cap in FeeWaterfallLib.
+     *      This function performs an early check: if batchDeltaEt > backstopNav,
+     *      it's impossible for the batch to process successfully (grant would exceed cap).
+     *      Note: backstopNav may change between settle and batch processing, so this is
+     *      an early warning, not a guarantee. Final enforcement is in FeeWaterfallLib.
      * @param batchId Batch identifier
      * @param lt P&L to add
      * @param ftot Fees to add
@@ -526,6 +551,13 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         snap.Lt += lt;
         snap.Ftot += ftot;
         snap.DeltaEtSum += deltaEt;
+        
+        // Phase 7: Early check for multi-market batch admissibility
+        // If total ΔEₜ exceeds backstopNav, batch will fail when processed
+        // Revert early to provide faster feedback to operators
+        if (snap.DeltaEtSum > capitalStack.backstopNav) {
+            revert CE.BatchDeltaEtExceedsBackstop(snap.DeltaEtSum, capitalStack.backstopNav);
+        }
     }
 
     /**
@@ -622,17 +654,19 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         }
         
         // ΔEₜ = α * ln(rootSum / uniformSum)
-        // Using: ln(a/b) = ln(a) - ln(b), and wLn for WAD-scaled log
-        // For safety, we compute conservatively
+        // SAFETY: Compute conservatively (upper bound) for prior admissibility
+        // Over-estimating ΔEₜ → more priors rejected → safer
         
-        // ratio = rootSum / uniformSum (in WAD)
-        uint256 ratio = rootSum.wDiv(uniformSum);
+        // ratio = rootSum / uniformSum (in WAD scale) - use ceiling division
+        uint256 ratio = rootSum.wDivUp(uniformSum);
         
         // ln(ratio) where ratio > 1 WAD
-        uint256 lnRatio = FixedPointMathU.wLn(ratio);
+        // wLn expects WAD-scaled input and returns WAD-scaled output
+        // Add 1 wei for conservative upper bound
+        uint256 lnRatio = FixedPointMathU.wLn(ratio) + 1;
         
-        // ΔEₜ = α * lnRatio
-        deltaEt = alpha.wMul(lnRatio);
+        // ΔEₜ = α * lnRatio - use ceiling multiplication
+        deltaEt = alpha.wMulUp(lnRatio);
     }
 
     /**

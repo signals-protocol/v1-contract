@@ -20,6 +20,7 @@ interface CLMSRErrors {
     error SettlementWindowNotExpired(uint64 deadline, uint64 currentTime);
     error BatchAlreadyProcessed(uint64 batchId);
     error BatchNotProcessed(uint64 batchId);
+    error BatchAlreadyHasMarket(uint64 batchId, uint256 existingMarketId);
 
     /* Trade params */
     error InvalidTick(int256 tick, int256 minTick, int256 maxTick);
@@ -59,6 +60,8 @@ interface CLMSRErrors {
     /* Risk / α Safety (Phase 7) */
     error AlphaExceedsLimit(uint256 marketAlpha, uint256 alphaLimit);
     error PriorNotAdmissible(uint256 deltaEt, uint256 effectiveBackstop);
+    error InvalidLambda(uint256 lambda);
+    error BatchDeltaEtExceedsBackstop(uint256 batchDeltaEt, uint256 backstopNav);
 
     /* Trade / math */
     error MathMulOverflow();
@@ -104,6 +107,7 @@ library CE {
     error SettlementWindowNotExpired(uint64 deadline, uint64 currentTime);
     error BatchAlreadyProcessed(uint64 batchId);
     error BatchNotProcessed(uint64 batchId);
+    error BatchAlreadyHasMarket(uint64 batchId, uint256 existingMarketId);
 
     /* Trade params */
     error InvalidTick(int256 tick, int256 minTick, int256 maxTick);
@@ -143,6 +147,8 @@ library CE {
     /* Risk / α Safety (Phase 7) */
     error AlphaExceedsLimit(uint256 marketAlpha, uint256 alphaLimit);
     error PriorNotAdmissible(uint256 deltaEt, uint256 effectiveBackstop);
+    error InvalidLambda(uint256 lambda);
+    error BatchDeltaEtExceedsBackstop(uint256 batchDeltaEt, uint256 backstopNav);
 
     /* Trade / math */
     error MathMulOverflow();

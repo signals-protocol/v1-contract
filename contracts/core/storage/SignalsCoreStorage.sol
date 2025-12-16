@@ -274,6 +274,11 @@ abstract contract SignalsCoreStorage {
     /// @notice Risk configuration (Phase 7)
     RiskConfig internal riskConfig;
 
+    /// @notice Batch ID → Market ID mapping (WP v2: one market per batch)
+    /// @dev Enforces 1:1 relationship between batch and market.
+    ///      0 means no market for that batch yet.
+    mapping(uint64 => uint256) internal _batchIdToMarketId;
+
     // Reserve ample slots for future upgrades; do not change after first deployment.
-    uint256[14] internal __gap;
+    uint256[13] internal __gap;
 }
