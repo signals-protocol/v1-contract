@@ -34,6 +34,12 @@ interface ISignalsCore {
         uint256 initialRootSum;
         // Gross fees collected from trades, stored in WAD units (Phase 6)
         uint256 accumulatedFees;
+
+        // Phase 7: Prior-based ΔEₜ calculation
+        // minFactor = min(baseFactors) at market creation (WAD)
+        // Used to compute ΔEₜ = α * ln(rootSum / (n * minFactor))
+        // Uniform prior: minFactor = 1 WAD → ΔEₜ = 0
+        uint256 minFactor;
     }
 
     // Trade / lifecycle entrypoints (signatures preserved for parity)
@@ -90,6 +96,18 @@ interface ISignalsCore {
     function requestSettlementChunks(uint256 marketId, uint32 maxChunksPerTx) external returns (uint32 emitted);
 
     // Lifecycle / oracle admin
+    /// @notice Create a new market with prior-based factors
+    /// @param minTick Lower tick bound (inclusive)
+    /// @param maxTick Upper tick bound (exclusive)
+    /// @param tickSpacing Spacing between ticks
+    /// @param startTimestamp When trading starts
+    /// @param endTimestamp When trading ends
+    /// @param settlementTimestamp When settlement occurs
+    /// @param numBins Number of outcome bins
+    /// @param liquidityParameter α (alpha) for CLMSR
+    /// @param feePolicy Address of fee policy contract
+    /// @param baseFactors Prior factors in WAD (length = numBins). All 1e18 = uniform prior.
+    ///        Concentrated prior: factors vary. ΔEₜ calculated from min(factors).
     function createMarket(
         int256 minTick,
         int256 maxTick,
@@ -99,7 +117,8 @@ interface ISignalsCore {
         uint64 settlementTimestamp,
         uint32 numBins,
         uint256 liquidityParameter,
-        address feePolicy
+        address feePolicy,
+        uint256[] calldata baseFactors
     ) external returns (uint256 marketId);
 
     function settleMarket(uint256 marketId) external;

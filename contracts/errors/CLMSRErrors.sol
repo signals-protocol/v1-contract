@@ -58,6 +58,7 @@ interface CLMSRErrors {
     
     /* Risk / α Safety (Phase 7) */
     error AlphaExceedsLimit(uint256 marketAlpha, uint256 alphaLimit);
+    error PriorNotAdmissible(uint256 deltaEt, uint256 effectiveBackstop);
 
     /* Trade / math */
     error MathMulOverflow();
@@ -141,6 +142,7 @@ library CE {
     
     /* Risk / α Safety (Phase 7) */
     error AlphaExceedsLimit(uint256 marketAlpha, uint256 alphaLimit);
+    error PriorNotAdmissible(uint256 deltaEt, uint256 effectiveBackstop);
 
     /* Trade / math */
     error MathMulOverflow();

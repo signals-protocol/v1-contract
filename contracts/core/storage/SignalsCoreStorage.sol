@@ -267,7 +267,7 @@ abstract contract SignalsCoreStorage {
     struct RiskConfig {
         uint256 lambda;      // λ: Safety parameter (WAD), e.g., 0.3e18 = 30% max drawdown
         uint256 kDrawdown;   // k: Drawdown sensitivity factor (WAD), typically 1.0e18
-        bool enforceAlpha;   // Whether to enforce α limits on trades
+        bool enforceAlpha;   // Whether to enforce α bounds at market config time (create/reopen)
     }
 
     /// @notice Risk configuration (Phase 7)
