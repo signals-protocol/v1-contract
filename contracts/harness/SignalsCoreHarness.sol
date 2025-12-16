@@ -111,4 +111,43 @@ contract SignalsCoreHarness is SignalsCore {
     function harnessGetPayoutReserve(uint256 marketId) external view returns (uint256 reserve) {
         return _payoutReserve[marketId];
     }
+
+    // ============================================================
+    // Phase 7: Backward-compatible createMarket for tests
+    // ============================================================
+
+    /// @notice Create market with uniform prior (backward compatible for tests)
+    /// @dev Generates uniform factors (all 1 WAD) internally
+    function createMarketUniform(
+        int256 minTick,
+        int256 maxTick,
+        int256 tickSpacing,
+        uint64 startTimestamp,
+        uint64 endTimestamp,
+        uint64 settlementTimestamp,
+        uint32 numBins,
+        uint256 liquidityParameter,
+        address feePolicy
+    ) external onlyOwner whenNotPaused returns (uint256 marketId) {
+        // Generate uniform factors for backward compatibility
+        uint256[] memory factors = new uint256[](numBins);
+        for (uint256 i = 0; i < numBins; i++) {
+            factors[i] = 1e18;
+        }
+        
+        bytes memory ret = _delegate(lifecycleModule, abi.encodeWithSignature(
+            "createMarket(int256,int256,int256,uint64,uint64,uint64,uint32,uint256,address,uint256[])",
+            minTick,
+            maxTick,
+            tickSpacing,
+            startTimestamp,
+            endTimestamp,
+            settlementTimestamp,
+            numBins,
+            liquidityParameter,
+            feePolicy,
+            factors
+        ));
+        if (ret.length > 0) marketId = abi.decode(ret, (uint256));
+    }
 }

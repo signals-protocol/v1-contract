@@ -61,6 +61,11 @@ contract MarketLifecycleModule is SignalsCoreStorage {
 
     // --- External ---
 
+    /// @notice Create a new market with prior-based factors (Phase 7)
+    /// @dev Per WP v2: Factors define the opening prior q₀,t
+    ///      - Uniform prior: all factors = 1 WAD → ΔEₜ = 0
+    ///      - Concentrated prior: factors vary → ΔEₜ > 0
+    ///      Prior admissibility is checked: ΔEₜ ≤ B_eff
     function createMarket(
         int256 minTick,
         int256 maxTick,
@@ -70,7 +75,8 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         uint64 settlementTimestamp,
         uint32 numBins,
         uint256 liquidityParameter,
-        address feePolicy
+        address feePolicy,
+        uint256[] calldata baseFactors
     ) external onlyDelegated returns (uint256 marketId) {
         _validateMarketParams(minTick, maxTick, tickSpacing, startTimestamp, endTimestamp, settlementTimestamp);
         if (numBins == 0) revert CE.BinCountExceedsLimit(0, MAX_BIN_COUNT);
@@ -78,9 +84,25 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         uint32 expectedBins = uint32(uint256((maxTick - minTick) / tickSpacing));
         if (expectedBins != numBins) revert CE.InvalidMarketParameters(minTick, maxTick, tickSpacing);
         if (liquidityParameter == 0) revert CE.InvalidLiquidityParameter();
+        if (baseFactors.length != numBins) revert CE.InvalidMarketParameters(minTick, maxTick, tickSpacing);
         
         // Phase 7: α Safety enforcement (WP v2 Sec 4.5)
         _validateAlphaForMarket(liquidityParameter, numBins);
+
+        // Calculate minFactor and rootSum from baseFactors for ΔEₜ calculation
+        uint256 minFactor = type(uint256).max;
+        uint256 rootSum = 0;
+        for (uint256 i = 0; i < numBins; i++) {
+            if (baseFactors[i] == 0) revert CE.InvalidFactor(baseFactors[i]);
+            if (baseFactors[i] < minFactor) minFactor = baseFactors[i];
+            rootSum += baseFactors[i];
+        }
+
+        // Phase 7: Prior admissibility check (WP v2 Sec 4.1)
+        // ΔEₜ := α * ln(rootSum / (n * minFactor))
+        // Admissibility: ΔEₜ ≤ B_eff_{t-1} ≤ backstopNav
+        uint256 deltaEt = _calculateDeltaEt(liquidityParameter, numBins, rootSum, minFactor);
+        _validatePriorAdmissibility(deltaEt);
 
         marketId = ++nextMarketId;
         ISignalsCore.Market storage market = markets[marketId];
@@ -100,18 +122,14 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         market.settlementValue = 0;
         market.liquidityParameter = liquidityParameter;
         market.feePolicy = feePolicy;
+        market.minFactor = minFactor; // Phase 7: Store for ΔEₜ calculation
 
         LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
         tree.init(numBins);
-        uint256[] memory factors = new uint256[](numBins);
-        for (uint256 i = 0; i < numBins; i++) {
-            factors[i] = 1e18;
-        }
-        tree.seedWithFactors(factors);
+        tree.seedWithFactors(baseFactors);
 
         // Phase 6: Store initial root sum for P&L calculation
-        // Z_start = n * WAD (uniform prior, all factors = 1.0)
-        market.initialRootSum = uint256(numBins) * WAD;
+        market.initialRootSum = rootSum;
 
         emit MarketCreated(marketId);
     }
@@ -556,6 +574,75 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         
         if (liquidityParameter > alphaLimit) {
             revert CE.AlphaExceedsLimit(liquidityParameter, alphaLimit);
+        }
+    }
+
+    // ============================================================
+    // Phase 7: ΔEₜ Calculation and Prior Admissibility
+    // ============================================================
+
+    /**
+     * @notice Calculate ΔEₜ (tail budget) from prior factors
+     * @dev Per WP v2 Sec 4.1:
+     *      E_ent(q₀,t) = C(q₀,t) - min_j q₀,t,j
+     *      where q_b = α * ln(factor_b), C(q) = α * ln(rootSum)
+     *      
+     *      For general prior:
+     *        E_ent = α * ln(rootSum) - α * ln(minFactor) = α * ln(rootSum/minFactor)
+     *      
+     *      ΔEₜ = E_ent - α*ln(n) = α * ln(rootSum / (n * minFactor))
+     *      
+     *      Uniform prior (all factors = 1 WAD):
+     *        rootSum = n * WAD, minFactor = WAD → ΔEₜ = 0
+     *
+     * @param alpha Market liquidity parameter α (WAD)
+     * @param numBins Number of outcome bins n
+     * @param rootSum Sum of all factors (WAD)
+     * @param minFactor Minimum factor value (WAD)
+     * @return deltaEt Tail budget (WAD)
+     */
+    function _calculateDeltaEt(
+        uint256 alpha,
+        uint32 numBins,
+        uint256 rootSum,
+        uint256 minFactor
+    ) internal pure returns (uint256 deltaEt) {
+        // ΔEₜ = α * ln(rootSum / (n * minFactor))
+        // If rootSum == n * minFactor (uniform), ΔEₜ = 0
+        
+        uint256 uniformSum = uint256(numBins) * minFactor;
+        
+        if (rootSum <= uniformSum) {
+            // Uniform or near-uniform prior → no tail risk
+            return 0;
+        }
+        
+        // ΔEₜ = α * ln(rootSum / uniformSum)
+        // Using: ln(a/b) = ln(a) - ln(b), and wLn for WAD-scaled log
+        // For safety, we compute conservatively
+        
+        // ratio = rootSum / uniformSum (in WAD)
+        uint256 ratio = rootSum.wDiv(uniformSum);
+        
+        // ln(ratio) where ratio > 1 WAD
+        uint256 lnRatio = FixedPointMathU.wLn(ratio);
+        
+        // ΔEₜ = α * lnRatio
+        deltaEt = alpha.wMul(lnRatio);
+    }
+
+    /**
+     * @notice Validate prior admissibility
+     * @dev Per WP v2: ΔEₜ ≤ B_eff_{t-1} ≤ backstopNav
+     *      If violated, revert with PriorNotAdmissible
+     * @param deltaEt Calculated tail budget (WAD)
+     */
+    function _validatePriorAdmissibility(uint256 deltaEt) internal view {
+        // B_eff = backstopNav (simplified; full version would account for pending grants)
+        uint256 effectiveBackstop = capitalStack.backstopNav;
+        
+        if (deltaEt > effectiveBackstop) {
+            revert CE.PriorNotAdmissible(deltaEt, effectiveBackstop);
         }
     }
 }

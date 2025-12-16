@@ -123,7 +123,7 @@ contract SignalsCore is
     ///      This function enforces the relationship by auto-updating pdd when lambda is set.
     /// @param lambda λ: Safety parameter (WAD), e.g., 0.3e18 = 30% max drawdown
     /// @param kDrawdown k: Drawdown sensitivity factor (WAD), typically 1.0e18
-    /// @param enforceAlpha Whether to enforce α limits on trades
+    /// @param enforceAlpha Whether to enforce α bounds at market configuration time (create/reopen)
     function setRiskConfig(
         uint256 lambda,
         uint256 kDrawdown,
@@ -263,6 +263,11 @@ contract SignalsCore is
 
     // --- Lifecycle / oracle ---
 
+    /// @notice Create a new market with prior-based factors (Phase 7)
+    /// @dev Per WP v2: baseFactors define the opening prior q₀,t
+    ///      - Uniform prior: all factors = 1 WAD → ΔEₜ = 0
+    ///      - Concentrated prior: factors vary → ΔEₜ > 0
+    ///      Prior admissibility is checked: ΔEₜ ≤ B_eff
     function createMarket(
         int256 minTick,
         int256 maxTick,
@@ -272,10 +277,11 @@ contract SignalsCore is
         uint64 settlementTimestamp,
         uint32 numBins,
         uint256 liquidityParameter,
-        address feePolicy
+        address feePolicy,
+        uint256[] calldata baseFactors
     ) external override onlyOwner whenNotPaused returns (uint256 marketId) {
         bytes memory ret = _delegate(lifecycleModule, abi.encodeWithSignature(
-            "createMarket(int256,int256,int256,uint64,uint64,uint64,uint32,uint256,address)",
+            "createMarket(int256,int256,int256,uint64,uint64,uint64,uint32,uint256,address,uint256[])",
             minTick,
             maxTick,
             tickSpacing,
@@ -284,7 +290,8 @@ contract SignalsCore is
             settlementTimestamp,
             numBins,
             liquidityParameter,
-            feePolicy
+            feePolicy,
+            baseFactors
         ));
         if (ret.length > 0) marketId = abi.decode(ret, (uint256));
     }
