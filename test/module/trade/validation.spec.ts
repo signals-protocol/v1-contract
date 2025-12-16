@@ -26,6 +26,7 @@ type MarketStruct = {
   initialRootSum: bigint;
   accumulatedFees: bigint;
   minFactor: bigint; // Phase 7
+  deltaEt: bigint; // Phase 7
 };
 
 function buildMarket(
@@ -54,7 +55,8 @@ function buildMarket(
     feePolicy: ethers.ZeroAddress,
     initialRootSum: BigInt(numBins) * ethers.parseEther("1"),
     accumulatedFees: 0n,
-      minFactor: WAD, // Phase 7: uniform prior
+    minFactor: WAD, // Phase 7: uniform prior
+    deltaEt: 0n, // Phase 7: uniform prior → ΔEₜ = 0
   };
   return { ...market, ...overrides };
 }

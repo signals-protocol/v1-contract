@@ -165,7 +165,7 @@ describe("UnitSystem Spec Tests (WP v2 Sec 6.2 + Appendix C)", () => {
       // Create a scenario where deposit amount doesn't divide evenly by price
       // First, change price by processing a batch with P&L
       const currentBatchId = await proxy.getCurrentBatchId();
-      await proxy.recordDailyPnl(currentBatchId + 1n, ethers.parseEther("1"), 0n);
+      await proxy.recordDailyPnl(currentBatchId + 1n, ethers.parseEther("1"), 0n, ethers.parseEther("500"));
       await proxy.processDailyBatch(currentBatchId + 1n);
 
       // Now price != 1.0, deposit may have residual
@@ -175,7 +175,7 @@ describe("UnitSystem Spec Tests (WP v2 Sec 6.2 + Appendix C)", () => {
       
       // Process batch
       const nextBatchId = await proxy.getCurrentBatchId();
-      await proxy.recordDailyPnl(nextBatchId + 1n, 0n, 0n);
+      await proxy.recordDailyPnl(nextBatchId + 1n, 0n, 0n, ethers.parseEther("500"));
       await proxy.processDailyBatch(nextBatchId + 1n);
 
       // Claim deposit
@@ -204,7 +204,7 @@ describe("UnitSystem Spec Tests (WP v2 Sec 6.2 + Appendix C)", () => {
       await proxy.connect(depositor).requestDeposit(depositAmount);
       
       const currentBatchId = await proxy.getCurrentBatchId();
-      await proxy.recordDailyPnl(currentBatchId + 1n, 0n, 0n);
+      await proxy.recordDailyPnl(currentBatchId + 1n, 0n, 0n, ethers.parseEther("500"));
       await proxy.processDailyBatch(currentBatchId + 1n);
       
       await proxy.connect(depositor).claimDeposit(0n);
@@ -262,7 +262,7 @@ describe("UnitSystem Spec Tests (WP v2 Sec 6.2 + Appendix C)", () => {
       await proxy.connect(owner).requestWithdraw(withdrawShares);
 
       const currentBatchId = await proxy.getCurrentBatchId();
-      await proxy.recordDailyPnl(currentBatchId + 1n, 0n, 0n);
+      await proxy.recordDailyPnl(currentBatchId + 1n, 0n, 0n, ethers.parseEther("500"));
       await proxy.processDailyBatch(currentBatchId + 1n);
 
       await proxy.connect(owner).claimWithdraw(0n);
@@ -381,7 +381,7 @@ describe("UnitSystem Spec Tests (WP v2 Sec 6.2 + Appendix C)", () => {
       await proxy.connect(owner).seedVault(1_000_000_000n); // 1000 USDC
 
       const currentBatchId = await proxy.getCurrentBatchId();
-      await proxy.recordDailyPnl(currentBatchId + 1n, ethers.parseEther("100"), 0n);
+      await proxy.recordDailyPnl(currentBatchId + 1n, ethers.parseEther("100"), 0n, ethers.parseEther("500"));
       await proxy.processDailyBatch(currentBatchId + 1n);
 
       // Get batch aggregation to check batchPrice

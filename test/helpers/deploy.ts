@@ -161,6 +161,7 @@ export async function deployTradeModuleSystem(
       accumulatedFees: 0n,
       // Phase 7: Prior-based ΔEₜ calculation
       minFactor: WAD, // Uniform prior: minFactor = 1 WAD
+      deltaEt: 0n, // Uniform prior: ΔEₜ = 0
     };
     await core.setMarket(marketId, market);
 

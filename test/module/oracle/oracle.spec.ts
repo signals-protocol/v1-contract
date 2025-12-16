@@ -99,6 +99,7 @@ describe("OracleModule", () => {
       initialRootSum: 4n * WAD,
       accumulatedFees: 0n,
       minFactor: WAD, // Phase 7: uniform prior
+      deltaEt: 0n, // Uniform prior: ΔEₜ = 0
     };
     await core.harnessSetMarket(1, market);
     // Seed tree for manualSettleFailedMarket tests that need P&L calculation

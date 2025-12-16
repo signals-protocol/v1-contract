@@ -52,6 +52,7 @@ function cloneMarket(
     initialRootSum: market.initialRootSum,
     accumulatedFees: market.accumulatedFees,
     minFactor: market.minFactor ?? WAD, // Phase 7: Default to uniform prior
+    deltaEt: market.deltaEt ?? 0n, // Phase 7: Default to 0 (uniform prior)
     ...overrides,
   };
 }

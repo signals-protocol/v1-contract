@@ -98,6 +98,7 @@ describe("TradeModule flow (minimal parity)", () => {
       initialRootSum: 4n * WAD,
       accumulatedFees: 0n,
       minFactor: WAD, // Phase 7: uniform prior
+      deltaEt: 0n, // Uniform prior: ΔEₜ = 0
       ...marketOverrides,
     };
     await core.setMarket(1, market);
@@ -203,6 +204,7 @@ describe("TradeModule flow (minimal parity)", () => {
       initialRootSum: m.initialRootSum,
       accumulatedFees: m.accumulatedFees,
       minFactor: m.minFactor, // Phase 7
+      deltaEt: m.deltaEt, // Phase 7
     };
     await core.setMarket(1, settledMarket);
 
@@ -251,6 +253,7 @@ describe("TradeModule flow (minimal parity)", () => {
       initialRootSum: m.initialRootSum,
       accumulatedFees: m.accumulatedFees,
       minFactor: m.minFactor, // Phase 7
+      deltaEt: m.deltaEt, // Phase 7
     };
     await core.setMarket(1, earlySettleMarket);
     await expect(core.connect(user).claimPayout(1)).to.be.reverted;
@@ -281,6 +284,7 @@ describe("TradeModule flow (minimal parity)", () => {
       initialRootSum: m2.initialRootSum,
       accumulatedFees: m2.accumulatedFees,
       minFactor: m2.minFactor, // Phase 7
+      deltaEt: m2.deltaEt, // Phase 7
     };
     await core.setMarket(1, claimableMarket);
     await core.connect(user).claimPayout(1);
@@ -317,6 +321,7 @@ describe("TradeModule flow (minimal parity)", () => {
       initialRootSum: m.initialRootSum,
       accumulatedFees: m.accumulatedFees,
       minFactor: m.minFactor, // Phase 7
+      deltaEt: m.deltaEt, // Phase 7
     };
     await core.setMarket(1, feeMarket);
     await expect(

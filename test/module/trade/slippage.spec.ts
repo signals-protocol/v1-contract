@@ -54,6 +54,7 @@ describe("TradeModule slippage and bounds", () => {
       initialRootSum: 4n * WAD,
       accumulatedFees: 0n,
       minFactor: WAD, // Phase 7: uniform prior
+      deltaEt: 0n, // Uniform prior: ΔEₜ = 0
     };
     await core.setMarket(1, settledMarket);
     

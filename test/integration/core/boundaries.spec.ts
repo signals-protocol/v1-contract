@@ -116,6 +116,7 @@ describe("Boundaries", () => {
       initialRootSum: BigInt(NUM_BINS) * WAD,
       accumulatedFees: 0n,
       minFactor: WAD, // Phase 7: uniform prior
+      deltaEt: 0n, // Uniform prior: ΔEₜ = 0
     };
     await core.setMarket(MARKET_ID, market);
 
@@ -418,6 +419,7 @@ describe("Boundaries", () => {
         initialRootSum: 10n * WAD,
         accumulatedFees: 0n,
       minFactor: WAD, // Phase 7: uniform prior
+      deltaEt: 0n, // Uniform prior: ΔEₜ = 0
       };
       await core.setMarket(2, market);
       await core.seedTree(2, Array(10).fill(WAD));
@@ -461,6 +463,7 @@ describe("Boundaries", () => {
         initialRootSum: 10n * WAD,
         accumulatedFees: 0n,
       minFactor: WAD, // Phase 7: uniform prior
+      deltaEt: 0n, // Uniform prior: ΔEₜ = 0
       };
       await core.setMarket(3, market);
       await core.seedTree(3, Array(10).fill(WAD));
@@ -504,6 +507,7 @@ describe("Boundaries", () => {
         initialRootSum: 10n * WAD,
         accumulatedFees: 0n,
       minFactor: WAD, // Phase 7: uniform prior
+      deltaEt: 0n, // Uniform prior: ΔEₜ = 0
       };
       await core.setMarket(4, market);
       await core.seedTree(4, Array(10).fill(WAD));
@@ -598,6 +602,7 @@ describe("Boundaries", () => {
         initialRootSum: 10n * WAD,
         accumulatedFees: 0n,
       minFactor: WAD, // Phase 7: uniform prior
+      deltaEt: 0n, // Uniform prior: ΔEₜ = 0
       };
       await core.setMarket(5, market);
       await core.seedTree(5, Array(10).fill(WAD));
@@ -641,6 +646,7 @@ describe("Boundaries", () => {
         initialRootSum: 10n * WAD,
         accumulatedFees: 0n,
       minFactor: WAD, // Phase 7: uniform prior
+      deltaEt: 0n, // Uniform prior: ΔEₜ = 0
       };
       await core.setMarket(6, market);
       await core.seedTree(6, Array(10).fill(WAD));
