@@ -63,6 +63,7 @@ interface CLMSRErrors {
     
     /* Free balance / Escrow safety (Phase 6) */
     error InsufficientFreeBalance(uint256 requested, uint256 available);
+    error InsufficientPayoutReserve(uint256 payout, uint256 remaining);
     
     /* Risk / α Safety (Phase 8: Moved to RiskModule as Risk_* errors) */
     // NOTE: AlphaExceedsLimit → RiskModule.Risk_AlphaExceedsLimit
@@ -157,6 +158,7 @@ library CE {
     
     /* Free balance / Escrow safety (Phase 6) */
     error InsufficientFreeBalance(uint256 requested, uint256 available);
+    error InsufficientPayoutReserve(uint256 payout, uint256 remaining);
     
     /* Risk / α Safety (Phase 8: Moved to RiskModule as Risk_* errors) */
     // NOTE: AlphaExceedsLimit → RiskModule.Risk_AlphaExceedsLimit

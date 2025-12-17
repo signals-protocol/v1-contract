@@ -81,6 +81,7 @@ contract LPVaultModule is SignalsCoreStorage {
     error InsufficientSeedAmount(uint256 provided, uint256 required);
     error ZeroAmount();
     error BatchNotReady(uint64 batchId);
+    error BatchNotEnded(uint64 batchId, uint64 batchEndTime, uint64 currentTime);
     error DailyBatchAlreadyProcessed(uint64 batchId);
     error RequestNotFound(uint64 requestId);
     error RequestNotOwned(uint64 requestId, address owner, address caller);
@@ -291,6 +292,12 @@ contract LPVaultModule is SignalsCoreStorage {
     function processDailyBatch(uint64 batchId) external onlyDelegated {
         if (!lpVault.isSeeded) revert VaultNotSeeded();
         if (batchId != currentBatchId + 1) revert BatchNotReady(batchId);
+
+        // Prevent processing future batches - batch can only be processed after its time period ends
+        uint64 batchEndTime = (batchId + 1) * BATCH_SECONDS;
+        if (block.timestamp < batchEndTime) {
+            revert BatchNotEnded(batchId, batchEndTime, uint64(block.timestamp));
+        }
 
         DailyPnlSnapshot storage snap = _dailyPnl[batchId];
         if (snap.processed) revert DailyBatchAlreadyProcessed(batchId);

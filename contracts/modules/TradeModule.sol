@@ -222,8 +222,9 @@ contract TradeModule is SignalsCoreStorage {
         // 4. Claim draws only from escrow, not affecting current NAV/price
         if (payout > 0) {
             uint256 remaining = _payoutReserveRemaining[position.marketId];
+            // Revert if reserve is insufficient - indicates critical accounting bug
             if (payout > remaining) {
-                payout = remaining; // Cap at remaining reserve (safety)
+                revert CE.InsufficientPayoutReserve(payout, remaining);
             }
             _payoutReserveRemaining[position.marketId] = remaining - payout;
             
@@ -606,7 +607,26 @@ contract TradeModule is SignalsCoreStorage {
 
     function _pushPayment(address to, uint256 amount6) internal {
         if (amount6 == 0) return;
+        // Verify free balance before payment - protects pending deposits and payout reserves
+        _requireFreeBalance(amount6);
         paymentToken.safeTransfer(to, amount6);
+    }
+
+    /**
+     * @notice Get free balance (total balance minus reserved amounts)
+     */
+    function _getFreeBalance() internal view returns (uint256) {
+        uint256 balance = paymentToken.balanceOf(address(this));
+        uint256 reserved = _totalPendingDeposits6 + _totalPayoutReserve6;
+        return balance > reserved ? balance - reserved : 0;
+    }
+
+    /**
+     * @notice Require sufficient free balance for payment
+     */
+    function _requireFreeBalance(uint256 amount6) internal view {
+        uint256 free = _getFreeBalance();
+        if (amount6 > free) revert CE.InsufficientFreeBalance(amount6, free);
     }
 
     // --- Tree update helper ---
