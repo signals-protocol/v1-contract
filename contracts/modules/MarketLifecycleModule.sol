@@ -6,7 +6,7 @@ import "../errors/ModuleErrors.sol";
 import "../errors/CLMSRErrors.sol";
 import "./trade/lib/LazyMulSegmentTree.sol";
 import "../lib/FixedPointMathU.sol";
-import "./trade/lib/ExposureFenwickLib.sol";
+import "./trade/lib/ExposureDiffLib.sol";
 import "./trade/lib/TickBinLib.sol";
 
 /// @notice Delegate-only lifecycle module (skeleton)
@@ -419,7 +419,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         int256 tick
     ) internal view returns (uint256 exposure) {
         uint32 bin = TickBinLib.tickToBin(market, tick);
-        return ExposureFenwickLib.pointQuery(_exposureFenwick[marketId], bin);
+        return ExposureDiffLib.pointQuery(_exposureFenwick[marketId], bin);
     }
 
     function _calculateTotalChunks(uint32 openPositionCount) internal pure returns (uint32) {

@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import "../core/SignalsCore.sol";
 import "../modules/trade/lib/LazyMulSegmentTree.sol";
-import "../modules/trade/lib/ExposureFenwickLib.sol";
+import "../modules/trade/lib/ExposureDiffLib.sol";
 import "../modules/trade/lib/TickBinLib.sol";
 import "../interfaces/IRiskModule.sol";
 
@@ -61,12 +61,12 @@ contract SignalsCoreHarness is SignalsCore {
         uint32 bin = TickBinLib.tickToBin(market, tick);
         
         // Get current exposure via Fenwick point query
-        int256 current = ExposureFenwickLib.rawPrefixSum(_exposureFenwick[marketId], bin);
+        int256 current = ExposureDiffLib.rawPrefixSum(_exposureFenwick[marketId], bin);
         int256 delta = int256(exposure) - current;
         
         // Apply delta to single bin [bin, bin]
         if (delta != 0) {
-            ExposureFenwickLib.rangeAdd(
+            ExposureDiffLib.rangeAdd(
                 _exposureFenwick[marketId],
                 bin,
                 bin,
@@ -92,7 +92,7 @@ contract SignalsCoreHarness is SignalsCore {
         ISignalsCore.Market memory market = markets[marketId];
         (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBins(market, lowerTick, upperTick);
         
-        ExposureFenwickLib.rangeAdd(
+        ExposureDiffLib.rangeAdd(
             _exposureFenwick[marketId],
             loBin,
             hiBin,
@@ -110,11 +110,11 @@ contract SignalsCoreHarness is SignalsCore {
         ISignalsCore.Market memory market = markets[marketId];
         uint32 bin = TickBinLib.tickToBin(market, tick);
         
-        int256 current = ExposureFenwickLib.rawPrefixSum(_exposureFenwick[marketId], bin);
+        int256 current = ExposureDiffLib.rawPrefixSum(_exposureFenwick[marketId], bin);
         int256 delta = int256(quantity) - current;
         
         if (delta != 0) {
-            ExposureFenwickLib.rangeAdd(
+            ExposureDiffLib.rangeAdd(
                 _exposureFenwick[marketId],
                 bin,
                 bin,
@@ -142,7 +142,7 @@ contract SignalsCoreHarness is SignalsCore {
     function harnessGetExposure(uint256 marketId, int256 tick) external view returns (uint256 exposure) {
         ISignalsCore.Market memory market = markets[marketId];
         uint32 bin = TickBinLib.tickToBin(market, tick);
-        return ExposureFenwickLib.pointQuery(_exposureFenwick[marketId], bin);
+        return ExposureDiffLib.pointQuery(_exposureFenwick[marketId], bin);
     }
 
     /**
