@@ -8,7 +8,8 @@ Signals is a modular smart contract system for prediction markets. It features:
 
 - **CLMSR-based pricing** — Logarithmic market scoring with O(log n) range queries
 - **Position NFTs** — ERC721 tokens representing market positions
-- **LP Vault** — Liquidity provider pool with daily batch processing
+- **LP Vault** — ERC-4626 compatible liquidity pool with async batch processing
+- **Risk module** — α safety bounds, exposure caps, prior admissibility checks
 - **Upgradeable architecture** — UUPS proxy pattern with delegate modules
 
 ## Architecture
@@ -47,14 +48,18 @@ contracts/
 │   ├── TradeModule.sol           # Open/close/claim positions
 │   ├── MarketLifecycleModule.sol # Create/settle markets
 │   ├── OracleModule.sol          # Settlement price feed
-│   └── LPVaultModule.sol         # LP deposit/withdraw
+│   ├── LPVaultModule.sol         # LP deposit/withdraw
+│   └── RiskModule.sol            # α bounds, exposure caps
 ├── position/
 │   └── SignalsPosition.sol       # Position NFT
 ├── vault/
 │   └── lib/VaultAccountingLib.sol
+├── tokens/
+│   └── SignalsLPShare.sol        # ERC-4626 LP share token
 └── lib/
     ├── LazyMulSegmentTree.sol    # CLMSR segment tree
     ├── FeeWaterfallLib.sol       # Fee distribution math
+    ├── RiskMathLib.sol           # α/drawdown/ΔE calculations
     └── FixedPointMathU.sol       # WAD arithmetic
 
 test/
@@ -87,6 +92,7 @@ yarn test test/unit/FeeWaterfallLib.spec.ts
 ### Markets
 
 Markets are prediction markets with:
+
 - Tick range `[tickLower, tickUpper)`
 - Start/end timestamps
 - Settlement price from oracle
@@ -94,6 +100,7 @@ Markets are prediction markets with:
 ### Positions
 
 Positions are ERC721 tokens representing:
+
 - Market ID
 - Tick range
 - Quantity
@@ -101,6 +108,7 @@ Positions are ERC721 tokens representing:
 ### LP Vault
 
 Liquidity providers deposit collateral and receive shares. The vault:
+
 - Processes deposits/withdrawals in daily batches
 - Calculates NAV, price, and drawdown
 - Distributes fees via waterfall
@@ -112,7 +120,11 @@ Liquidity providers deposit collateral and receive shares. The vault:
 C(q) = α · ln(Z_after / Z_before)
 
 // Vault batch price
-P_e = N_pre / S_{t-1}
+P_t = N_t / S_t
+
+// α safety bound
+α_base = λ · E_t / ln(n)
+α_limit = α_base · (1 - k · DD_t)
 
 // Fee waterfall
 F_loss = min(F_tot, |L_t|)
@@ -132,7 +144,8 @@ yarn coverage
 yarn test --grep "FeeWaterfallLib"
 ```
 
-**433 tests** covering:
+**530+ tests** covering:
+
 - SDK parity within ≤1 wei
 - Math invariants (100+ fuzz cases)
 - Edge cases and boundary conditions

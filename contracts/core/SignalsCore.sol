@@ -11,6 +11,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./storage/SignalsCoreStorage.sol";
 import "../interfaces/ISignalsCore.sol";
 import "../interfaces/ISignalsPosition.sol";
+import "../interfaces/IRiskModule.sol";
 import "../errors/CLMSRErrors.sol";
 
 /// @title SignalsCore
@@ -37,6 +38,16 @@ contract SignalsCore is
     // ============================================================
     error ModuleNotSet();
     error InvalidFeeSplitSum(uint256 phiLP, uint256 phiBS, uint256 phiTR);
+
+    // ============================================================
+    // Events (Phase 10: Config changes for FE/Indexer)
+    // ============================================================
+    event RiskConfigUpdated(uint256 lambda, uint256 kDrawdown, bool enforceAlpha);
+    event FeeWaterfallConfigUpdated(uint256 rhoBS, int256 pdd, uint256 phiLP, uint256 phiBS, uint256 phiTR);
+    event CapitalStackUpdated(uint256 backstopNav, uint256 treasuryNav);
+    event WithdrawalLagUpdated(uint64 lag);
+    event LpShareTokenUpdated(address lpShareToken);
+    event ModulesUpdated(address trade, address lifecycle, address risk, address vault, address oracle);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -74,6 +85,7 @@ contract SignalsCore is
         riskModule = _riskModule;
         vaultModule = _vaultModule;
         oracleModule = _oracleModule;
+        emit ModulesUpdated(_tradeModule, _lifecycleModule, _riskModule, _vaultModule, _oracleModule);
     }
 
     // ============================================================
@@ -85,8 +97,15 @@ contract SignalsCore is
         minSeedAmount = amount;
     }
 
+    /// @notice Set LP Share token address (Phase 10: ERC-4626)
+    function setLpShareToken(address _lpShareToken) external onlyOwner {
+        lpShareToken = _lpShareToken;
+        emit LpShareTokenUpdated(_lpShareToken);
+    }
+
     function setWithdrawalLagBatches(uint64 lag) external onlyOwner whenNotPaused {
         withdrawalLagBatches = lag;
+        emit WithdrawalLagUpdated(lag);
     }
 
     /// @notice Configure fee waterfall parameters (except pdd)
@@ -105,11 +124,13 @@ contract SignalsCore is
         feeWaterfallConfig.phiLP = phiLP;
         feeWaterfallConfig.phiBS = phiBS;
         feeWaterfallConfig.phiTR = phiTR;
+        emit FeeWaterfallConfigUpdated(rhoBS, feeWaterfallConfig.pdd, phiLP, phiBS, phiTR);
     }
 
     function setCapitalStack(uint256 backstopNav, uint256 treasuryNav) external onlyOwner whenNotPaused {
         capitalStack.backstopNav = backstopNav;
         capitalStack.treasuryNav = treasuryNav;
+        emit CapitalStackUpdated(backstopNav, treasuryNav);
     }
 
     /// @notice Configure risk parameters for α Safety Bounds
@@ -136,6 +157,8 @@ contract SignalsCore is
         // Whitepaper v2 invariant: pdd := -λ
         // Auto-update drawdown floor to maintain Safety guarantee
         feeWaterfallConfig.pdd = -int256(lambda);
+        
+        emit RiskConfigUpdated(lambda, kDrawdown, enforceAlpha);
     }
 
     // --- External stubs: delegate to modules ---
@@ -147,6 +170,12 @@ contract SignalsCore is
         uint128 quantity,
         uint256 maxCost
     ) external override whenNotPaused nonReentrant returns (uint256 positionId) {
+        // Phase 8: Risk gate FIRST (no-op in Phase 8, exposure caps in Phase 9)
+        _riskGate(abi.encodeCall(
+            IRiskModule.gateOpenPosition,
+            (marketId, msg.sender, quantity)
+        ));
+
         bytes memory ret = _delegate(tradeModule, abi.encodeWithSignature(
             "openPosition(uint256,int256,int256,uint128,uint256)",
             marketId,
@@ -163,6 +192,12 @@ contract SignalsCore is
         uint128 quantity,
         uint256 maxCost
     ) external override whenNotPaused nonReentrant {
+        // Phase 8: Risk gate FIRST (no-op in Phase 8, exposure caps in Phase 9)
+        _riskGate(abi.encodeCall(
+            IRiskModule.gateIncreasePosition,
+            (positionId, msg.sender, quantity)
+        ));
+
         _delegate(tradeModule, abi.encodeWithSignature(
             "increasePosition(uint256,uint128,uint256)",
             positionId,
@@ -263,11 +298,13 @@ contract SignalsCore is
 
     // --- Lifecycle / oracle ---
 
-    /// @notice Create a new market with prior-based factors (Phase 7)
-    /// @dev Per WP v2: baseFactors define the opening prior q₀,t
+    /// @notice Create a new market with prior-based factors
+    /// @dev Phase 8 Core-first Risk Gate pattern:
+    ///      1. Core calls RiskModule.gateCreateMarket FIRST (α limit + prior admissibility)
+    ///      2. Core delegates to MarketLifecycleModule (state machine, storage)
+    ///      Per WP v2: baseFactors define the opening prior q₀,t
     ///      - Uniform prior: all factors = 1 WAD → ΔEₜ = 0
     ///      - Concentrated prior: factors vary → ΔEₜ > 0
-    ///      Prior admissibility is checked: ΔEₜ ≤ B_eff
     function createMarket(
         int256 minTick,
         int256 maxTick,
@@ -280,6 +317,13 @@ contract SignalsCore is
         address feePolicy,
         uint256[] calldata baseFactors
     ) external override onlyOwner whenNotPaused returns (uint256 marketId) {
+        // Phase 8: Risk gate FIRST - RiskModule calculates deltaEt from baseFactors
+        _riskGate(abi.encodeCall(
+            IRiskModule.gateCreateMarket,
+            (liquidityParameter, numBins, baseFactors)
+        ));
+
+        // Then delegate to lifecycle module (state machine only, risk already validated)
         bytes memory ret = _delegate(lifecycleModule, abi.encodeWithSignature(
             "createMarket(int256,int256,int256,uint64,uint64,uint64,uint32,uint256,address,uint256[])",
             minTick,
@@ -316,6 +360,14 @@ contract SignalsCore is
     }
 
     function reopenMarket(uint256 marketId) external override onlyOwner whenNotPaused {
+        // Phase 8: Risk gate FIRST - get market data for validation
+        ISignalsCore.Market storage market = markets[marketId];
+        
+        _riskGate(abi.encodeCall(
+            IRiskModule.gateReopenMarket,
+            (market.liquidityParameter, market.numBins, market.deltaEt)
+        ));
+
         _delegate(lifecycleModule, abi.encodeWithSignature("reopenMarket(uint256)", marketId));
     }
 
@@ -425,21 +477,86 @@ contract SignalsCore is
         if (ret.length > 0) assets = abi.decode(ret, (uint256));
     }
 
-    // Views (delegate to LPVaultModule)
+    // ============================================================
+    // Vault View Functions (direct storage read for ERC-4626)
+    // ============================================================
 
-    function getVaultNav() external returns (uint256 nav) {
-        bytes memory ret = _delegateView(vaultModule, abi.encodeWithSignature("getVaultNav()"));
-        if (ret.length > 0) nav = abi.decode(ret, (uint256));
+    /// @notice Get current vault NAV
+    function getVaultNav() external view returns (uint256) {
+        return lpVault.nav;
     }
 
-    function getVaultShares() external returns (uint256 shares) {
-        bytes memory ret = _delegateView(vaultModule, abi.encodeWithSignature("getVaultShares()"));
-        if (ret.length > 0) shares = abi.decode(ret, (uint256));
+    /// @notice Get current vault total shares
+    function getVaultShares() external view returns (uint256) {
+        return lpVault.shares;
     }
 
-    function getVaultPrice() external returns (uint256 price) {
-        bytes memory ret = _delegateView(vaultModule, abi.encodeWithSignature("getVaultPrice()"));
-        if (ret.length > 0) price = abi.decode(ret, (uint256));
+    /// @notice Get current vault share price (P = N/S)
+    function getVaultPrice() external view returns (uint256) {
+        return lpVault.price;
+    }
+
+    /// @notice Check if vault is seeded
+    function isVaultSeeded() external view returns (bool) {
+        return lpVault.isSeeded;
+    }
+
+    /// @notice Get vault peak price
+    function getVaultPricePeak() external view returns (uint256) {
+        return lpVault.pricePeak;
+    }
+
+    /// @notice Get current vault drawdown
+    /// @return drawdown Drawdown in WAD (0 = no drawdown, 1e18 = 100%)
+    function getVaultDrawdown() external view returns (uint256 drawdown) {
+        if (lpVault.pricePeak == 0 || lpVault.price >= lpVault.pricePeak) {
+            return 0;
+        }
+        return WAD - (lpVault.price * WAD) / lpVault.pricePeak;
+    }
+
+    /// @notice Get current risk configuration
+    function getRiskConfig() external view returns (
+        uint256 lambda,
+        uint256 kDrawdown,
+        bool enforceAlpha
+    ) {
+        return (riskConfig.lambda, riskConfig.kDrawdown, riskConfig.enforceAlpha);
+    }
+
+    /// @notice Get fee waterfall configuration
+    function getFeeWaterfallConfig() external view returns (
+        uint256 rhoBS,
+        int256 pdd,
+        uint256 phiLP,
+        uint256 phiBS,
+        uint256 phiTR
+    ) {
+        return (
+            feeWaterfallConfig.rhoBS,
+            feeWaterfallConfig.pdd,
+            feeWaterfallConfig.phiLP,
+            feeWaterfallConfig.phiBS,
+            feeWaterfallConfig.phiTR
+        );
+    }
+
+    /// @notice Get capital stack state
+    function getCapitalStack() external view returns (
+        uint256 backstopNav,
+        uint256 treasuryNav
+    ) {
+        return (capitalStack.backstopNav, capitalStack.treasuryNav);
+    }
+
+    /// @notice Get current batch ID
+    function getCurrentBatchId() external view returns (uint64) {
+        return currentBatchId;
+    }
+
+    /// @notice Get withdrawal lag in batches
+    function getWithdrawalLagBatches() external view returns (uint64) {
+        return withdrawalLagBatches;
     }
 
     function getDailyPnl(uint64 batchId)
@@ -485,6 +602,22 @@ contract SignalsCore is
             }
         }
         return ret;
+    }
+
+    // ============================================================
+    // Phase 8: Risk Gate Pattern
+    // ============================================================
+
+    /// @dev Execute risk gate via delegatecall, bubble up revert
+    /// @param gateCalldata Encoded call to RiskModule gate function
+    function _riskGate(bytes memory gateCalldata) internal {
+        if (riskModule == address(0)) revert ModuleNotSet();
+        (bool success, bytes memory ret) = riskModule.delegatecall(gateCalldata);
+        if (!success) {
+            assembly ("memory-safe") {
+                revert(add(ret, 32), mload(ret))
+            }
+        }
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
