@@ -93,37 +93,35 @@ contract TradeModule is SignalsCoreStorage {
         ISignalsCore.Market storage market = _loadAndValidateMarket(marketId);
         _validateTickRange(lowerTick, upperTick, market);
         
-        // α/prior are fixed at Zero-Hour (createMarket).
-        // No per-trade α gate here - bettors trade freely within configured α.
+        // Cache market params and compute bins ONCE
+        uint256 alpha = market.liquidityParameter;
+        uint32 numBins = market.numBins;
+        address feePolicy = market.feePolicy != address(0) ? market.feePolicy : defaultFeePolicy;
+        (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBinsPrim(
+            market.minTick, market.maxTick, market.tickSpacing, numBins, lowerTick, upperTick
+        );
 
         uint256 qtyWad = uint256(quantity).toWad();
-        uint256 costWad = _calculateTradeCostInternal(marketId, lowerTick, upperTick, qtyWad);
+        uint256 costWad = _calculateTradeCostBins(marketId, loBin, hiBin, qtyWad, alpha);
         uint256 cost6 = _roundDebit(costWad);
 
-        uint256 fee6 = _quoteFee(true, msg.sender, marketId, lowerTick, upperTick, quantity, cost6);
+        uint256 fee6 = _quoteFeeWithPolicy(feePolicy, true, msg.sender, marketId, lowerTick, upperTick, quantity, cost6);
         if (fee6 > cost6) revert CE.FeeExceedsBase(fee6, cost6);
         uint256 totalCost = cost6 + fee6;
         if (totalCost > maxCost) revert CE.CostExceedsMaximum(totalCost, maxCost);
 
         _pullPayment(msg.sender, totalCost);
-        // Phase 6: Fee NOT transferred out during trade (WP v1.0 Sec 4)
-        // Fee stays in core for Waterfall distribution after settlement
 
-        _applyFactorChunked(marketId, lowerTick, upperTick, qtyWad, market.liquidityParameter, true);
-
-        // Phase 6: Accumulate fees in WAD (internal accounting uses WAD)
-        // Conversion: USDC6 → WAD at entry point
+        _applyFactorBins(marketId, loBin, hiBin, qtyWad, alpha, true);
         market.accumulatedFees += fee6.toWad();
-
-        // Phase 6: Update exposure ledger
-        _addExposure(marketId, lowerTick, upperTick, quantity);
+        _addExposureBins(marketId, loBin, hiBin, quantity, numBins);
 
         positionId = positionContract.mintPosition(msg.sender, marketId, lowerTick, upperTick, quantity);
         if (!market.settled) {
             market.openPositionCount += 1;
         }
 
-        emit TradeFeeCharged(msg.sender, marketId, positionId, true, cost6, fee6, _resolveFeePolicy(market));
+        emit TradeFeeCharged(msg.sender, marketId, positionId, true, cost6, fee6, feePolicy);
     }
 
     function increasePosition(
@@ -138,33 +136,34 @@ contract TradeModule is SignalsCoreStorage {
         ISignalsCore.Market storage market = _loadAndValidateMarket(position.marketId);
         _validateTickRange(position.lowerTick, position.upperTick, market);
         
-        // α/prior are fixed at Zero-Hour (createMarket).
-        // No per-trade α gate here - bettors trade freely within configured α.
+        // Cache market params and compute bins ONCE
+        uint256 alpha = market.liquidityParameter;
+        uint32 numBins = market.numBins;
+        address feePolicy = market.feePolicy != address(0) ? market.feePolicy : defaultFeePolicy;
+        (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBinsPrim(
+            market.minTick, market.maxTick, market.tickSpacing, numBins,
+            position.lowerTick, position.upperTick
+        );
 
         uint256 qtyWad = uint256(quantity).toWad();
-        uint256 costWad = _calculateTradeCostInternal(position.marketId, position.lowerTick, position.upperTick, qtyWad);
+        uint256 costWad = _calculateTradeCostBins(position.marketId, loBin, hiBin, qtyWad, alpha);
         uint256 cost6 = _roundDebit(costWad);
 
-        uint256 fee6 = _quoteFee(true, msg.sender, position.marketId, position.lowerTick, position.upperTick, quantity, cost6);
+        uint256 fee6 = _quoteFeeWithPolicy(feePolicy, true, msg.sender, position.marketId, position.lowerTick, position.upperTick, quantity, cost6);
         if (fee6 > cost6) revert CE.FeeExceedsBase(fee6, cost6);
         uint256 totalCost = cost6 + fee6;
         if (totalCost > maxCost) revert CE.CostExceedsMaximum(totalCost, maxCost);
 
         _pullPayment(msg.sender, totalCost);
-        // Phase 6: Fee NOT transferred out during trade (WP v1.0 Sec 4)
 
-        _applyFactorChunked(position.marketId, position.lowerTick, position.upperTick, qtyWad, market.liquidityParameter, true);
-
-        // Phase 6: Accumulate fees in WAD (internal accounting uses WAD)
+        _applyFactorBins(position.marketId, loBin, hiBin, qtyWad, alpha, true);
         market.accumulatedFees += fee6.toWad();
-
-        // Phase 6: Update exposure ledger
-        _addExposure(position.marketId, position.lowerTick, position.upperTick, quantity);
+        _addExposureBins(position.marketId, loBin, hiBin, quantity, numBins);
 
         uint128 newQuantity = position.quantity + quantity;
         positionContract.updateQuantity(positionId, newQuantity);
 
-        emit TradeFeeCharged(msg.sender, position.marketId, positionId, true, cost6, fee6, _resolveFeePolicy(market));
+        emit TradeFeeCharged(msg.sender, position.marketId, positionId, true, cost6, fee6, feePolicy);
     }
 
     function decreasePosition(
@@ -408,6 +407,36 @@ contract TradeModule is SignalsCoreStorage {
         costWad = tree.calculateTradeCost(market.liquidityParameter, loBin, hiBin, quantityWad);
     }
 
+    /**
+     * @notice Calculate trade cost using pre-computed bins (gas optimized)
+     * @dev Avoids redundant Market memory copy and bins calculation
+     */
+    function _calculateTradeCostBins(
+        uint256 marketId,
+        uint32 loBin,
+        uint32 hiBin,
+        uint256 quantityWad,
+        uint256 alpha
+    ) internal view returns (uint256 costWad) {
+        LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
+        costWad = tree.calculateTradeCost(alpha, loBin, hiBin, quantityWad);
+    }
+
+    /**
+     * @notice Calculate sell proceeds using pre-computed bins (gas optimized)
+     * @dev Avoids redundant Market memory copy and bins calculation
+     */
+    function _calculateSellProceedsBins(
+        uint256 marketId,
+        uint32 loBin,
+        uint32 hiBin,
+        uint256 quantityWad,
+        uint256 alpha
+    ) internal view returns (uint256 proceedsWad) {
+        LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
+        proceedsWad = tree.calculateSellProceeds(alpha, loBin, hiBin, quantityWad);
+    }
+
     /// @dev Thin wrapper to calculate sell proceeds using shared library.
     function _calculateSellProceeds(
         uint256 marketId,
@@ -448,11 +477,21 @@ contract TradeModule is SignalsCoreStorage {
 
         if (quantity > position.quantity) revert CE.InsufficientPositionQuantity(quantity, position.quantity);
 
+        // Cache market params and compute bins ONCE
+        uint256 alpha = market.liquidityParameter;
+        uint32 numBins = market.numBins;
+        address feePolicy = market.feePolicy != address(0) ? market.feePolicy : defaultFeePolicy;
+        (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBinsPrim(
+            market.minTick, market.maxTick, market.tickSpacing, numBins,
+            position.lowerTick, position.upperTick
+        );
+
         uint256 qtyWad = uint256(quantity).toWad();
-        uint256 proceedsWad = _calculateSellProceeds(position.marketId, position.lowerTick, position.upperTick, qtyWad);
+        uint256 proceedsWad = _calculateSellProceedsBins(position.marketId, loBin, hiBin, qtyWad, alpha);
         baseProceeds = _roundCredit(proceedsWad);
 
-        uint256 fee6 = _quoteFee(
+        uint256 fee6 = _quoteFeeWithPolicy(
+            feePolicy,
             false,
             msg.sender,
             position.marketId,
@@ -465,17 +504,11 @@ contract TradeModule is SignalsCoreStorage {
         uint256 netProceeds = baseProceeds - fee6;
         if (netProceeds < minProceeds) revert CE.ProceedsBelowMinimum(netProceeds, minProceeds);
 
-        _applyFactorChunked(position.marketId, position.lowerTick, position.upperTick, qtyWad, market.liquidityParameter, false);
-
-        // Phase 6: Accumulate fees in WAD (internal accounting uses WAD)
+        _applyFactorBins(position.marketId, loBin, hiBin, qtyWad, alpha, false);
         market.accumulatedFees += fee6.toWad();
-
-        // Phase 6: Update exposure ledger (remove exposure for sold quantity)
-        _removeExposure(position.marketId, position.lowerTick, position.upperTick, quantity);
+        _removeExposureBins(position.marketId, loBin, hiBin, quantity, numBins);
 
         _pushPayment(msg.sender, netProceeds);
-        // Phase 6: Fee NOT transferred out during trade (WP v1.0 Sec 4)
-        // Fee stays in core for Waterfall distribution
 
         newQuantity = position.quantity - quantity;
         if (newQuantity == 0) {
@@ -487,7 +520,7 @@ contract TradeModule is SignalsCoreStorage {
             positionContract.updateQuantity(positionId, newQuantity);
         }
 
-        emit TradeFeeCharged(msg.sender, position.marketId, positionId, false, baseProceeds, fee6, _resolveFeePolicy(market));
+        emit TradeFeeCharged(msg.sender, position.marketId, positionId, false, baseProceeds, fee6, feePolicy);
     }
 
     // --- Fee/payment helpers ---
@@ -535,6 +568,35 @@ contract TradeModule is SignalsCoreStorage {
         if (fee6 > baseAmount) revert CE.FeeExceedsBase(fee6, baseAmount);
     }
 
+    /**
+     * @notice Quote fee using pre-resolved policy address (gas optimized)
+     * @dev Avoids redundant Market memory copy for policy resolution
+     */
+    function _quoteFeeWithPolicy(
+        address policyAddress,
+        bool isBuy,
+        address trader,
+        uint256 marketId,
+        int256 lowerTick,
+        int256 upperTick,
+        uint128 quantity,
+        uint256 baseAmount
+    ) internal view returns (uint256 fee6) {
+        if (policyAddress == address(0)) return 0;
+        IFeePolicy.QuoteParams memory params = IFeePolicy.QuoteParams({
+            trader: trader,
+            marketId: marketId,
+            lowerTick: lowerTick,
+            upperTick: upperTick,
+            quantity: quantity,
+            baseAmount: baseAmount,
+            isBuy: isBuy,
+            context: bytes32(0)
+        });
+        fee6 = IFeePolicy(policyAddress).quoteFee(params);
+        if (fee6 > baseAmount) revert CE.FeeExceedsBase(fee6, baseAmount);
+    }
+
     function _pullPayment(address from, uint256 amount6) internal {
         if (amount6 == 0) return;
         uint256 balance = paymentToken.balanceOf(from);
@@ -559,6 +621,25 @@ contract TradeModule is SignalsCoreStorage {
     ) internal {
         ISignalsCore.Market memory market = markets[marketId];
         (uint32 loBin, uint32 hiBin) = _ticksToBins(market, lowerTick, upperTick);
+        uint256 factor = SignalsClmsrMath._safeExp(qtyWad, alpha);
+        if (!isBuy) {
+            factor = WAD.wDivUp(factor);
+        }
+        marketTrees[marketId].applyRangeFactor(loBin, hiBin, factor);
+    }
+
+    /**
+     * @notice Apply factor to tree using pre-computed bins (gas optimized)
+     * @dev Avoids redundant Market memory copy and bins calculation
+     */
+    function _applyFactorBins(
+        uint256 marketId,
+        uint32 loBin,
+        uint32 hiBin,
+        uint256 qtyWad,
+        uint256 alpha,
+        bool isBuy
+    ) internal {
         uint256 factor = SignalsClmsrMath._safeExp(qtyWad, alpha);
         if (!isBuy) {
             factor = WAD.wDivUp(factor);
@@ -608,6 +689,26 @@ contract TradeModule is SignalsCoreStorage {
     }
 
     /**
+     * @notice Update exposure ledger using pre-computed bins (gas optimized)
+     * @dev Avoids redundant Market memory copy and bins calculation
+     */
+    function _addExposureBins(
+        uint256 marketId,
+        uint32 loBin,
+        uint32 hiBin,
+        uint128 quantity,
+        uint32 numBins
+    ) internal {
+        ExposureDiffLib.rangeAdd(
+            _exposureFenwick[marketId],
+            loBin,
+            hiBin,
+            int256(uint256(quantity)),
+            numBins
+        );
+    }
+
+    /**
      * @notice Update exposure ledger for position decrease/close (Diff-based)
      * @dev Uses O(1) diff array update with negative delta
      *      WP v2 Sec 3.5: Decreasing/closing subtracts over the same range
@@ -632,6 +733,26 @@ contract TradeModule is SignalsCoreStorage {
             hiBin,
             -int256(uint256(quantity)),
             market.numBins
+        );
+    }
+
+    /**
+     * @notice Remove exposure using pre-computed bins (gas optimized)
+     * @dev Avoids redundant Market memory copy and bins calculation
+     */
+    function _removeExposureBins(
+        uint256 marketId,
+        uint32 loBin,
+        uint32 hiBin,
+        uint128 quantity,
+        uint32 numBins
+    ) internal {
+        ExposureDiffLib.rangeAdd(
+            _exposureFenwick[marketId],
+            loBin,
+            hiBin,
+            -int256(uint256(quantity)),
+            numBins
         );
     }
 
