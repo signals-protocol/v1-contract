@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { time, loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-import { WAD, USDC_DECIMALS } from "../helpers/constants";
+import { USDC_DECIMALS } from "../helpers/constants";
 
 /**
  * Batch Processing Security Tests

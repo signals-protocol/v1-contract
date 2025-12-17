@@ -18,7 +18,11 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
-import { WAD, BATCH_SECONDS, advancePastBatchEnd } from "../../helpers/constants";
+import {
+  WAD,
+  BATCH_SECONDS,
+  advancePastBatchEnd,
+} from "../../helpers/constants";
 
 describe("UnitSystem Spec Tests (WP v2 Sec 6.2 + Appendix C)", () => {
   const WAD_DECIMALS = 18n;
@@ -71,18 +75,18 @@ describe("UnitSystem Spec Tests (WP v2 Sec 6.2 + Appendix C)", () => {
       // When a trader buys, cost is calculated in WAD
       // Conversion to USDC6 rounds UP → trader pays slightly more
       // The difference (dust) stays with the maker
-      
+
       const costWad = ethers.parseEther("10") + 1n; // 10 WAD + 1 wei
-      
+
       // Round up: trader pays ceiling
       const costUsdc6 = wadToUsdc6Up(costWad);
-      
+
       // Round down: what the exact conversion would be
       const exactUsdc6 = wadToUsdc6Down(costWad);
-      
+
       // Dust = trader paid - exact
       const dust = costUsdc6 - exactUsdc6;
-      
+
       // Dust should be positive (goes to maker/LP)
       expect(dust).to.equal(1n);
     });
@@ -106,13 +110,13 @@ describe("UnitSystem Spec Tests (WP v2 Sec 6.2 + Appendix C)", () => {
 
     it("proceeds dust stays with maker when trader sells", async () => {
       const proceedsWad = ethers.parseEther("10") + (SCALE_FACTOR - 1n);
-      
+
       // Round down: trader receives floor
       const proceedsUsdc6 = wadToUsdc6Down(proceedsWad);
-      
+
       // Exact proceeds in USDC6 (if we had perfect division)
       const exactUsdc6 = Number(proceedsWad) / Number(SCALE_FACTOR);
-      
+
       // Trader receives less than exact → dust stays with maker
       expect(Number(proceedsUsdc6)).to.be.lt(exactUsdc6);
     });
@@ -133,7 +137,9 @@ describe("UnitSystem Spec Tests (WP v2 Sec 6.2 + Appendix C)", () => {
       const moduleFactory = await ethers.getContractFactory("LPVaultModule");
       const module = await moduleFactory.deploy();
 
-      const proxyFactory = await ethers.getContractFactory("LPVaultModuleProxy");
+      const proxyFactory = await ethers.getContractFactory(
+        "LPVaultModuleProxy"
+      );
       const proxy = await proxyFactory.deploy(module.target);
 
       await proxy.setPaymentToken(payment.target);
@@ -176,7 +182,12 @@ describe("UnitSystem Spec Tests (WP v2 Sec 6.2 + Appendix C)", () => {
       // Create a scenario where deposit amount doesn't divide evenly by price
       // First, change price by processing a batch with P&L
       const currentBatchId = await proxy.getCurrentBatchId();
-      await proxy.harnessRecordPnl(currentBatchId + 1n, ethers.parseEther("1"), 0n, ethers.parseEther("500"));
+      await proxy.harnessRecordPnl(
+        currentBatchId + 1n,
+        ethers.parseEther("1"),
+        0n,
+        ethers.parseEther("500")
+      );
       await advancePastBatchEnd(currentBatchId + 1n);
       await proxy.processDailyBatch(currentBatchId + 1n);
 
@@ -184,10 +195,15 @@ describe("UnitSystem Spec Tests (WP v2 Sec 6.2 + Appendix C)", () => {
       const depositAmount = 1_000_001n; // 1.000001 USDC
 
       await proxy.connect(depositor).requestDeposit(depositAmount);
-      
+
       // Process batch
       const nextBatchId = await proxy.getCurrentBatchId();
-      await proxy.harnessRecordPnl(nextBatchId + 1n, 0n, 0n, ethers.parseEther("500"));
+      await proxy.harnessRecordPnl(
+        nextBatchId + 1n,
+        0n,
+        0n,
+        ethers.parseEther("500")
+      );
       await advancePastBatchEnd(nextBatchId + 1n);
       await proxy.processDailyBatch(nextBatchId + 1n);
 
@@ -198,7 +214,7 @@ describe("UnitSystem Spec Tests (WP v2 Sec 6.2 + Appendix C)", () => {
       // Vault should not keep residual
       // Depositor balance should reflect: -depositAmount + refund
       // If refund > 0, balanceAfter > balanceBefore - depositAmount
-      
+
       // This test verifies the implementation correctly handles residuals
       // Expected behavior: vault NAV increases by exactly A_used (not full deposit)
       // and residual is refunded to depositor
@@ -209,22 +225,27 @@ describe("UnitSystem Spec Tests (WP v2 Sec 6.2 + Appendix C)", () => {
 
       // Skip to avoid complexity of price changes for this unit test
       // The key invariant is tested in integration tests
-      
+
       const navBefore = await proxy.getVaultNav();
-      
+
       // Deposit
       const depositAmount = 1_000_000n; // 1 USDC
       await proxy.connect(depositor).requestDeposit(depositAmount);
-      
+
       const currentBatchId = await proxy.getCurrentBatchId();
-      await proxy.harnessRecordPnl(currentBatchId + 1n, 0n, 0n, ethers.parseEther("500"));
+      await proxy.harnessRecordPnl(
+        currentBatchId + 1n,
+        0n,
+        0n,
+        ethers.parseEther("500")
+      );
       await advancePastBatchEnd(currentBatchId + 1n);
       await proxy.processDailyBatch(currentBatchId + 1n);
-      
+
       await proxy.connect(depositor).claimDeposit(0n);
-      
+
       const navAfter = await proxy.getVaultNav();
-      
+
       // NAV should increase by exactly deposit amount when price = 1.0
       // (no residual in this case)
       expect(navAfter - navBefore).to.be.gte(0n);
@@ -245,7 +266,9 @@ describe("UnitSystem Spec Tests (WP v2 Sec 6.2 + Appendix C)", () => {
       const moduleFactory = await ethers.getContractFactory("LPVaultModule");
       const module = await moduleFactory.deploy();
 
-      const proxyFactory = await ethers.getContractFactory("LPVaultModuleProxy");
+      const proxyFactory = await ethers.getContractFactory(
+        "LPVaultModuleProxy"
+      );
       const proxy = await proxyFactory.deploy(module.target);
 
       await proxy.setPaymentToken(payment.target);
@@ -281,7 +304,12 @@ describe("UnitSystem Spec Tests (WP v2 Sec 6.2 + Appendix C)", () => {
       await proxy.connect(owner).requestWithdraw(withdrawShares);
 
       const currentBatchId = await proxy.getCurrentBatchId();
-      await proxy.harnessRecordPnl(currentBatchId + 1n, 0n, 0n, ethers.parseEther("500"));
+      await proxy.harnessRecordPnl(
+        currentBatchId + 1n,
+        0n,
+        0n,
+        ethers.parseEther("500")
+      );
       await advancePastBatchEnd(currentBatchId + 1n);
       await proxy.processDailyBatch(currentBatchId + 1n);
 
@@ -306,7 +334,7 @@ describe("UnitSystem Spec Tests (WP v2 Sec 6.2 + Appendix C)", () => {
       //   FcoreTR = floor(Fremain × phiTR / WAD)
       //   Fdust = Fremain - FcoreLP - FcoreBS - FcoreTR
       //   Ft = Floss + FcoreLP + Fdust (all to LP)
-      
+
       // Verify via harness
       const factory = await ethers.getContractFactory("FeeWaterfallLibHarness");
       const harness = await factory.deploy();
@@ -323,7 +351,7 @@ describe("UnitSystem Spec Tests (WP v2 Sec 6.2 + Appendix C)", () => {
         0n, // rhoBS = 0 (no fill needed)
         ethers.parseEther("0.333333333333333333"), // phiLP ≈ 1/3
         ethers.parseEther("0.333333333333333333"), // phiBS ≈ 1/3
-        ethers.parseEther("0.333333333333333334")  // phiTR ≈ 1/3
+        ethers.parseEther("0.333333333333333334") // phiTR ≈ 1/3
       );
 
       // Fdust should be non-zero due to rounding
@@ -348,7 +376,9 @@ describe("UnitSystem Spec Tests (WP v2 Sec 6.2 + Appendix C)", () => {
       const moduleFactory = await ethers.getContractFactory("LPVaultModule");
       const module = await moduleFactory.deploy();
 
-      const proxyFactory = await ethers.getContractFactory("LPVaultModuleProxy");
+      const proxyFactory = await ethers.getContractFactory(
+        "LPVaultModuleProxy"
+      );
       const proxy = await proxyFactory.deploy(module.target);
 
       await proxy.setPaymentToken(payment.target);
@@ -406,16 +436,22 @@ describe("UnitSystem Spec Tests (WP v2 Sec 6.2 + Appendix C)", () => {
       await proxy.connect(owner).seedVault(1_000_000_000n); // 1000 USDC
 
       const currentBatchId = await proxy.getCurrentBatchId();
-      await proxy.harnessRecordPnl(currentBatchId + 1n, ethers.parseEther("100"), 0n, ethers.parseEther("500"));
+      await proxy.harnessRecordPnl(
+        currentBatchId + 1n,
+        ethers.parseEther("100"),
+        0n,
+        ethers.parseEther("500")
+      );
       await advancePastBatchEnd(currentBatchId + 1n);
       await proxy.processDailyBatch(currentBatchId + 1n);
 
       // Get batch aggregation to check batchPrice
-      const [, , batchPrice] = await proxy.getBatchAggregation(currentBatchId + 1n);
+      const [, , batchPrice] = await proxy.getBatchAggregation(
+        currentBatchId + 1n
+      );
 
       // batchPrice should be in WAD
       expect(batchPrice).to.be.gt(WAD); // Price increased due to positive P&L
     });
   });
 });
-

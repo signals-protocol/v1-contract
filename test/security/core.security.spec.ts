@@ -319,7 +319,7 @@ describe("Core Security", () => {
 
   describe("Free Balance Protection", () => {
     it("trade proceeds cannot drain pending deposits", async () => {
-      const { core, user, payment, owner } = await loadFixture(
+      const { core, user, payment } = await loadFixture(
         deploySecurityFixture
       );
 
