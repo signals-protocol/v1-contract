@@ -47,7 +47,6 @@ describe("LPVaultModule", () => {
     // Configure proxy
     await proxy.setPaymentToken(payment.target);
     await proxy.setMinSeedAmount(usdc("100")); // 6-decimal token amount
-    await proxy.setWithdrawLag(0);
     await proxy.setWithdrawalLagBatches(1); // D_lag = 1 batch
 
     // Configure Risk (sets pdd := -λ)
@@ -273,7 +272,7 @@ describe("LPVaultModule", () => {
       await proxy.connect(userB).requestDeposit(usdc("100"));
 
       // Process the batch
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         firstBatchId,
         0n,
         0n,
@@ -347,7 +346,7 @@ describe("LPVaultModule", () => {
       await proxy.connect(userB).requestDeposit(usdc("200"));
 
       // Record P&L for batch 1
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         firstBatchId,
         0n,
         0n,
@@ -372,7 +371,7 @@ describe("LPVaultModule", () => {
       );
 
       await proxy.connect(userB).requestDeposit(usdc("500"));
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         firstBatchId,
         0n,
         0n,
@@ -408,7 +407,7 @@ describe("LPVaultModule", () => {
       await proxy.setWithdrawalLagBatches(0);
 
       await proxy.connect(userA).requestWithdraw(ethers.parseEther("200"));
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         firstBatchId,
         0n,
         0n,
@@ -439,7 +438,7 @@ describe("LPVaultModule", () => {
       await proxy.connect(userA).requestWithdraw(ethers.parseEther("300"));
       await proxy.connect(userB).requestDeposit(usdc("500"));
 
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         firstBatchId,
         0n,
         0n,
@@ -470,7 +469,7 @@ describe("LPVaultModule", () => {
       // Record positive P&L so price changes
       // N_pre = 1000 + 100 (P&L) = 1100, S = 1000
       // P_e = 1.1
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         firstBatchId,
         ethers.parseEther("100"),
         0n,
@@ -510,7 +509,7 @@ describe("LPVaultModule", () => {
       );
 
       await proxy.connect(userB).requestDeposit(usdc("100"));
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         firstBatchId,
         0n,
         0n,
@@ -533,7 +532,7 @@ describe("LPVaultModule", () => {
       );
 
       await proxy.connect(userB).requestDeposit(usdc("100"));
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         firstBatchId,
         0n,
         0n,
@@ -565,7 +564,7 @@ describe("LPVaultModule", () => {
       // Process with positive P&L
       // N_pre = 1000 + 200 = 1200, S = 1000
       // P_e = 1.2
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         firstBatchId,
         ethers.parseEther("200"),
         0n,
@@ -593,7 +592,7 @@ describe("LPVaultModule", () => {
       await proxy.connect(userA).requestWithdraw(ethers.parseEther("100"));
 
       // Process first batch (N+1)
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         firstBatchId,
         0n,
         0n,
@@ -616,7 +615,7 @@ describe("LPVaultModule", () => {
       await proxy.connect(userA).requestWithdraw(ethers.parseEther("100"));
 
       // Process first batch
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         firstBatchId,
         0n,
         0n,
@@ -626,7 +625,7 @@ describe("LPVaultModule", () => {
 
       // Process second batch
       const secondBatchId = firstBatchId + 1n;
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         secondBatchId,
         0n,
         0n,
@@ -675,7 +674,7 @@ describe("LPVaultModule", () => {
       // which should equal sum of individual amounts (in WAD)
       const expectedTotalWad = amountsWad[0] + amountsWad[1] + amountsWad[2];
 
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         firstBatchId,
         0n,
         0n,
@@ -701,7 +700,7 @@ describe("LPVaultModule", () => {
       await proxy.connect(userA).cancelDeposit(0n);
 
       // Process batch - should only include userB's 200
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         firstBatchId,
         0n,
         0n,
@@ -734,7 +733,7 @@ describe("LPVaultModule", () => {
       await proxy.connect(userB).requestDeposit(usdc("200"));
 
       // Process first batch - deposit included in batch totals
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         firstBatchId,
         0n,
         0n,
@@ -753,7 +752,7 @@ describe("LPVaultModule", () => {
 
       // Process second batch
       const secondBatchId = firstBatchId + 1n;
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         secondBatchId,
         0n,
         0n,
@@ -768,7 +767,7 @@ describe("LPVaultModule", () => {
 
       // Process third batch
       const thirdBatchId = firstBatchId + 2n;
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         thirdBatchId,
         0n,
         0n,

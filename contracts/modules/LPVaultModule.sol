@@ -277,21 +277,6 @@ contract LPVaultModule is SignalsCoreStorage {
     // ============================================================
 
     /**
-     * @notice Record daily P&L from market settlement
-     * @dev Called by MarketLifecycleModule after settleMarket
-     * @param batchId Batch identifier
-     * @param lt CLMSR P&L (signed)
-     * @param ftot Gross fees
-     */
-    function recordDailyPnl(uint64 batchId, int256 lt, uint256 ftot, uint256 deltaEt) external onlyDelegated {
-        DailyPnlSnapshot storage snap = _dailyPnl[batchId];
-        if (snap.processed) revert DailyBatchAlreadyProcessed(batchId);
-        snap.Lt += lt;
-        snap.Ftot += ftot;
-        snap.DeltaEtSum += deltaEt;
-    }
-
-    /**
      * @notice Process daily batch using pre-aggregated totals
      * @dev O(1) complexity - no iteration over users
      *

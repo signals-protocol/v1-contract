@@ -29,10 +29,6 @@ contract LPVaultModuleProxy is SignalsCoreStorage {
         minSeedAmount = amount;
     }
 
-    function setWithdrawLag(uint64 lag) external {
-        withdrawLag = lag;
-    }
-
     function setWithdrawalLagBatches(uint64 lag) external {
         withdrawalLagBatches = lag;
     }
@@ -67,12 +63,6 @@ contract LPVaultModuleProxy is SignalsCoreStorage {
     function setCapitalStack(uint256 backstopNav, uint256 treasuryNav) external {
         capitalStack.backstopNav = backstopNav;
         capitalStack.treasuryNav = treasuryNav;
-    }
-
-    /// @notice Set tail budget (ΔEₜ) for testing grant mechanics
-    /// @dev V1 default: 0 (uniform prior). Set to backstopNav to enable grants.
-    function setDeltaEt(uint256 deltaEt) external {
-        feeWaterfallConfig.deltaEt = deltaEt;
     }
 
     // ============================================================
@@ -121,14 +111,13 @@ contract LPVaultModuleProxy is SignalsCoreStorage {
     // Batch Processing
     // ============================================================
 
-    function recordDailyPnl(uint64 batchId, int256 lt, uint256 ftot, uint256 deltaEt) external {
-        _delegate(abi.encodeWithSelector(
-            LPVaultModule.recordDailyPnl.selector,
-            batchId,
-            lt,
-            ftot,
-            deltaEt
-        ));
+    /// @notice Harness-only: directly set daily P&L snapshot for testing
+    /// @dev This bypasses the settlement flow for unit testing batch processing
+    function harnessRecordPnl(uint64 batchId, int256 lt, uint256 ftot, uint256 deltaEt) external {
+        DailyPnlSnapshot storage snap = _dailyPnl[batchId];
+        snap.Lt += lt;
+        snap.Ftot += ftot;
+        snap.DeltaEtSum += deltaEt;
     }
 
     function processDailyBatch(uint64 batchId) external {

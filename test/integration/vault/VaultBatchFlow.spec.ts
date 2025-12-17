@@ -40,7 +40,6 @@ describe("VaultBatchFlow Integration", () => {
     await proxy.setPaymentToken(payment.target);
     // minSeedAmount is in token units (6 decimals)
     await proxy.setMinSeedAmount(usdc("100"));
-    await proxy.setWithdrawLag(0);
     await proxy.setWithdrawalLagBatches(0); // Immediate withdrawals for testing
 
     // Configure Risk (sets pdd := -λ)
@@ -83,7 +82,7 @@ describe("VaultBatchFlow Integration", () => {
     // This ensures FeeWaterfall doesn't revert on grantNeed > deltaEt
     const backstopNav = ethers.parseEther("500"); // 500 WAD backstop
     await proxy.setCapitalStack(backstopNav, 0n);
-    // deltaEt is now set per-batch via recordDailyPnl, not globally
+    // deltaEt is now set per-batch via harnessRecordPnl, not globally
     const currentBatchId = await proxy.getCurrentBatchId();
     const firstBatchId = currentBatchId + 1n;
     return { ...fixture, currentBatchId, firstBatchId };
@@ -98,7 +97,7 @@ describe("VaultBatchFlow Integration", () => {
     fees: bigint = 0n,
     deltaEt: bigint = DEFAULT_DELTA_ET
   ) {
-    await proxy.recordDailyPnl(batchId, pnl, fees, deltaEt);
+    await proxy.harnessRecordPnl(batchId, pnl, fees, deltaEt);
     await proxy.processDailyBatch(batchId);
   }
 
@@ -221,7 +220,7 @@ describe("VaultBatchFlow Integration", () => {
 
       const moduleAtProxy = module.attach(proxy.target);
 
-      await proxy.recordDailyPnl(firstBatchId, 0n, 0n, DEFAULT_DELTA_ET);
+      await proxy.harnessRecordPnl(firstBatchId, 0n, 0n, DEFAULT_DELTA_ET);
       await expect(proxy.processDailyBatch(firstBatchId)).to.emit(
         moduleAtProxy,
         "DailyBatchProcessed"
@@ -546,7 +545,7 @@ describe("VaultBatchFlow Integration", () => {
 
       // Try to process far-future batch when expecting firstBatchId
       const badBatchId = firstBatchId + 4n;
-      await proxy.recordDailyPnl(badBatchId, 0n, 0n, DEFAULT_DELTA_ET);
+      await proxy.harnessRecordPnl(badBatchId, 0n, 0n, DEFAULT_DELTA_ET);
       await expect(
         proxy.processDailyBatch(badBatchId)
       ).to.be.revertedWithCustomError(module, "BatchNotReady");

@@ -87,48 +87,10 @@ abstract contract SignalsCoreStorage {
         bool isSeeded;         // Has vault been seeded
     }
     
-    /// @notice Backstop vault state
-    struct BackstopState {
-        uint256 nav;           // B_t: Backstop NAV (WAD)
-        uint256 targetCoverage; // ρ_BS target coverage ratio (WAD)
-    }
-
-    /// @notice Treasury state
-    struct TreasuryState {
-        uint256 nav;           // T_t: Treasury NAV (WAD)
-    }
-
-    /// @notice User deposit/withdraw request
-    struct VaultRequest {
-        uint256 amount;        // Deposit: asset amount, Withdraw: shares
-        uint64 requestTimestamp;
-        bool isDeposit;        // true = deposit, false = withdraw
-    }
-
-    /// @notice Pending queue totals
-    struct VaultQueue {
-        uint256 pendingDeposits;    // Total pending deposit amount (WAD)
-        uint256 pendingWithdraws;   // Total pending withdraw shares (WAD)
-    }
-
     VaultState internal lpVault;
-    BackstopState internal backstop;
-    TreasuryState internal treasury;
-    VaultQueue internal vaultQueue;
-
-    /// @notice User request queue: user => request
-    mapping(address => VaultRequest) internal userRequests;
-
-    /// @notice Withdrawal lag in seconds
-    uint64 public withdrawLag;
 
     /// @notice Minimum seed amount for first deposit
     uint256 public minSeedAmount;
-
-    /// @notice Fee distribution ratios (must sum to WAD)
-    uint256 public feeRatioLP;      // ϕ_LP
-    uint256 public feeRatioBackstop; // ϕ_BS
-    uint256 public feeRatioTreasury; // ϕ_TR
 
     // ============================================================
     // Phase 5: Fee Waterfall & Capital Stack
@@ -147,9 +109,8 @@ abstract contract SignalsCoreStorage {
         uint256 phiLP;           // ϕ_LP: LP residual fee share (WAD)
         uint256 phiBS;           // ϕ_BS: Backstop residual fee share (WAD)
         uint256 phiTR;           // ϕ_TR: Treasury residual fee share (WAD)
-        uint256 deltaEt;         // ΔEₜ: Tail budget (WAD). V1: 0 (uniform prior)
-                                 // Per WP v2: ΔEₜ := E_ent(q₀,t) - α_t ln n
-                                 // Uniform prior → ΔEₜ = 0 (no tail risk)
+        // NOTE: ΔEₜ is now stored per-market in Market.deltaEt and summed per-batch
+        //       in DailyPnlSnapshot.DeltaEtSum. Global config field removed.
     }
 
     /// @notice Daily P&L snapshot for batch processing

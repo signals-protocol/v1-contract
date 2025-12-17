@@ -43,7 +43,6 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
 
     await proxy.setPaymentToken(payment.target);
     await proxy.setMinSeedAmount(usdc("100"));
-    await proxy.setWithdrawLag(0);
     await proxy.setWithdrawalLagBatches(0);
     // Configure Risk (sets pdd := -λ)
     // λ = 0.3 → pdd = -0.3 (30% drawdown floor)
@@ -80,7 +79,8 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
     // Production V1 uses deltaEt = 0 (uniform prior), but tests need to verify grant flow
     const backstopNav = ethers.parseEther("500"); // 500 WAD backstop
     await fixture.proxy.setCapitalStack(backstopNav, 0n);
-    await fixture.proxy.setDeltaEt(backstopNav);
+    // NOTE: deltaEt is now per-market (Market.deltaEt) and summed per-batch (DeltaEtSum)
+    // Global config deltaEt field removed - grants use batch DeltaEtSum
     const currentBatchId = await fixture.proxy.getCurrentBatchId();
     return { ...fixture, currentBatchId };
   }
@@ -132,7 +132,7 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       );
 
       await proxy.connect(userA).requestDeposit(usdc("500"));
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         currentBatchId + 1n,
         0n,
         0n,
@@ -166,7 +166,7 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       );
 
       await proxy.connect(owner).requestWithdraw(ethers.parseEther("200"));
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         currentBatchId + 1n,
         0n,
         0n,
@@ -200,7 +200,7 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       const batchId = currentBatchId + 1n;
 
       // First call succeeds
-      await proxy.recordDailyPnl(batchId, 0n, 0n, ethers.parseEther("500"));
+      await proxy.harnessRecordPnl(batchId, 0n, 0n, ethers.parseEther("500"));
       await proxy.processDailyBatch(batchId);
 
       // Second call reverts
@@ -226,7 +226,7 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       const Lt = ethers.parseEther("100");
       const Ftot = ethers.parseEther("30");
 
-      await proxy.recordDailyPnl(batchId, Lt, Ftot, ethers.parseEther("500"));
+      await proxy.harnessRecordPnl(batchId, Lt, Ftot, ethers.parseEther("500"));
       await proxy.processDailyBatch(batchId);
 
       // Get recorded values from snapshot
@@ -254,7 +254,7 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       const Lt = ethers.parseEther("-400"); // -40% of NAV
       const Ftot = ethers.parseEther("20");
 
-      await proxy.recordDailyPnl(batchId, Lt, Ftot, ethers.parseEther("500"));
+      await proxy.harnessRecordPnl(batchId, Lt, Ftot, ethers.parseEther("500"));
       await proxy.processDailyBatch(batchId);
 
       const [, , ft, gt, npre] = await proxy.getDailyPnl(batchId);
@@ -274,7 +274,7 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       const N_prev = await proxy.getVaultNav();
       const batchId = currentBatchId + 1n;
 
-      await proxy.recordDailyPnl(batchId, 0n, 0n, ethers.parseEther("500"));
+      await proxy.harnessRecordPnl(batchId, 0n, 0n, ethers.parseEther("500"));
       await proxy.processDailyBatch(batchId);
 
       const [, , ft, gt, npre] = await proxy.getDailyPnl(batchId);
@@ -300,7 +300,7 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       const batchId = currentBatchId + 1n;
 
       const Lt = ethers.parseEther("50");
-      await proxy.recordDailyPnl(batchId, Lt, 0n, ethers.parseEther("500"));
+      await proxy.harnessRecordPnl(batchId, Lt, 0n, ethers.parseEther("500"));
       await proxy.processDailyBatch(batchId);
 
       const [, , , , npre, pe] = await proxy.getDailyPnl(batchId);
@@ -323,7 +323,7 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       await proxy.connect(owner).requestWithdraw(ethers.parseEther("50"));
 
       const batchId = currentBatchId + 1n;
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         batchId,
         ethers.parseEther("30"),
         0n,
@@ -357,7 +357,7 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       await proxy.connect(userA).requestDeposit(usdc("500"));
 
       const batchId = currentBatchId + 1n;
-      await proxy.recordDailyPnl(batchId, 0n, 0n, ethers.parseEther("500"));
+      await proxy.harnessRecordPnl(batchId, 0n, 0n, ethers.parseEther("500"));
       await proxy.processDailyBatch(batchId);
 
       const [, , batchPrice] = await proxy.getBatchAggregation(batchId);
@@ -379,7 +379,7 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       await proxy.connect(owner).requestWithdraw(ethers.parseEther("200"));
 
       const batchId = currentBatchId + 1n;
-      await proxy.recordDailyPnl(batchId, 0n, 0n, ethers.parseEther("500"));
+      await proxy.harnessRecordPnl(batchId, 0n, 0n, ethers.parseEther("500"));
       await proxy.processDailyBatch(batchId);
 
       const [, , batchPrice] = await proxy.getBatchAggregation(batchId);
@@ -401,7 +401,7 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       await proxy.connect(owner).requestWithdraw(ethers.parseEther("100"));
 
       const batchId = currentBatchId + 1n;
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         batchId,
         ethers.parseEther("50"),
         0n,
@@ -436,7 +436,7 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
 
       // Process batch with P&L
       const batchId = currentBatchId + 1n;
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         batchId,
         ethers.parseEther("100"),
         0n,
@@ -464,7 +464,7 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       await proxy.connect(userA).requestDeposit(usdc("500"));
 
       const batchId = currentBatchId + 1n;
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         batchId,
         ethers.parseEther("100"),
         0n,
@@ -489,7 +489,7 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
   // SPEC-6: No duplicate state updates
   // ================================================================
   describe("SPEC-6: No duplicate state updates", () => {
-    it("recordDailyPnl accumulates, doesn't overwrite", async () => {
+    it("harnessRecordPnl accumulates, doesn't overwrite", async () => {
       const { proxy, currentBatchId } = await loadFixture(
         deploySeededVaultFixture
       );
@@ -497,13 +497,13 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       const batchId = currentBatchId + 1n;
 
       // Record P&L from multiple markets
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         batchId,
         ethers.parseEther("30"),
         ethers.parseEther("5"),
         ethers.parseEther("500")
       );
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         batchId,
         ethers.parseEther("20"),
         ethers.parseEther("3"),
@@ -525,7 +525,7 @@ describe("BatchAccounting Spec Tests (WP v2 Sec 3)", () => {
       const batchId = currentBatchId + 1n;
       const navBefore = await proxy.getVaultNav();
 
-      await proxy.recordDailyPnl(
+      await proxy.harnessRecordPnl(
         batchId,
         ethers.parseEther("100"),
         0n,

@@ -575,20 +575,6 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         }
     }
 
-    /**
-     * @notice Manually record P&L for a batch (admin/testing)
-     * @dev Allows external P&L recording for testing or when trades
-     *      are processed off-chain.
-     * @param batchId Batch identifier
-     * @param lt P&L to add
-     * @param ftot Fees to add
-     * @param deltaEt Tail budget to add to batch (for testing grant mechanics)
-     */
-    function recordBatchPnl(uint64 batchId, int256 lt, uint256 ftot, uint256 deltaEt) external onlyDelegated {
-        _recordPnlToBatch(batchId, lt, ftot, deltaEt);
-        emit MarketPnlRecorded(0, batchId, lt, ftot);
-    }
-
     // ============================================================
     // Phase 7: α Safety Enforcement
     // ============================================================
