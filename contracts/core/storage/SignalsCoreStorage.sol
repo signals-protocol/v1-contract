@@ -235,12 +235,12 @@ abstract contract SignalsCoreStorage {
     ///      Replaced by _exposureFenwick (bin-based Fenwick tree)
     mapping(uint256 => mapping(int256 => uint256)) internal _exposureLedger;
 
-    /// @notice Market ID → Fenwick tree for exposure tracking (bin-based)
+    /// @notice Market ID → Diff array for exposure tracking (bin-based)
     /// @dev Exposure Ledger Q_t: tracks payout liability per settlement bin
-    ///      Uses diff-array + prefix-sum pattern for O(log n) operations:
-    ///      - rangeAdd([loBin, hiBin], delta): O(log n)
-    ///      - pointQuery(bin): O(log n)
-    ///      Index is 1-based (Fenwick convention): node[1..numBins]
+    ///      Uses diff-array pattern:
+    ///      - rangeAdd([loBin, hiBin], delta): O(1) - 2 SSTOREs
+    ///      - pointQuery(bin): O(n) - prefix sum over [0..bin]
+    ///      Index is 0-based: diff[0..numBins-1]
     ///      Signed int256 to support both positive and negative deltas
     mapping(uint256 => mapping(uint32 => int256)) internal _exposureFenwick;
 
