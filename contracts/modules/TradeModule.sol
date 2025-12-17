@@ -91,18 +91,10 @@ contract TradeModule is SignalsCoreStorage {
     ) external onlyDelegated returns (uint256 positionId) {
         if (quantity == 0) revert CE.InvalidQuantity(quantity);
         ISignalsCore.Market storage market = _loadAndValidateMarket(marketId);
-        _validateTickRange(lowerTick, upperTick, market);
-        
-        // Cache market params and compute bins ONCE
-        uint256 alpha = market.liquidityParameter;
-        uint32 numBins = market.numBins;
         address feePolicy = market.feePolicy != address(0) ? market.feePolicy : defaultFeePolicy;
-        (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBinsPrim(
-            market.minTick, market.maxTick, market.tickSpacing, numBins, lowerTick, upperTick
-        );
 
         uint256 qtyWad = uint256(quantity).toWad();
-        uint256 costWad = _calculateTradeCostBins(marketId, loBin, hiBin, qtyWad, alpha);
+        uint256 costWad = _calculateTradeCost(marketId, lowerTick, upperTick, qtyWad);
         uint256 cost6 = _roundDebit(costWad);
 
         uint256 fee6 = _quoteFeeWithPolicy(feePolicy, true, msg.sender, marketId, lowerTick, upperTick, quantity, cost6);
@@ -112,9 +104,9 @@ contract TradeModule is SignalsCoreStorage {
 
         _pullPayment(msg.sender, totalCost);
 
-        _applyFactorBins(marketId, loBin, hiBin, qtyWad, alpha, true);
+        _applyFactor(marketId, lowerTick, upperTick, qtyWad, true);
         market.accumulatedFees += fee6.toWad();
-        _addExposureBins(marketId, loBin, hiBin, quantity, numBins);
+        _addExposure(marketId, lowerTick, upperTick, quantity);
 
         positionId = positionContract.mintPosition(msg.sender, marketId, lowerTick, upperTick, quantity);
         if (!market.settled) {
@@ -134,19 +126,10 @@ contract TradeModule is SignalsCoreStorage {
         if (positionContract.ownerOf(positionId) != msg.sender) revert CE.UnauthorizedCaller(msg.sender);
 
         ISignalsCore.Market storage market = _loadAndValidateMarket(position.marketId);
-        _validateTickRange(position.lowerTick, position.upperTick, market);
-        
-        // Cache market params and compute bins ONCE
-        uint256 alpha = market.liquidityParameter;
-        uint32 numBins = market.numBins;
         address feePolicy = market.feePolicy != address(0) ? market.feePolicy : defaultFeePolicy;
-        (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBinsPrim(
-            market.minTick, market.maxTick, market.tickSpacing, numBins,
-            position.lowerTick, position.upperTick
-        );
 
         uint256 qtyWad = uint256(quantity).toWad();
-        uint256 costWad = _calculateTradeCostBins(position.marketId, loBin, hiBin, qtyWad, alpha);
+        uint256 costWad = _calculateTradeCost(position.marketId, position.lowerTick, position.upperTick, qtyWad);
         uint256 cost6 = _roundDebit(costWad);
 
         uint256 fee6 = _quoteFeeWithPolicy(feePolicy, true, msg.sender, position.marketId, position.lowerTick, position.upperTick, quantity, cost6);
@@ -156,9 +139,9 @@ contract TradeModule is SignalsCoreStorage {
 
         _pullPayment(msg.sender, totalCost);
 
-        _applyFactorBins(position.marketId, loBin, hiBin, qtyWad, alpha, true);
+        _applyFactor(position.marketId, position.lowerTick, position.upperTick, qtyWad, true);
         market.accumulatedFees += fee6.toWad();
-        _addExposureBins(position.marketId, loBin, hiBin, quantity, numBins);
+        _addExposure(position.marketId, position.lowerTick, position.upperTick, quantity);
 
         uint128 newQuantity = position.quantity + quantity;
         positionContract.updateQuantity(positionId, newQuantity);
@@ -253,15 +236,8 @@ contract TradeModule is SignalsCoreStorage {
         uint128 quantity
     ) external view returns (uint256 cost) {
         if (quantity == 0) revert CE.InvalidQuantity(quantity);
-        ISignalsCore.Market storage market = _loadAndValidateMarket(marketId);
-        _validateTickRange(lowerTick, upperTick, market);
-
-        uint256 costWad = _calculateTradeCostInternal(
-            marketId,
-            lowerTick,
-            upperTick,
-            uint256(quantity).toWad()
-        );
+        _loadAndValidateMarket(marketId);
+        uint256 costWad = _calculateTradeCost(marketId, lowerTick, upperTick, uint256(quantity).toWad());
         return _roundDebit(costWad);
     }
 
@@ -270,19 +246,10 @@ contract TradeModule is SignalsCoreStorage {
         uint128 quantity
     ) external view returns (uint256 cost) {
         if (quantity == 0) revert CE.InvalidQuantity(quantity);
-        ISignalsCore.Market storage market;
-        {
-            ISignalsPosition.Position memory position = positionContract.getPosition(positionId);
-            market = _loadAndValidateMarket(position.marketId);
-            _validateTickRange(position.lowerTick, position.upperTick, market);
-            uint256 costWad = _calculateTradeCostInternal(
-                position.marketId,
-                position.lowerTick,
-                position.upperTick,
-                uint256(quantity).toWad()
-            );
-            return _roundDebit(costWad);
-        }
+        ISignalsPosition.Position memory position = positionContract.getPosition(positionId);
+        _loadAndValidateMarket(position.marketId);
+        uint256 costWad = _calculateTradeCost(position.marketId, position.lowerTick, position.upperTick, uint256(quantity).toWad());
+        return _roundDebit(costWad);
     }
 
     function calculateDecreaseProceeds(
@@ -291,14 +258,8 @@ contract TradeModule is SignalsCoreStorage {
     ) external view returns (uint256 proceeds) {
         if (quantity == 0) revert CE.InvalidQuantity(quantity);
         ISignalsPosition.Position memory position = positionContract.getPosition(positionId);
-        ISignalsCore.Market storage market = _loadAndValidateMarket(position.marketId);
-        _validateTickRange(position.lowerTick, position.upperTick, market);
-        uint256 proceedsWad = _calculateSellProceeds(
-            position.marketId,
-            position.lowerTick,
-            position.upperTick,
-            uint256(quantity).toWad()
-        );
+        _loadAndValidateMarket(position.marketId);
+        uint256 proceedsWad = _calculateSellProceeds(position.marketId, position.lowerTick, position.upperTick, uint256(quantity).toWad());
         return _roundCredit(proceedsWad);
     }
 
@@ -306,14 +267,8 @@ contract TradeModule is SignalsCoreStorage {
         uint256 positionId
     ) external view returns (uint256 proceeds) {
         ISignalsPosition.Position memory position = positionContract.getPosition(positionId);
-        ISignalsCore.Market storage market = _loadAndValidateMarket(position.marketId);
-        _validateTickRange(position.lowerTick, position.upperTick, market);
-        uint256 proceedsWad = _calculateSellProceeds(
-            position.marketId,
-            position.lowerTick,
-            position.upperTick,
-            uint256(position.quantity).toWad()
-        );
+        _loadAndValidateMarket(position.marketId);
+        uint256 proceedsWad = _calculateSellProceeds(position.marketId, position.lowerTick, position.upperTick, uint256(position.quantity).toWad());
         return _roundCredit(proceedsWad);
     }
 
@@ -321,14 +276,7 @@ contract TradeModule is SignalsCoreStorage {
         uint256 positionId
     ) external view returns (uint256 value) {
         ISignalsPosition.Position memory position = positionContract.getPosition(positionId);
-        ISignalsCore.Market storage market = markets[position.marketId];
-        _validateTickRange(position.lowerTick, position.upperTick, market);
-        uint256 proceedsWad = _calculateSellProceeds(
-            position.marketId,
-            position.lowerTick,
-            position.upperTick,
-            uint256(position.quantity).toWad()
-        );
+        uint256 proceedsWad = _calculateSellProceeds(position.marketId, position.lowerTick, position.upperTick, uint256(position.quantity).toWad());
         return _roundCredit(proceedsWad);
     }
 
@@ -352,93 +300,22 @@ contract TradeModule is SignalsCoreStorage {
         if (block.timestamp > market.endTimestamp) revert CE.MarketExpired();
     }
 
-    function _validateTick(int256 tick, ISignalsCore.Market memory market) internal pure {
-        if (tick < market.minTick || tick > market.maxTick) {
-            revert CE.InvalidTick(tick, market.minTick, market.maxTick);
-        }
-        if ((tick - market.minTick) % market.tickSpacing != 0) {
-            revert CE.InvalidTickSpacing(tick, market.tickSpacing);
-        }
-    }
-
-    /// @dev Validates tick ordering/spacing; “no point betting” enforced via strict inequality.
-    function _validateTickRange(
-        int256 lowerTick,
-        int256 upperTick,
-        ISignalsCore.Market memory market
-    ) internal pure {
-        _validateTick(lowerTick, market);
-        _validateTick(upperTick, market);
-        if (lowerTick >= upperTick) {
-            revert CE.InvalidTickRange(lowerTick, upperTick);
-        }
-        if ((upperTick - lowerTick) % market.tickSpacing != 0) {
-            revert CE.InvalidTickRange(lowerTick, upperTick);
-        }
-    }
-
-    /// @dev Converts ticks to inclusive bin range using shared library
-    function _ticksToBins(
-        ISignalsCore.Market memory market,
-        int256 lowerTick,
-        int256 upperTick
-    ) internal pure returns (uint32 loBin, uint32 hiBin) {
-        _validateTickRange(lowerTick, upperTick, market);
-        return TickBinLib.ticksToBins(market, lowerTick, upperTick);
-    }
-
-    /// @dev Converts a single tick to bin index using shared library
-    function _tickToBin(
-        ISignalsCore.Market memory market,
-        int256 tick
-    ) internal pure returns (uint32 bin) {
-        return TickBinLib.tickToBin(market, tick);
-    }
-
     /// @dev Thin wrapper to calculate buy cost using shared library.
-    function _calculateTradeCostInternal(
+    function _calculateTradeCost(
         uint256 marketId,
         int256 lowerTick,
         int256 upperTick,
         uint256 quantityWad
     ) internal view returns (uint256 costWad) {
         ISignalsCore.Market storage market = markets[marketId];
+        (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBins(
+            market.minTick, market.maxTick, market.tickSpacing, market.numBins,
+            lowerTick, upperTick
+        );
         LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
-        (uint32 loBin, uint32 hiBin) = _ticksToBins(market, lowerTick, upperTick);
         costWad = tree.calculateTradeCost(market.liquidityParameter, loBin, hiBin, quantityWad);
     }
 
-    /**
-     * @notice Calculate trade cost using pre-computed bins (gas optimized)
-     * @dev Avoids redundant Market memory copy and bins calculation
-     */
-    function _calculateTradeCostBins(
-        uint256 marketId,
-        uint32 loBin,
-        uint32 hiBin,
-        uint256 quantityWad,
-        uint256 alpha
-    ) internal view returns (uint256 costWad) {
-        LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
-        costWad = tree.calculateTradeCost(alpha, loBin, hiBin, quantityWad);
-    }
-
-    /**
-     * @notice Calculate sell proceeds using pre-computed bins (gas optimized)
-     * @dev Avoids redundant Market memory copy and bins calculation
-     */
-    function _calculateSellProceedsBins(
-        uint256 marketId,
-        uint32 loBin,
-        uint32 hiBin,
-        uint256 quantityWad,
-        uint256 alpha
-    ) internal view returns (uint256 proceedsWad) {
-        LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
-        proceedsWad = tree.calculateSellProceeds(alpha, loBin, hiBin, quantityWad);
-    }
-
-    /// @dev Thin wrapper to calculate sell proceeds using shared library.
     function _calculateSellProceeds(
         uint256 marketId,
         int256 lowerTick,
@@ -446,22 +323,12 @@ contract TradeModule is SignalsCoreStorage {
         uint256 quantityWad
     ) internal view returns (uint256 proceedsWad) {
         ISignalsCore.Market storage market = markets[marketId];
+        (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBins(
+            market.minTick, market.maxTick, market.tickSpacing, market.numBins,
+            lowerTick, upperTick
+        );
         LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
-        (uint32 loBin, uint32 hiBin) = _ticksToBins(market, lowerTick, upperTick);
         proceedsWad = tree.calculateSellProceeds(market.liquidityParameter, loBin, hiBin, quantityWad);
-    }
-
-    /// @dev Thin wrapper to back out quantity from cost using shared library.
-    function _calculateQuantityFromCostInternal(
-        uint256 marketId,
-        int256 lowerTick,
-        int256 upperTick,
-        uint256 costWad
-    ) internal view returns (uint256 quantityWad) {
-        ISignalsCore.Market storage market = markets[marketId];
-        LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
-        (uint32 loBin, uint32 hiBin) = _ticksToBins(market, lowerTick, upperTick);
-        quantityWad = tree.calculateQuantityFromCost(market.liquidityParameter, loBin, hiBin, costWad);
     }
 
     function _decreasePositionInternal(
@@ -474,21 +341,11 @@ contract TradeModule is SignalsCoreStorage {
         if (positionContract.ownerOf(positionId) != msg.sender) revert CE.UnauthorizedCaller(msg.sender);
 
         ISignalsCore.Market storage market = _loadAndValidateMarket(position.marketId);
-        _validateTickRange(position.lowerTick, position.upperTick, market);
-
         if (quantity > position.quantity) revert CE.InsufficientPositionQuantity(quantity, position.quantity);
-
-        // Cache market params and compute bins ONCE
-        uint256 alpha = market.liquidityParameter;
-        uint32 numBins = market.numBins;
         address feePolicy = market.feePolicy != address(0) ? market.feePolicy : defaultFeePolicy;
-        (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBinsPrim(
-            market.minTick, market.maxTick, market.tickSpacing, numBins,
-            position.lowerTick, position.upperTick
-        );
 
         uint256 qtyWad = uint256(quantity).toWad();
-        uint256 proceedsWad = _calculateSellProceedsBins(position.marketId, loBin, hiBin, qtyWad, alpha);
+        uint256 proceedsWad = _calculateSellProceeds(position.marketId, position.lowerTick, position.upperTick, qtyWad);
         baseProceeds = _roundCredit(proceedsWad);
 
         uint256 fee6 = _quoteFeeWithPolicy(
@@ -505,9 +362,9 @@ contract TradeModule is SignalsCoreStorage {
         uint256 netProceeds = baseProceeds - fee6;
         if (netProceeds < minProceeds) revert CE.ProceedsBelowMinimum(netProceeds, minProceeds);
 
-        _applyFactorBins(position.marketId, loBin, hiBin, qtyWad, alpha, false);
+        _applyFactor(position.marketId, position.lowerTick, position.upperTick, qtyWad, false);
         market.accumulatedFees += fee6.toWad();
-        _removeExposureBins(position.marketId, loBin, hiBin, quantity, numBins);
+        _removeExposure(position.marketId, position.lowerTick, position.upperTick, quantity);
 
         _pushPayment(msg.sender, netProceeds);
 
@@ -631,36 +488,19 @@ contract TradeModule is SignalsCoreStorage {
 
     // --- Tree update helper ---
 
-    function _applyFactorChunked(
+    function _applyFactor(
         uint256 marketId,
         int256 lowerTick,
         int256 upperTick,
         uint256 qtyWad,
-        uint256 alpha,
         bool isBuy
     ) internal {
-        ISignalsCore.Market memory market = markets[marketId];
-        (uint32 loBin, uint32 hiBin) = _ticksToBins(market, lowerTick, upperTick);
-        uint256 factor = SignalsClmsrMath._safeExp(qtyWad, alpha);
-        if (!isBuy) {
-            factor = WAD.wDivUp(factor);
-        }
-        marketTrees[marketId].applyRangeFactor(loBin, hiBin, factor);
-    }
-
-    /**
-     * @notice Apply factor to tree using pre-computed bins (gas optimized)
-     * @dev Avoids redundant Market memory copy and bins calculation
-     */
-    function _applyFactorBins(
-        uint256 marketId,
-        uint32 loBin,
-        uint32 hiBin,
-        uint256 qtyWad,
-        uint256 alpha,
-        bool isBuy
-    ) internal {
-        uint256 factor = SignalsClmsrMath._safeExp(qtyWad, alpha);
+        ISignalsCore.Market storage market = markets[marketId];
+        (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBins(
+            market.minTick, market.maxTick, market.tickSpacing, market.numBins,
+            lowerTick, upperTick
+        );
+        uint256 factor = SignalsClmsrMath._safeExp(qtyWad, market.liquidityParameter);
         if (!isBuy) {
             factor = WAD.wDivUp(factor);
         }
@@ -680,25 +520,17 @@ contract TradeModule is SignalsCoreStorage {
 
     // --- Exposure Ledger helpers (Diff-based) ---
 
-    /**
-     * @notice Update exposure ledger for position open/increase (Diff-based)
-     * @dev Uses O(1) diff array update: exactly 2 storage writes
-     *      WP v2 Sec 3.5: Q_{t,b} accumulates quantity for all positions covering bin b
-     * @param marketId Market identifier
-     * @param lowerTick Lower bound (inclusive)
-     * @param upperTick Upper bound (exclusive)
-     * @param quantity Position quantity (token units)
-     */
     function _addExposure(
         uint256 marketId,
         int256 lowerTick,
         int256 upperTick,
         uint128 quantity
     ) internal {
-        ISignalsCore.Market memory market = markets[marketId];
-        (uint32 loBin, uint32 hiBin) = _ticksToBins(market, lowerTick, upperTick);
-        
-        // Use diff array for O(1) range update
+        ISignalsCore.Market storage market = markets[marketId];
+        (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBins(
+            market.minTick, market.maxTick, market.tickSpacing, market.numBins,
+            lowerTick, upperTick
+        );
         ExposureDiffLib.rangeAdd(
             _exposureFenwick[marketId],
             loBin,
@@ -708,71 +540,23 @@ contract TradeModule is SignalsCoreStorage {
         );
     }
 
-    /**
-     * @notice Update exposure ledger using pre-computed bins (gas optimized)
-     * @dev Avoids redundant Market memory copy and bins calculation
-     */
-    function _addExposureBins(
-        uint256 marketId,
-        uint32 loBin,
-        uint32 hiBin,
-        uint128 quantity,
-        uint32 numBins
-    ) internal {
-        ExposureDiffLib.rangeAdd(
-            _exposureFenwick[marketId],
-            loBin,
-            hiBin,
-            int256(uint256(quantity)),
-            numBins
-        );
-    }
-
-    /**
-     * @notice Update exposure ledger for position decrease/close (Diff-based)
-     * @dev Uses O(1) diff array update with negative delta
-     *      WP v2 Sec 3.5: Decreasing/closing subtracts over the same range
-     * @param marketId Market identifier
-     * @param lowerTick Lower bound (inclusive)
-     * @param upperTick Upper bound (exclusive)
-     * @param quantity Position quantity (token units)
-     */
     function _removeExposure(
         uint256 marketId,
         int256 lowerTick,
         int256 upperTick,
         uint128 quantity
     ) internal {
-        ISignalsCore.Market memory market = markets[marketId];
-        (uint32 loBin, uint32 hiBin) = _ticksToBins(market, lowerTick, upperTick);
-        
-        // Use diff array for O(1) range update (negative delta)
+        ISignalsCore.Market storage market = markets[marketId];
+        (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBins(
+            market.minTick, market.maxTick, market.tickSpacing, market.numBins,
+            lowerTick, upperTick
+        );
         ExposureDiffLib.rangeAdd(
             _exposureFenwick[marketId],
             loBin,
             hiBin,
             -int256(uint256(quantity)),
             market.numBins
-        );
-    }
-
-    /**
-     * @notice Remove exposure using pre-computed bins (gas optimized)
-     * @dev Avoids redundant Market memory copy and bins calculation
-     */
-    function _removeExposureBins(
-        uint256 marketId,
-        uint32 loBin,
-        uint32 hiBin,
-        uint128 quantity,
-        uint32 numBins
-    ) internal {
-        ExposureDiffLib.rangeAdd(
-            _exposureFenwick[marketId],
-            loBin,
-            hiBin,
-            -int256(uint256(quantity)),
-            numBins
         );
     }
 
@@ -787,10 +571,8 @@ contract TradeModule is SignalsCoreStorage {
         uint256 marketId,
         int256 tick
     ) internal view returns (uint256 exposure) {
-        ISignalsCore.Market memory market = markets[marketId];
-        uint32 bin = _tickToBin(market, tick);
-        
-        // Use diff array prefix sum for point query
+        ISignalsCore.Market storage market = markets[marketId];
+        uint32 bin = TickBinLib.tickToBin(market.minTick, market.tickSpacing, market.numBins, tick);
         return ExposureDiffLib.pointQuery(_exposureFenwick[marketId], bin);
     }
 }

@@ -125,9 +125,10 @@ describe("TradeModule validation helpers (Phase 3-1)", () => {
       harness.exposedValidateTickRange(-1, 1, 1)
     ).to.be.revertedWithCustomError(harness, "InvalidTick");
 
+    // upperTick=5 with maxTick=4, tickSpacing=1, numBins=4 → hiBin=4 >= numBins
     await expect(
       harness.exposedValidateTickRange(0, 5, 1)
-    ).to.be.revertedWithCustomError(harness, "InvalidTick");
+    ).to.be.revertedWithCustomError(harness, "RangeBinsOutOfBounds");
 
     await expect(
       harness.exposedValidateTickRange(0, 0, 1)

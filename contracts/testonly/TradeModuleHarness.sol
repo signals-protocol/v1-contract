@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "../modules/TradeModule.sol";
+import "../modules/trade/lib/TickBinLib.sol";
 
 /// @notice Harness to expose TradeModule validation helpers for testing.
 contract TradeModuleHarness is TradeModule {
@@ -25,13 +26,17 @@ contract TradeModuleHarness is TradeModule {
         return market;
     }
 
-    /// @notice Expose tick range validation.
+    /// @notice Expose tick range validation via TickBinLib.ticksToBins.
     function exposedValidateTickRange(
         int256 lowerTick,
         int256 upperTick,
         uint256 marketId
     ) external view {
-        ISignalsCore.Market memory market = markets[marketId];
-        _validateTickRange(lowerTick, upperTick, market);
+        ISignalsCore.Market storage market = markets[marketId];
+        // TickBinLib.ticksToBins validates tick range internally
+        TickBinLib.ticksToBins(
+            market.minTick, market.maxTick, market.tickSpacing, market.numBins,
+            lowerTick, upperTick
+        );
     }
 }
