@@ -11,6 +11,8 @@ import "../core/lib/SignalsDistributionMath.sol";
 import "../core/lib/SignalsClmsrMath.sol";
 import "../lib/LazyMulSegmentTree.sol";
 import "../lib/FixedPointMathU.sol";
+import "../lib/ExposureFenwickLib.sol";
+import "../lib/TickBinLib.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 interface IOwnableLite {
@@ -208,8 +210,8 @@ contract TradeModule is SignalsCoreStorage {
         // Phase 6: Time-based gating (WP v1.0 Oracle & Settlement State Machine)
         // Claim is allowed after settlementFinalizedAt + Δ_claim
         // Note: Batch processing status is NOT a gating condition
-        uint64 claimOpen = market.settlementFinalizedAt + settlementFinalizeDeadline;
-        if (block.timestamp < claimOpen) revert CE.SettlementTooEarly(claimOpen, uint64(block.timestamp));
+        uint64 claimOpen = market.settlementFinalizedAt + claimDelaySeconds;
+        if (block.timestamp < claimOpen) revert CE.ClaimTooEarly(claimOpen, uint64(block.timestamp));
 
         uint256 payout = _calculateClaimAmount(position, market);
 
@@ -375,19 +377,22 @@ contract TradeModule is SignalsCoreStorage {
         }
     }
 
-    /// @dev Converts ticks to inclusive bin range; reverts if out of bounds.
+    /// @dev Converts ticks to inclusive bin range using shared library
     function _ticksToBins(
         ISignalsCore.Market memory market,
         int256 lowerTick,
         int256 upperTick
     ) internal pure returns (uint32 loBin, uint32 hiBin) {
         _validateTickRange(lowerTick, upperTick, market);
-        loBin = uint32(uint256((lowerTick - market.minTick) / market.tickSpacing));
-        hiBin = uint32(uint256((upperTick - market.minTick) / market.tickSpacing - 1));
-        if (loBin >= market.numBins || hiBin >= market.numBins) {
-            revert CE.RangeBinsOutOfBounds(loBin, hiBin, market.numBins);
-        }
-        if (loBin > hiBin) revert CE.InvalidRangeBins(loBin, hiBin);
+        return TickBinLib.ticksToBins(market, lowerTick, upperTick);
+    }
+
+    /// @dev Converts a single tick to bin index using shared library
+    function _tickToBin(
+        ISignalsCore.Market memory market,
+        int256 tick
+    ) internal pure returns (uint32 bin) {
+        return TickBinLib.tickToBin(market, tick);
     }
 
     /// @dev Thin wrapper to calculate buy cost using shared library.
@@ -575,9 +580,9 @@ contract TradeModule is SignalsCoreStorage {
     // --- Exposure Ledger helpers (Phase 6) ---
 
     /**
-     * @notice Update exposure ledger for position open/increase
-     * @dev Adds quantity to each tick in [lowerTick, upperTick) range
-     *      WP v2 Sec 3.5: Opening/increasing (R, x) adds x to Q_{t,b} for all b ∈ R
+     * @notice Update exposure ledger for position open/increase (Fenwick-based)
+     * @dev Uses O(log n) range-add on Fenwick tree instead of O(n) tick iteration
+     *      WP v2 Sec 3.5: Q_{t,b} accumulates quantity for all positions covering bin b
      * @param marketId Market identifier
      * @param lowerTick Lower bound (inclusive)
      * @param upperTick Upper bound (exclusive)
@@ -589,16 +594,22 @@ contract TradeModule is SignalsCoreStorage {
         int256 upperTick,
         uint128 quantity
     ) internal {
-        // Exposure is tracked per tick in [lowerTick, upperTick) range
-        // This represents payout owed if settlement tick falls in this range
-        for (int256 tick = lowerTick; tick < upperTick; tick++) {
-            _exposureLedger[marketId][tick] += quantity;
-        }
+        ISignalsCore.Market memory market = markets[marketId];
+        (uint32 loBin, uint32 hiBin) = _ticksToBins(market, lowerTick, upperTick);
+        
+        // Use Fenwick tree for O(log n) range update
+        ExposureFenwickLib.rangeAdd(
+            _exposureFenwick[marketId],
+            loBin,
+            hiBin,
+            int256(uint256(quantity)),
+            market.numBins
+        );
     }
 
     /**
-     * @notice Update exposure ledger for position decrease/close
-     * @dev Subtracts quantity from each tick in [lowerTick, upperTick) range
+     * @notice Update exposure ledger for position decrease/close (Fenwick-based)
+     * @dev Uses O(log n) range-add with negative delta
      *      WP v2 Sec 3.5: Decreasing/closing subtracts over the same range
      * @param marketId Market identifier
      * @param lowerTick Lower bound (inclusive)
@@ -611,22 +622,34 @@ contract TradeModule is SignalsCoreStorage {
         int256 upperTick,
         uint128 quantity
     ) internal {
-        for (int256 tick = lowerTick; tick < upperTick; tick++) {
-            // Safe: exposure should always be >= quantity being removed
-            _exposureLedger[marketId][tick] -= quantity;
-        }
+        ISignalsCore.Market memory market = markets[marketId];
+        (uint32 loBin, uint32 hiBin) = _ticksToBins(market, lowerTick, upperTick);
+        
+        // Use Fenwick tree for O(log n) range update (negative delta)
+        ExposureFenwickLib.rangeAdd(
+            _exposureFenwick[marketId],
+            loBin,
+            hiBin,
+            -int256(uint256(quantity)),
+            market.numBins
+        );
     }
 
     /**
-     * @notice Get payout exposure at a specific tick
+     * @notice Get payout exposure at a specific tick (Fenwick-based)
+     * @dev Uses O(log n) point query instead of direct mapping lookup
      * @param marketId Market identifier
-     * @param tick Settlement tick
+     * @param tick Settlement tick (must be aligned to tickSpacing)
      * @return exposure Total payout owed if settlement tick is `tick`
      */
     function _getExposureAtTick(
         uint256 marketId,
         int256 tick
     ) internal view returns (uint256 exposure) {
-        return _exposureLedger[marketId][tick];
+        ISignalsCore.Market memory market = markets[marketId];
+        uint32 bin = _tickToBin(market, tick);
+        
+        // Use Fenwick tree for O(log n) point query
+        return ExposureFenwickLib.pointQuery(_exposureFenwick[marketId], bin);
     }
 }

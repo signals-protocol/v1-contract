@@ -6,6 +6,8 @@ import "../errors/ModuleErrors.sol";
 import "../errors/CLMSRErrors.sol";
 import "../lib/LazyMulSegmentTree.sol";
 import "../lib/FixedPointMathU.sol";
+import "../lib/ExposureFenwickLib.sol";
+import "../lib/TickBinLib.sol";
 
 /// @notice Delegate-only lifecycle module (skeleton)
 contract MarketLifecycleModule is SignalsCoreStorage {
@@ -138,7 +140,23 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         emit MarketCreated(marketId);
     }
 
-    function settleMarket(uint256 marketId) external onlyDelegated {
+    // ============================================================
+    // Phase 8: WP v2 Settlement State Machine
+    // ============================================================
+    // Timeline:
+    //   Trading:        t < Tset
+    //   SettlementOpen: Tset ≤ t < Tset + Δsettle (sample submission)
+    //   PendingOps:     Tset + Δsettle ≤ t < Tset + Δsettle + Δops (ops can mark failed)
+    //   After PendingOps: finalizePrimary() or already failed → manual settle
+    // ============================================================
+
+    /**
+     * @notice Finalize primary settlement after PendingOps window ends
+     * @dev WP v2 Sec 7.4: Called after Tset + Δsettle + Δops
+     *      Uses the closest-sample candidate from SettlementOpen window
+     * @param marketId Market to finalize
+     */
+    function finalizePrimarySettlement(uint256 marketId) external onlyDelegated {
         ISignalsCore.Market storage market = markets[marketId];
         if (!_marketExists(marketId)) revert CE.MarketNotFound(marketId);
         if (market.settled) revert CE.MarketAlreadySettled(marketId);
@@ -147,27 +165,13 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         SettlementOracleState storage state = settlementOracleState[marketId];
         if (state.candidatePriceTimestamp == 0) revert CE.SettlementOracleCandidateMissing();
 
-        // Tset = settlementTimestamp (market creation time parameter)
-        // startTimestamp < endTimestamp < settlementTimestamp
         uint64 tSet = market.settlementTimestamp;
+        uint64 nowTs = uint64(block.timestamp);
         
-        // Can only settle after Tset
-        if (uint64(block.timestamp) < tSet) {
-            revert CE.SettlementTooEarly(tSet, uint64(block.timestamp));
-        }
-        
-        // Candidate must be from valid window [Tset, Tset + submitWindow]
-        if (state.candidatePriceTimestamp < tSet) {
-            revert CE.SettlementTooEarly(tSet, state.candidatePriceTimestamp);
-        }
-        if (state.candidatePriceTimestamp > tSet + settlementSubmitWindow) {
-            revert CE.SettlementFinalizeWindowClosed(tSet + settlementSubmitWindow, state.candidatePriceTimestamp);
-        }
-
-        // Must finalize within deadline from candidate submission
-        uint64 finalizeDeadlineTs = state.candidatePriceTimestamp + settlementFinalizeDeadline;
-        if (uint64(block.timestamp) > finalizeDeadlineTs) {
-            revert CE.SettlementFinalizeWindowClosed(finalizeDeadlineTs, uint64(block.timestamp));
+        // WP v2: Can only finalize after PendingOps ends (Tset + Δsettle + Δops)
+        uint64 opsEnd = tSet + settlementSubmitWindow + pendingOpsWindow;
+        if (nowTs < opsEnd) {
+            revert CE.PendingOpsNotStarted();
         }
 
         int256 settlementTick = _toSettlementTick(market, state.candidateValue);
@@ -177,7 +181,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         market.settlementTick = settlementTick;
         // settlementTimestamp stays as-is (market day key set at creation)
         // settlementFinalizedAt records when settlement tx was mined
-        market.settlementFinalizedAt = uint64(block.timestamp);
+        market.settlementFinalizedAt = nowTs;
         market.isActive = false;
         market.snapshotChunkCursor = 0;
         market.snapshotChunksDone = (market.openPositionCount == 0);
@@ -191,7 +195,6 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         (int256 lt, uint256 ftot, uint256 payoutReserve) = _calculateMarketPnlWithPayout(marketId, settlementTick);
         
         // Store payout reserve in escrow (WP v2 Sec 3.3)
-        // N_t already reflects payout reserve as deducted liability
         _payoutReserve[marketId] = payoutReserve;
         _payoutReserveRemaining[marketId] = payoutReserve;
         
@@ -205,49 +208,59 @@ contract MarketLifecycleModule is SignalsCoreStorage {
     }
 
     /**
-     * @notice Mark a market as failed due to oracle not providing valid settlement
-     * @dev Can only be called after settlement window expires without valid candidate
+     * @notice Mark a market's settlement as failed (operations only during PendingOps)
+     * @dev WP v2 Sec 7.5: Operations can mark failed during PendingOps
+     *      - Can be called even if candidate exists (divergence scenario)
+     *      - Callable during: [Tset + Δsettle, Tset + Δsettle + Δops)
+     *      - After PendingOps, if no markSettlementFailed → finalize via finalizePrimarySettlement
      * @param marketId Market to mark as failed
      */
-    function markFailed(uint256 marketId) external onlyDelegated {
+    function markSettlementFailed(uint256 marketId) external onlyDelegated {
         ISignalsCore.Market storage market = markets[marketId];
         if (!_marketExists(marketId)) revert CE.MarketNotFound(marketId);
         if (market.settled) revert CE.MarketAlreadySettled(marketId);
         if (market.failed) revert CE.MarketAlreadyFailed(marketId);
 
-        // Tset = settlementTimestamp
         uint64 tSet = market.settlementTimestamp;
-        uint64 deadline = tSet + settlementSubmitWindow + settlementFinalizeDeadline;
-
-        // Can only mark failed after full settlement window has expired
-        if (uint64(block.timestamp) <= deadline) {
-            revert CE.SettlementWindowNotExpired(deadline, uint64(block.timestamp));
-        }
-
-        // Check if there's no valid candidate OR candidate expired
+        uint64 nowTs = uint64(block.timestamp);
+        
+        // WP v2: markFailed during PendingOps [Tset + Δsettle, Tset + Δsettle + Δops)
+        uint64 opsStart = tSet + settlementSubmitWindow;
+        uint64 opsEnd = opsStart + pendingOpsWindow;
+        
+        // Also allow after opsEnd if no candidate (oracle sample absence case)
         SettlementOracleState storage state = settlementOracleState[marketId];
-        bool hasValidCandidate = state.candidatePriceTimestamp != 0 &&
-            state.candidatePriceTimestamp >= tSet &&
-            state.candidatePriceTimestamp <= tSet + settlementSubmitWindow;
-
-        if (hasValidCandidate) {
-            // There's a valid candidate - should use settleMarket instead
-            revert CE.SettlementOracleCandidateMissing(); // Misleading but indicates "use settleMarket"
+        bool hasCandidate = state.candidatePriceTimestamp != 0;
+        
+        if (nowTs < opsStart) {
+            // Before PendingOps - not allowed
+            revert CE.PendingOpsNotStarted();
         }
+        
+        if (nowTs >= opsEnd && hasCandidate) {
+            // After PendingOps with candidate: should use settleMarket instead
+            revert CE.SettlementOracleCandidateMissing();
+        }
+        
+        // Clear any candidate (WP v2: divergence case discards candidate)
+        state.candidateValue = 0;
+        state.candidatePriceTimestamp = 0;
 
         market.failed = true;
         market.isActive = false;
 
-        emit MarketFailed(marketId, uint64(block.timestamp));
+        emit MarketFailed(marketId, nowTs);
     }
 
     /**
-     * @notice Manually settle a failed market (secondary settlement path)
-     * @dev Can only be called on a failed market. Ops provides settlement value.
+     * @notice Finalize secondary settlement for a failed market
+     * @dev WP v2 Sec 7.5: Operations provides settlement value for failed markets
+     *      Can only be called on a market marked as failed
+     *      Settlement value comes from pre-announced secondary rule (off-chain)
      * @param marketId Market to settle
      * @param settlementValue The settlement value (ops-determined)
      */
-    function manualSettleFailedMarket(
+    function finalizeSecondarySettlement(
         uint256 marketId,
         int256 settlementValue
     ) external onlyDelegated {
@@ -261,7 +274,8 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         market.settled = true;
         market.settlementValue = settlementValue;
         market.settlementTick = settlementTick;
-        market.settlementTimestamp = market.endTimestamp; // Market day key
+        // WP v2: Keep original settlementTimestamp as market day key
+        // (DO NOT change to endTimestamp - that breaks batch association)
         market.settlementFinalizedAt = uint64(block.timestamp);
         market.snapshotChunkCursor = 0;
         market.snapshotChunksDone = (market.openPositionCount == 0);
@@ -382,14 +396,30 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         return markets[marketId].numBins > 0;
     }
 
+    /// @dev Convert settlement value to tick (WP v2 Eq 6.1)
+    /// settlementTick = settlementValue / 1e6 (like v0)
     function _toSettlementTick(ISignalsCore.Market memory market, int256 settlementValue) internal pure returns (int256) {
         int256 spacing = market.tickSpacing;
-        int256 tick = settlementValue;
+        int256 tick = settlementValue / 1_000_000; // Convert 6-decimal value to tick
         if (tick < market.minTick) tick = market.minTick;
         if (tick > market.maxTick) tick = market.maxTick;
         int256 offset = tick - market.minTick;
         tick = market.minTick + (offset / spacing) * spacing;
         return tick;
+    }
+
+    /// @dev Get payout exposure at a specific tick using Fenwick point query
+    /// @param marketId Market identifier
+    /// @param market Market struct
+    /// @param tick Settlement tick (must be aligned to tickSpacing)
+    /// @return exposure Total payout owed if settlement tick is `tick`
+    function _getExposureAtTick(
+        uint256 marketId,
+        ISignalsCore.Market memory market,
+        int256 tick
+    ) internal view returns (uint256 exposure) {
+        uint32 bin = TickBinLib.tickToBin(market, tick);
+        return ExposureFenwickLib.pointQuery(_exposureFenwick[marketId], bin);
     }
 
     function _calculateTotalChunks(uint32 openPositionCount) internal pure returns (uint32) {
@@ -501,8 +531,8 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         }
         
         // Payout_t := Q_{t,τ_t} (WP v2 Eq. 3.11)
-        // Get payout exposure at settlement tick (token units, convert to WAD)
-        payoutReserve = _exposureLedger[marketId][settlementTick];
+        // Get payout exposure at settlement tick using Fenwick point query
+        payoutReserve = _getExposureAtTick(marketId, market, settlementTick);
         
         // L_t := ΔC_t - Payout_t (WP v2 Eq. 3.12)
         // Note: payoutReserve is in token units (6 decimals), need to convert to WAD for consistency

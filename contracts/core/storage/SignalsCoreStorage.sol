@@ -11,9 +11,44 @@ abstract contract SignalsCoreStorage {
     ///      Note: This is a mechanism-layer constant (whitepaper "day t" cycle).
     uint64 internal constant BATCH_SECONDS = 86_400;
 
-    // Governance-configurable settlement windows (set via initializer/setter in Core).
+    // ============================================================
+    // Phase 8: Settlement Timeline Configuration (WP v2 Sec 7)
+    // ============================================================
+    // Timeline: Trading → SettlementOpen → PendingOps → Finalized
+    // 
+    // settlementSubmitWindow (Δsettle): [Tset, Tset + Δsettle) = SettlementOpen
+    //   - Anyone can submit oracle samples during this window
+    // pendingOpsWindow (Δops): [Tset + Δsettle, Tset + Δsettle + Δops) = PendingOps
+    //   - No new samples; ops can mark failed
+    // After Tset + Δsettle + Δops: finalizePrimary() becomes callable
+    //
+    // Note: settlementFinalizeDeadline is now used for claim gating (Δclaim)
+
+    /// @notice Δsettle: Duration of SettlementOpen window (seconds)
+    /// @dev Anyone can submit oracle samples during [Tset, Tset + settlementSubmitWindow)
     uint64 public settlementSubmitWindow;
-    uint64 public settlementFinalizeDeadline;
+    
+    /// @notice Δclaim: Delay before claims open after finalization (seconds)
+    /// @dev Claims open at settlementFinalizedAt + claimDelaySeconds
+    uint64 public claimDelaySeconds;
+    
+    /// @notice Δops: Duration of PendingOps window (seconds)
+    /// @dev Operations can mark failed during [Tset + Δsettle, Tset + Δsettle + Δops)
+    uint64 public pendingOpsWindow;
+    
+    /// @notice Δmax: Maximum allowed |priceTimestamp - Tset| for samples (seconds)
+    /// @dev Samples with distance > maxSampleDistance are rejected
+    uint64 public maxSampleDistance;
+    
+    /// @notice δfuture: Future tolerance for price timestamps (seconds, default 0)
+    /// @dev Samples with priceTimestamp > block.timestamp + futureTolerance are rejected
+    uint64 public futureTolerance;
+    
+    /// @notice Redstone data feed ID (e.g., bytes32("BTC"))
+    bytes32 public redstoneFeedId;
+    
+    /// @notice Redstone feed decimals (e.g., 8 for BTC/USD)
+    uint8 public redstoneFeedDecimals;
 
     IERC20 public paymentToken;
     ISignalsPosition public positionContract;
@@ -234,12 +269,19 @@ abstract contract SignalsCoreStorage {
     // Phase 6: Exposure Ledger & Payout Reserve
     // ============================================================
 
-    /// @notice Market ID → (tick index → exposure amount in token units)
-    /// @dev Exposure Ledger Q_t: tracks payout liability per settlement tick
-    ///      Q_{t,b} = total payout owed if settlement tick τ_t = b
-    ///      Open/increase: adds quantity to [lowerTick, upperTick) range
-    ///      Decrease/close: subtracts quantity from [lowerTick, upperTick) range
+    /// @notice DEPRECATED: Old tick-keyed exposure ledger
+    /// @dev Kept for storage slot stability - DO NOT USE
+    ///      Replaced by _exposureFenwick (bin-based Fenwick tree)
     mapping(uint256 => mapping(int256 => uint256)) internal _exposureLedger;
+
+    /// @notice Market ID → Fenwick tree for exposure tracking (bin-based)
+    /// @dev Exposure Ledger Q_t: tracks payout liability per settlement bin
+    ///      Uses diff-array + prefix-sum pattern for O(log n) operations:
+    ///      - rangeAdd([loBin, hiBin], delta): O(log n)
+    ///      - pointQuery(bin): O(log n)
+    ///      Index is 1-based (Fenwick convention): node[1..numBins]
+    ///      Signed int256 to support both positive and negative deltas
+    mapping(uint256 => mapping(uint32 => int256)) internal _exposureFenwick;
 
     /// @notice Market ID → payout reserve (escrow) for settled markets
     /// @dev Set at settleMarket time, equals Q_{τ_t} (exposure at settlement tick)
