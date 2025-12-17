@@ -49,7 +49,8 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         uint64 settlementTimestamp
     );
 
-    uint32 private constant MAX_BIN_COUNT = 1_000_000;
+    // Diff array pointQuery is O(n), so limit bins to prevent settlement DoS
+    uint32 private constant MAX_BIN_COUNT = 256;
     uint32 public constant CHUNK_SIZE = 512;
 
     modifier onlyDelegated() {
@@ -426,7 +427,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         ISignalsCore.Market memory market,
         int256 tick
     ) internal view returns (uint256 exposure) {
-        uint32 bin = TickBinLib.tickToBin(market, tick);
+        uint32 bin = TickBinLib.tickToBin(market.minTick, market.tickSpacing, market.numBins, tick);
         return ExposureDiffLib.pointQuery(_exposureFenwick[marketId], bin);
     }
 
