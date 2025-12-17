@@ -3,23 +3,23 @@ pragma solidity ^0.8.24;
 
 import "../core/storage/SignalsCoreStorage.sol";
 import "../lib/FixedPointMathU.sol";
+import "../lib/RiskMathLib.sol";
 import "../errors/ModuleErrors.sol";
 
 /// @title RiskModule
-/// @notice Delegate-only module providing Risk calculation helpers (Phase 7)
-/// @dev Implements whitepaper v2 Sec 4.1-4.5 calculation functions:
+/// @notice Delegate-only module for Risk calculations AND enforcement (Phase 8)
+/// @dev Implements whitepaper v2 Sec 4.1-4.5:
 ///      - ΔEₜ (tail budget) calculation from prior
 ///      - αbase/αlimit calculation with drawdown
 ///      - Prior admissibility check
 ///
-///      IMPORTANT: This module provides CALCULATIONS only.
-///      Actual enforcement (revert on violations) is done in MarketLifecycleModule:
-///      - createMarket: calls _validateAlphaForMarket, _validatePriorAdmissibility
-///      - reopenMarket: re-validates α and prior
-///
-///      This separation allows:
-///      - Unit testing of calculations independently
-///      - Clear separation of concerns (compute vs enforce)
+///      Phase 8: Core-first Risk Gate Architecture
+///      This module now provides BOTH calculations AND enforcement via gate functions.
+///      SignalsCore calls gate* functions BEFORE delegating to target modules.
+///      This ensures:
+///      - Bypass-proof enforcement (Core always calls gate first)
+///      - Clear single point of risk validation
+///      - Testable call-order via mock modules
 contract RiskModule is SignalsCoreStorage {
     using FixedPointMathU for uint256;
 
@@ -29,14 +29,20 @@ contract RiskModule is SignalsCoreStorage {
     // Errors
     // ============================================================
 
+    /// @notice Invalid number of bins (must be > 1)
+    error InvalidNumBins(uint256 numBins);
+
+    /// @notice Market α exceeds safety limit
+    error AlphaExceedsLimit(uint256 alpha, uint256 limit);
+
     /// @notice Prior not admissible: ΔEₜ > B^eff_{t-1}
     error PriorNotAdmissible(uint256 deltaEt, uint256 effectiveBackstop);
 
-    /// @notice Market α exceeds safety limit
-    error AlphaExceedsLimit(uint256 marketAlpha, uint256 alphaLimit);
+    /// @notice Single trade quantity exceeds per-ticket cap (Phase 9)
+    error PerTicketCapExceeded(uint128 quantity, uint128 cap);
 
-    /// @notice Invalid number of bins (must be > 1)
-    error InvalidNumBins(uint256 numBins);
+    /// @notice Account total exposure exceeds per-account cap (Phase 9)
+    error PerAccountCapExceeded(uint256 totalExposure, uint256 cap);
 
     // ============================================================
     // Constants
@@ -115,12 +121,7 @@ contract RiskModule is SignalsCoreStorage {
 
     /**
      * @notice Calculate αbase from NAV and bins
-     * @dev Per whitepaper v2 Eq. 4.9:
-     *      αbase,t = λ * E_t / ln(n)
-     *      where E_t = N_{t-1} (vault NAV from previous batch)
-     * 
-     *      This ensures uniform-prior worst-case loss ≤ λ * E_t
-     * 
+     * @dev Delegates to RiskMathLib library
      * @param Et Vault NAV (WAD)
      * @param numBins Number of outcome bins n
      * @param lambda Safety parameter λ (WAD, e.g., 0.3 = 30% max drawdown)
@@ -131,22 +132,12 @@ contract RiskModule is SignalsCoreStorage {
         uint256 numBins,
         uint256 lambda
     ) external pure returns (uint256 alphaBase) {
-        if (numBins <= 1) revert InvalidNumBins(numBins);
-        
-        // Use safe (upward-rounded) ln to ensure conservative α_base
-        uint256 lnN = FixedPointMathU.lnWadUp(numBins);
-        if (lnN == 0) return type(uint256).max; // Edge case: n=1
-        
-        // αbase = λ * E_t / ln(n)
-        alphaBase = lambda.wMul(Et).wDiv(lnN);
+        return RiskMathLib.calculateAlphaBase(Et, numBins, lambda);
     }
 
     /**
      * @notice Calculate αlimit from αbase and drawdown
-     * @dev Per whitepaper v2 Eq. 4.15:
-     *      αlimit,t+1 = max{0, αbase,t+1 * (1 - k * DD_t)}
-     *      where DD_t = 1 - P_t / P^peak_t
-     * 
+     * @dev Delegates to RiskMathLib library
      * @param alphaBase Base liquidity parameter (WAD)
      * @param drawdown Current drawdown DD_t (WAD, 0 to WAD)
      * @param k Drawdown sensitivity factor (WAD, typically 1.0)
@@ -157,21 +148,12 @@ contract RiskModule is SignalsCoreStorage {
         uint256 drawdown,
         uint256 k
     ) external pure returns (uint256 alphaLimit) {
-        // αlimit = αbase * (1 - k * DD)
-        uint256 kDD = k.wMul(drawdown);
-        
-        if (kDD >= WAD) {
-            // k * DD >= 1 → factor would be negative → return 0
-            return 0;
-        }
-        
-        uint256 factor = WAD - kDD; // 1 - k * DD
-        alphaLimit = alphaBase.wMul(factor);
+        return RiskMathLib.calculateAlphaLimit(alphaBase, drawdown, k);
     }
 
     /**
      * @notice Get current αlimit for the system
-     * @dev Combines αbase calculation with current drawdown
+     * @dev Combines αbase calculation with current drawdown using RiskMathLib
      * @param numBins Number of bins for α calculation
      * @param lambda Safety parameter λ (WAD)
      * @param k Drawdown sensitivity factor (WAD)
@@ -182,27 +164,11 @@ contract RiskModule is SignalsCoreStorage {
         uint256 lambda,
         uint256 k
     ) external view onlyDelegated returns (uint256 alphaLimit) {
-        // E_t = N_{t-1} (use current NAV as proxy)
-        uint256 Et = lpVault.nav;
-        if (Et == 0) return 0;
+        if (lpVault.nav == 0) return 0;
         
-        // Calculate αbase with safe (upward-rounded) ln
-        uint256 lnN = FixedPointMathU.lnWadUp(numBins);
-        if (lnN == 0) return type(uint256).max;
-        uint256 alphaBase = lambda.wMul(Et).wDiv(lnN);
-        
-        // Calculate drawdown: DD = 1 - P / P^peak
-        uint256 drawdown = 0;
-        if (lpVault.pricePeak > 0 && lpVault.price < lpVault.pricePeak) {
-            drawdown = WAD - lpVault.price.wDiv(lpVault.pricePeak);
-        }
-        
-        // Calculate αlimit
-        uint256 kDD = k.wMul(drawdown);
-        if (kDD >= WAD) {
-            return 0;
-        }
-        alphaLimit = alphaBase.wMul(WAD - kDD);
+        uint256 alphaBase = RiskMathLib.calculateAlphaBase(lpVault.nav, numBins, lambda);
+        uint256 drawdown = RiskMathLib.calculateDrawdown(lpVault.price, lpVault.pricePeak);
+        alphaLimit = RiskMathLib.calculateAlphaLimit(alphaBase, drawdown, k);
     }
 
     // ============================================================
@@ -212,7 +178,7 @@ contract RiskModule is SignalsCoreStorage {
     /**
      * @notice Check if prior is admissible
      * @dev Per whitepaper v2: ΔEₜ ≤ B^eff_{t-1}
-     *      If violated, reverts with PriorNotAdmissible
+     *      If violated, reverts with Risk_PriorNotAdmissible
      * 
      * @param deltaEt Tail budget from prior (WAD)
      * @param effectiveBackstop Effective backstop budget B^eff (WAD)
@@ -232,12 +198,153 @@ contract RiskModule is SignalsCoreStorage {
 
     /**
      * @notice Calculate natural log of n in WAD (safe upper bound)
-     * @dev Uses FixedPointMathU.lnWadUp for conservative α calculation
+     * @dev Delegates to RiskMathLib library
      * @param n Input value (not WAD)
      * @return Natural log of n in WAD precision (rounded up)
      */
     function lnWad(uint256 n) external pure returns (uint256) {
-        return FixedPointMathU.lnWadUp(n);
+        return RiskMathLib.lnWadUp(n);
+    }
+
+    // ============================================================
+    // Phase 8: Gate Functions (Enforcement)
+    // ============================================================
+
+    /**
+     * @notice Gate for market creation - validates α limit and prior admissibility
+     * @dev Called by SignalsCore BEFORE MarketLifecycleModule.createMarket
+     *      Calculates ΔEₜ from baseFactors internally (no calculation in Core)
+     *      Per WP v2:
+     *      - αlimit,t+1 = max{0, αbase,t+1 * (1 - k * DD_t)}
+     *      - ΔEₜ ≤ B^eff_{t-1} (prior admissibility)
+     * @param liquidityParameter Market α to validate (WAD)
+     * @param numBins Number of outcome bins
+     * @param baseFactors Prior factor weights (passed from Core, calculation done here)
+     */
+    function gateCreateMarket(
+        uint256 liquidityParameter,
+        uint32 numBins,
+        uint256[] calldata baseFactors
+    ) external view onlyDelegated {
+        _enforceAlphaLimit(liquidityParameter, numBins);
+        
+        // Calculate ΔEₜ from baseFactors
+        uint256 deltaEt = _calculateDeltaEtFromFactors(liquidityParameter, numBins, baseFactors);
+        _enforcePriorAdmissibility(deltaEt);
+    }
+
+    /**
+     * @notice Gate for market reopen - re-validates α and prior
+     * @dev Drawdown may have increased since creation, requiring re-validation
+     * @param liquidityParameter Market α to validate (WAD)
+     * @param numBins Number of outcome bins
+     * @param deltaEt Stored tail budget from market creation (WAD)
+     */
+    function gateReopenMarket(
+        uint256 liquidityParameter,
+        uint32 numBins,
+        uint256 deltaEt
+    ) external view onlyDelegated {
+        _enforceAlphaLimit(liquidityParameter, numBins);
+        _enforcePriorAdmissibility(deltaEt);
+    }
+
+    /**
+     * @notice Gate for position open - validates exposure caps
+     * @dev Phase 9 (DEFERRED): perTicketCap and perAccountCap enforcement
+     *      Currently no-op - exposure cap implementation is pending
+     * @param marketId Market ID
+     * @param trader Trader address
+     * @param quantity Position quantity
+     */
+    function gateOpenPosition(
+        uint256 marketId,
+        address trader,
+        uint128 quantity
+    ) external view onlyDelegated {
+        // Phase 9 deferred: exposure cap enforcement pending
+        // Silence unused parameter warnings
+        marketId;
+        trader;
+        quantity;
+    }
+
+    /**
+     * @notice Gate for position increase - validates exposure caps
+     * @dev Phase 9 (DEFERRED): perTicketCap and perAccountCap enforcement
+     *      Currently no-op - exposure cap implementation is pending
+     * @param positionId Position ID
+     * @param trader Trader address
+     * @param additionalQuantity Additional quantity
+     */
+    function gateIncreasePosition(
+        uint256 positionId,
+        address trader,
+        uint128 additionalQuantity
+    ) external view onlyDelegated {
+        // Phase 9 deferred: exposure cap enforcement pending
+        // Silence unused parameter warnings
+        positionId;
+        trader;
+        additionalQuantity;
+    }
+
+    // ============================================================
+    // Internal Enforcement Helpers
+    // ============================================================
+
+    /**
+     * @notice Enforce α ≤ αlimit
+     * @dev Calculates current αlimit and reverts if exceeded
+     *      Uses RiskMathLib library for core calculations
+     * @param liquidityParameter Market α to validate (WAD)
+     * @param numBins Number of outcome bins
+     */
+    function _enforceAlphaLimit(uint256 liquidityParameter, uint32 numBins) internal view {
+        if (!riskConfig.enforceAlpha) return; // Skip if enforcement disabled
+        if (lpVault.nav == 0) return; // Skip if vault not seeded
+        
+        // Calculate αbase using RiskMathLib
+        uint256 alphaBase = RiskMathLib.calculateAlphaBase(lpVault.nav, numBins, riskConfig.lambda);
+        
+        // Calculate drawdown using RiskMathLib
+        uint256 drawdown = RiskMathLib.calculateDrawdown(lpVault.price, lpVault.pricePeak);
+        
+        // Calculate αlimit using RiskMathLib
+        uint256 alphaLimit = RiskMathLib.calculateAlphaLimit(alphaBase, drawdown, riskConfig.kDrawdown);
+        
+        // Enforce: α ≤ αlimit (using RiskMathLib error)
+        if (liquidityParameter > alphaLimit) {
+            revert AlphaExceedsLimit(liquidityParameter, alphaLimit);
+        }
+    }
+
+    /**
+     * @notice Enforce prior admissibility: ΔEₜ ≤ B^eff_{t-1}
+     * @dev Reverts if tail budget exceeds effective backstop
+     * @param deltaEt Tail budget (WAD)
+     */
+    function _enforcePriorAdmissibility(uint256 deltaEt) internal view {
+        uint256 effectiveBackstop = capitalStack.backstopNav;
+        if (deltaEt > effectiveBackstop) {
+            revert PriorNotAdmissible(deltaEt, effectiveBackstop);
+        }
+    }
+
+    /**
+     * @notice Calculate ΔEₜ from base factors
+     * @dev Delegates to RiskMathLib library for calculation
+     * @param alpha Market liquidity parameter α (WAD)
+     * @param numBins Number of outcome bins
+     * @param baseFactors Prior factor weights
+     * @return deltaEt Tail budget (WAD)
+     */
+    function _calculateDeltaEtFromFactors(
+        uint256 alpha,
+        uint32 numBins,
+        uint256[] calldata baseFactors
+    ) internal pure returns (uint256 deltaEt) {
+        return RiskMathLib.calculateDeltaEtFromFactors(alpha, numBins, baseFactors);
     }
 }
 
