@@ -4,11 +4,16 @@ pragma solidity ^0.8.24;
 import "../core/storage/SignalsCoreStorage.sol";
 import "../errors/ModuleErrors.sol";
 import "../errors/CLMSRErrors.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import "@redstone-finance/evm-connector/contracts/data-services/PrimaryProdDataServiceConsumerBase.sol";
 
-/// @notice Delegate-only oracle module (skeleton)
-contract OracleModule is SignalsCoreStorage {
+/// @title OracleModule
+/// @notice Delegate-only oracle module with Redstone signed-pull oracle (WP v2 Sec 7)
+/// @dev Implements:
+///      - Redstone signed-pull oracle verification (v0 compatible)
+///      - Closest-sample selection: |priceTimestamp - Tset| minimum, tie-break to past
+///      - Δmax validation: reject samples too far from Tset
+///      - δfuture validation: reject future-dated samples
+contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase {
     address private immutable self;
 
     modifier onlyDelegated() {
@@ -20,79 +25,163 @@ contract OracleModule is SignalsCoreStorage {
         self = address(this);
     }
 
+    // ============================================================
+    // Events
+    // ============================================================
+
     event SettlementPriceSubmitted(
         uint256 indexed marketId,
         int256 settlementValue,
         uint64 priceTimestamp,
-        address indexed signer
+        address indexed submitter
     );
 
-    function setOracleConfig(address signer) external onlyDelegated {
-        if (signer == address(0)) revert CE.ZeroAddress();
-        settlementOracleSigner = signer;
+    event SettlementCandidateUpdated(
+        uint256 indexed marketId,
+        int256 settlementValue,
+        int256 settlementTick,
+        uint64 priceTimestamp,
+        uint64 distance
+    );
+
+    event OracleConfigUpdated(
+        bytes32 feedId,
+        uint8 feedDecimals,
+        uint64 maxSampleDistance,
+        uint64 futureTolerance
+    );
+
+    // ============================================================
+    // Configuration
+    // ============================================================
+
+    /// @notice Set Redstone oracle configuration
+    /// @param feedId Redstone data feed ID (e.g., bytes32("BTC"))
+    /// @param feedDecimals Decimals of the feed price (e.g., 8 for BTC/USD)
+    /// @param _maxSampleDistance Δmax: maximum |priceTimestamp - Tset|
+    /// @param _futureTolerance δfuture: maximum priceTimestamp - block.timestamp
+    function setRedstoneConfig(
+        bytes32 feedId,
+        uint8 feedDecimals,
+        uint64 _maxSampleDistance,
+        uint64 _futureTolerance
+    ) external onlyDelegated {
+        redstoneFeedId = feedId;
+        redstoneFeedDecimals = feedDecimals;
+        maxSampleDistance = _maxSampleDistance;
+        futureTolerance = _futureTolerance;
+        emit OracleConfigUpdated(feedId, feedDecimals, _maxSampleDistance, _futureTolerance);
     }
 
-    function submitSettlementPrice(
-        uint256 marketId,
-        int256 settlementValue,
-        uint64 priceTimestamp,
-        bytes calldata signature
+    // ============================================================
+    // Settlement Submission (Redstone Signed-Pull)
+    // ============================================================
+
+    /// @notice Submit settlement sample with Redstone signed-pull oracle (WP v2 Sec 7.4)
+    /// @dev Permissionless during SettlementOpen window. Price/timestamp extracted from
+    ///      Redstone payload in calldata. Signatures verified on-chain via PrimaryProdDataServiceConsumerBase.
+    ///      Closest-sample selection: |priceTimestamp - Tset| minimum, tie-break to past
+    /// @param marketId Market to submit settlement for
+    function submitSettlementSample(
+        uint256 marketId
     ) external onlyDelegated {
         ISignalsCore.Market storage market = markets[marketId];
         if (market.numBins == 0) revert CE.MarketNotFound(marketId);
         if (market.settled) revert CE.MarketAlreadySettled(marketId);
+        if (market.failed) revert CE.MarketAlreadyFailed(marketId);
 
-        // Tset = settlementTimestamp (the reference time for settlement)
-        // startTimestamp < endTimestamp < settlementTimestamp
         uint64 tSet = market.settlementTimestamp;
-        
-        // Price timestamp must be within [tSet, tSet + submitWindow]
-        if (priceTimestamp < tSet) revert CE.SettlementTooEarly(tSet, priceTimestamp);
-        if (priceTimestamp > tSet + settlementSubmitWindow) {
-            revert CE.SettlementFinalizeWindowClosed(tSet + settlementSubmitWindow, priceTimestamp);
-        }
-        if (priceTimestamp > block.timestamp) {
-            revert CE.SettlementTooEarly(priceTimestamp, uint64(block.timestamp));
+        uint64 nowTs = uint64(block.timestamp);
+
+        // WP v2: SettlementOpen = [Tset, Tset + Δsettle)
+        if (nowTs < tSet) revert CE.OracleSampleTooEarly(tSet, nowTs);
+        if (nowTs >= tSet + settlementSubmitWindow) revert CE.SettlementWindowClosed();
+
+        // Extract price and timestamp from Redstone payload in calldata
+        // PrimaryProdDataServiceConsumerBase validates signatures and unique signer threshold
+        uint256 price = getOracleNumericValueFromTxMsg(redstoneFeedId);
+        uint256 timestampMs = extractTimestampsAndAssertAllAreEqual();
+        uint64 priceTimestamp = uint64(timestampMs / 1000);
+
+        // δfuture check: reject future-dated samples
+        if (priceTimestamp > nowTs + futureTolerance) {
+            revert CE.OracleSampleInFuture(priceTimestamp, nowTs);
         }
 
-        address recovered = _recoverSigner(marketId, settlementValue, priceTimestamp, signature);
-        if (recovered != settlementOracleSigner) {
-            revert CE.SettlementOracleSignatureInvalid(recovered);
+        // Δmax check: |priceTimestamp - Tset| ≤ maxSampleDistance
+        uint64 distance = priceTimestamp >= tSet
+            ? priceTimestamp - tSet
+            : tSet - priceTimestamp;
+        if (maxSampleDistance > 0 && distance > maxSampleDistance) {
+            revert CE.OracleSampleTooFarFromTset(distance, maxSampleDistance);
         }
 
-        // Closest-sample rule per whitepaper Section 6:
-        // Only update candidate if new sample is strictly closer to Tset.
-        // On tie (equal distance), keep existing candidate (prefer earlier submission).
+        // Convert price to settlementValue (scale from feedDecimals to 6 decimals)
+        int256 settlementValue = _convertPriceToSettlementValue(price);
+
+        // Closest-sample selection (WP v2 Sec 7.4)
+        _updateCandidate(marketId, settlementValue, priceTimestamp, tSet);
+
+        emit SettlementPriceSubmitted(marketId, settlementValue, priceTimestamp, msg.sender);
+    }
+
+
+    // ============================================================
+    // Closest-Sample Selection (WP v2 Sec 7.4)
+    // ============================================================
+
+    /// @dev Update candidate using closest-sample rule
+    ///      - Replace if |new - Tset| < |existing - Tset|
+    ///      - On tie, keep the more past (smaller timestamp)
+    function _updateCandidate(
+        uint256 marketId,
+        int256 settlementValue,
+        uint64 priceTimestamp,
+        uint64 tSet
+    ) internal {
         SettlementOracleState storage state = settlementOracleState[marketId];
         
+        uint64 newDistance = priceTimestamp >= tSet
+            ? priceTimestamp - tSet
+            : tSet - priceTimestamp;
+
         if (state.candidatePriceTimestamp == 0) {
             // No existing candidate, accept new one
             state.candidateValue = settlementValue;
             state.candidatePriceTimestamp = priceTimestamp;
-            emit SettlementPriceSubmitted(marketId, settlementValue, priceTimestamp, recovered);
-        } else {
-            // Compare distances to Tset
-            // Both timestamps are >= tSet due to validation above
-            uint64 existingDistance = state.candidatePriceTimestamp - tSet;
-            uint64 newDistance = priceTimestamp - tSet;
             
-            // Only update if strictly closer (< not <=)
-            if (newDistance < existingDistance) {
+            int256 tick = _toSettlementTick(markets[marketId], settlementValue);
+            emit SettlementCandidateUpdated(marketId, settlementValue, tick, priceTimestamp, newDistance);
+        } else {
+            // Compare distances to Tset (absolute value)
+            uint64 existingTs = state.candidatePriceTimestamp;
+            uint64 existingDistance = existingTs >= tSet
+                ? existingTs - tSet
+                : tSet - existingTs;
+
+            // WP v2: Replace only if strictly closer, or same distance and more past
+            bool shouldReplace = newDistance < existingDistance ||
+                (newDistance == existingDistance && priceTimestamp < existingTs);
+
+            if (shouldReplace) {
                 state.candidateValue = settlementValue;
                 state.candidatePriceTimestamp = priceTimestamp;
-                emit SettlementPriceSubmitted(marketId, settlementValue, priceTimestamp, recovered);
+                
+                int256 tick = _toSettlementTick(markets[marketId], settlementValue);
+                emit SettlementCandidateUpdated(marketId, settlementValue, tick, priceTimestamp, newDistance);
             }
-            // If equal or farther, silently ignore (existing candidate preferred)
+            // If not closer, silently ignore (existing candidate preferred)
         }
     }
 
+    // ============================================================
+    // View Functions
+    // ============================================================
+
     /// @notice Returns the settlement price candidate for a market
-    /// @dev This is a simple getter for the most recent candidate, not a historical lookup
-    /// @param marketId The market ID to query
-    /// @return price The settlement value
-    /// @return priceTimestamp The timestamp when the price was submitted
     function getSettlementPrice(uint256 marketId)
         external
+        view
         onlyDelegated
         returns (int256 price, uint64 priceTimestamp)
     {
@@ -102,15 +191,76 @@ contract OracleModule is SignalsCoreStorage {
         priceTimestamp = state.candidatePriceTimestamp;
     }
 
-    function _recoverSigner(
-        uint256 marketId,
-        int256 settlementValue,
-        uint64 priceTimestamp,
-        bytes calldata signature
-    ) internal view returns (address) {
-        bytes32 digest = MessageHashUtils.toEthSignedMessageHash(
-            keccak256(abi.encode(block.chainid, address(this), marketId, settlementValue, priceTimestamp))
-        );
-        return ECDSA.recover(digest, signature);
+    /// @notice Get the current market state (derived from timestamps)
+    /// @return state 0=Trading, 1=SettlementOpen, 2=PendingOps, 3=FinalizedPrimary, 4=FinalizedSecondary, 5=FailedPendingManual
+    function getMarketState(uint256 marketId) external view returns (uint8 state) {
+        ISignalsCore.Market storage market = markets[marketId];
+        if (market.numBins == 0) revert CE.MarketNotFound(marketId);
+        
+        if (market.settled) {
+            return market.failed ? 4 : 3; // FinalizedSecondary or FinalizedPrimary
+        }
+        if (market.failed) {
+            return 5; // FailedPendingManual
+        }
+        
+        uint64 tSet = market.settlementTimestamp;
+        uint64 nowTs = uint64(block.timestamp);
+        
+        if (nowTs < tSet) return 0; // Trading
+        if (nowTs < tSet + settlementSubmitWindow) return 1; // SettlementOpen
+        if (nowTs < tSet + settlementSubmitWindow + pendingOpsWindow) return 2; // PendingOps
+        return 3; // FinalizedPrimary (if not failed and time passed)
+    }
+
+    /// @notice Get settlement windows for a market
+    function getSettlementWindows(uint256 marketId) external view returns (
+        uint64 tSet,
+        uint64 settleEnd,
+        uint64 opsEnd,
+        uint64 claimOpen
+    ) {
+        ISignalsCore.Market storage market = markets[marketId];
+        if (market.numBins == 0) revert CE.MarketNotFound(marketId);
+        
+        tSet = market.settlementTimestamp;
+        settleEnd = tSet + settlementSubmitWindow;
+        opsEnd = settleEnd + pendingOpsWindow;
+        claimOpen = market.settlementFinalizedAt > 0 
+            ? market.settlementFinalizedAt + claimDelaySeconds 
+            : 0;
+    }
+
+    // ============================================================
+    // Internal Helpers
+    // ============================================================
+
+    /// @dev Convert Redstone price (feedDecimals) to settlementValue (6 decimals)
+    function _convertPriceToSettlementValue(uint256 price) internal view returns (int256) {
+        if (redstoneFeedDecimals <= 6) {
+            // Scale up if feed has fewer decimals
+            uint256 scaleFactor = 10 ** uint256(6 - redstoneFeedDecimals);
+            uint256 scaled = price * scaleFactor;
+            require(scaled <= uint256(type(int256).max), "PriceOverflow");
+            return int256(scaled);
+        } else {
+            // Scale down if feed has more decimals
+            uint256 scaleDivisor = 10 ** uint256(redstoneFeedDecimals - 6);
+            uint256 scaled = price / scaleDivisor;
+            require(scaled <= uint256(type(int256).max), "PriceOverflow");
+            return int256(scaled);
+        }
+    }
+
+    /// @dev Convert settlement value to tick (WP v2 Eq 6.1)
+    /// settlementTick = settlementValue / 1e6 (like v0)
+    function _toSettlementTick(ISignalsCore.Market storage market, int256 settlementValue) internal view returns (int256) {
+        int256 spacing = market.tickSpacing;
+        int256 tick = settlementValue / 1_000_000; // Convert 6-decimal value to tick
+        if (tick < market.minTick) tick = market.minTick;
+        if (tick > market.maxTick) tick = market.maxTick;
+        int256 offset = tick - market.minTick;
+        tick = market.minTick + (offset / spacing) * spacing;
+        return tick;
     }
 }

@@ -25,38 +25,38 @@ import {
   TradeModule,
 } from "../../../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import {
+  DATA_FEED_ID,
+  FEED_DECIMALS,
+  authorisedWallets,
+  buildRedstonePayload,
+  submitWithPayload,
+} from "../../helpers/redstone";
 
-const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 const BATCH_SECONDS = 86_400n;
 const WAD = ethers.parseEther("1");
+
+// Redstone feed config (for setRedstoneConfig)
+const FEED_ID = ethers.encodeBytes32String(DATA_FEED_ID);
+const MAX_SAMPLE_DISTANCE = 600n;
+const FUTURE_TOLERANCE = 60n;
+
+// Human price to tick mapping: humanPrice equals desired tick
+function tickToHumanPrice(tick: bigint): number {
+  return Number(tick);
+}
 
 // Phase 6: Helper for 6-decimal token amounts
 function usdc(amount: string | number): bigint {
   return ethers.parseUnits(String(amount), 6);
 }
 
-function buildOracleDigest(
-  chainId: bigint,
-  core: string,
-  marketId: bigint,
-  settlementValue: bigint,
-  priceTimestamp: bigint
-) {
-  const encoded = abiCoder.encode(
-    ["uint256", "address", "uint256", "int256", "uint64"],
-    [chainId, core, marketId, settlementValue, priceTimestamp]
-  );
-  return ethers.keccak256(encoded);
-}
-
 describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
   async function deployFullSystem() {
-    const [owner, seeder, trader, oracleSigner] = await ethers.getSigners();
-    const { chainId } = await ethers.provider.getNetwork();
+    const [owner, seeder, trader] = await ethers.getSigners();
 
-    // 18-decimal token for WAD-aligned accounting
-    const MockERC20Factory = await ethers.getContractFactory("MockERC20");
     // Phase 6: Use 6-decimal token as per WP v2 Sec 6.2 (paymentToken = USDC6)
+    const MockERC20Factory = await ethers.getContractFactory("MockERC20");
     const payment = (await MockERC20Factory.deploy(
       "MockVaultToken",
       "MVT",
@@ -83,8 +83,9 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
       })
     ).deploy()) as TradeModule;
 
+    // Use OracleModuleTest to allow Hardhat local signers for Redstone verification
     const oracle = (await (
-      await ethers.getContractFactory("OracleModule")
+      await ethers.getContractFactory("OracleModuleTest")
     ).deploy()) as OracleModule;
 
     const vault = (await (
@@ -124,7 +125,14 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
       vault.target,
       oracle.target
     );
-    await core.setOracleConfig(oracleSigner.address);
+
+    // Configure Redstone oracle params
+    await core.setRedstoneConfig(
+      FEED_ID,
+      FEED_DECIMALS,
+      MAX_SAMPLE_DISTANCE,
+      FUTURE_TOLERANCE
+    );
 
     // Vault configuration
     await core.setMinSeedAmount(usdc("100"));
@@ -154,8 +162,6 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
       owner,
       seeder,
       trader,
-      oracleSigner,
-      chainId,
       core,
       payment,
       position,
@@ -166,9 +172,7 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
   async function setupMarketWithPosition(
     core: SignalsCoreHarness,
     seeder: HardhatEthersSigner,
-    _oracleSigner: HardhatEthersSigner,
-    _chainId: bigint,
-    winningTick: number = 1
+    _winningTick: number = 1
   ) {
     // Set deterministic timestamp aligned to batch boundary
     const latest = BigInt(await time.latest());
@@ -219,7 +223,7 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
       tSet,
       start,
       end,
-      winningTick,
+      winningTick: _winningTick,
       batchId: baseBatchId,
     };
   }
@@ -232,15 +236,11 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
   // ================================================================
   describe("SPEC-1: Claim Gating - time-based (settlementFinalizedAt + Δ_claim)", () => {
     it("reverts claimPayout when time < settlementFinalizedAt + Δ_claim", async () => {
-      const { core, seeder, trader, oracleSigner, chainId, position, trade } =
-        await loadFixture(deployFullSystem);
-
-      const { marketId, tSet } = await setupMarketWithPosition(
-        core,
-        seeder,
-        oracleSigner,
-        chainId
+      const { core, seeder, trader, position, trade } = await loadFixture(
+        deployFullSystem
       );
+
+      const { marketId, tSet } = await setupMarketWithPosition(core, seeder);
 
       // Create a position
       const positionId = 1n;
@@ -259,50 +259,38 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
 
       // Submit oracle price and settle market
       const priceTimestamp = tSet + 1n;
-      const settlementValue = 1n; // tick 1 wins
-      const digest = buildOracleDigest(
-        chainId,
-        await core.getAddress(),
-        marketId,
-        settlementValue,
-        priceTimestamp
-      );
-      const sig = await oracleSigner.signMessage(ethers.getBytes(digest));
-
       await time.setNextBlockTimestamp(Number(priceTimestamp + 1n));
-      await core.submitSettlementPrice(
-        marketId,
-        settlementValue,
+      const payload = buildRedstonePayload(
+        tickToHumanPrice(1n),
         Number(priceTimestamp),
-        sig
+        authorisedWallets
       );
+      await submitWithPayload(core, seeder, marketId, payload);
 
-      // settlementFinalizeDeadline is 60s, settle at priceTimestamp + 50n
-      const settleTime = priceTimestamp + 50n;
-      await time.setNextBlockTimestamp(Number(settleTime));
-      await core.settleMarket(marketId);
+      // finalize after PendingOps ends (submitWindow=300, pendingOpsWindow=60)
+      const opsEnd = tSet + 300n + 60n;
+      await time.setNextBlockTimestamp(Number(opsEnd + 1n));
+      await core.finalizePrimarySettlement(marketId);
 
       // Market is settled, but we're before claimOpenTime
       // claimOpenTime = settlementFinalizedAt + settlementFinalizeDeadline
-      // Try to claim at settleTime + 30s (before 60s deadline)
-      await time.setNextBlockTimestamp(Number(settleTime + 30n));
+      // Try to claim at opsEnd + 30s (before 60s deadline after finalize)
+      await time.setNextBlockTimestamp(Number(opsEnd + 30n));
 
       // SPEC: claimPayout should REVERT because time < claimOpenTime
-      // Note: Use TradeModule for error signature since SignalsCoreHarness may not expose it
       await expect(
         core.connect(trader).claimPayout(positionId)
-      ).to.be.revertedWithCustomError(trade, "SettlementTooEarly");
+      ).to.be.revertedWithCustomError(trade, "ClaimTooEarly");
     });
 
     it("allows claimPayout after time >= settlementFinalizedAt + Δ_claim (batch not processed)", async () => {
-      const { core, seeder, trader, oracleSigner, chainId, position, payment } =
-        await loadFixture(deployFullSystem);
+      const { core, seeder, trader, position, payment } = await loadFixture(
+        deployFullSystem
+      );
 
       const { marketId, tSet, batchId } = await setupMarketWithPosition(
         core,
-        seeder,
-        oracleSigner,
-        chainId
+        seeder
       );
 
       // Create a winning position
@@ -322,30 +310,21 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
 
       // Settle market
       const priceTimestamp = tSet + 1n;
-      const settlementValue = 1n; // tick 1 wins
-      const digest = buildOracleDigest(
-        chainId,
-        await core.getAddress(),
-        marketId,
-        settlementValue,
-        priceTimestamp
-      );
-      const sig = await oracleSigner.signMessage(ethers.getBytes(digest));
-
       await time.setNextBlockTimestamp(Number(priceTimestamp + 1n));
-      await core.submitSettlementPrice(
-        marketId,
-        settlementValue,
+      const payload = buildRedstonePayload(
+        tickToHumanPrice(1n),
         Number(priceTimestamp),
-        sig
+        authorisedWallets
       );
+      await submitWithPayload(core, seeder, marketId, payload);
 
-      const settleTime = priceTimestamp + 50n;
-      await time.setNextBlockTimestamp(Number(settleTime));
-      await core.settleMarket(marketId);
+      // finalize after PendingOps ends (submitWindow=300, pendingOpsWindow=60)
+      const opsEnd = tSet + 300n + 60n;
+      await time.setNextBlockTimestamp(Number(opsEnd + 1n));
+      await core.finalizePrimarySettlement(marketId);
 
       // claimOpenTime = settlementFinalizedAt + settlementFinalizeDeadline (60s)
-      const claimOpenTime = settleTime + 61n;
+      const claimOpenTime = opsEnd + 1n + 61n;
 
       // KEY: DO NOT process the batch - claim should still work based on TIME only
       const [, , , , , , processed] = await core.getDailyPnl.staticCall(
@@ -373,14 +352,13 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
   // ================================================================
   describe("SPEC-2: claimPayout does NOT change NAV/Price", () => {
     it("NAV is unchanged after claimPayout", async () => {
-      const { core, seeder, trader, oracleSigner, chainId, position } =
-        await loadFixture(deployFullSystem);
+      const { core, seeder, trader, position } = await loadFixture(
+        deployFullSystem
+      );
 
       const { marketId, tSet, batchId } = await setupMarketWithPosition(
         core,
-        seeder,
-        oracleSigner,
-        chainId
+        seeder
       );
 
       // Create winning position
@@ -400,27 +378,19 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
 
       // Settle and process batch
       const priceTimestamp = tSet + 1n;
-      const digest = buildOracleDigest(
-        chainId,
-        await core.getAddress(),
-        marketId,
-        1n,
-        priceTimestamp
-      );
-      const sig = await oracleSigner.signMessage(ethers.getBytes(digest));
-
       await time.setNextBlockTimestamp(Number(priceTimestamp + 1n));
-      await core.submitSettlementPrice(
-        marketId,
-        1n,
-        Number(priceTimestamp),
-        sig
+      const payload = buildRedstonePayload(
+        tickToHumanPrice(1n),
+        Number(priceTimestamp)
       );
-      await time.setNextBlockTimestamp(Number(priceTimestamp + 50n));
-      await core.settleMarket(marketId);
+      await submitWithPayload(core, seeder, marketId, payload);
+      // finalize after PendingOps ends (submitWindow=300, pendingOpsWindow=60)
+      const opsEnd = tSet + 300n + 60n;
+      await time.setNextBlockTimestamp(Number(opsEnd + 1n));
+      await core.finalizePrimarySettlement(marketId);
 
       // Advance time past claim window (settlementFinalizeDeadline = 60s)
-      const claimOpenTime = priceTimestamp + 50n + 61n;
+      const claimOpenTime = opsEnd + 1n + 61n;
       await time.setNextBlockTimestamp(Number(claimOpenTime));
       await core.processDailyBatch(batchId);
 
@@ -444,14 +414,13 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
     });
 
     it("multiple claims do not change NAV", async () => {
-      const { core, seeder, trader, owner, oracleSigner, chainId, position } =
-        await loadFixture(deployFullSystem);
+      const { core, seeder, trader, owner, position } = await loadFixture(
+        deployFullSystem
+      );
 
       const { marketId, tSet, batchId } = await setupMarketWithPosition(
         core,
-        seeder,
-        oracleSigner,
-        chainId
+        seeder
       );
 
       // Create multiple winning positions
@@ -466,27 +435,19 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
 
       // Settle and process
       const priceTimestamp = tSet + 1n;
-      const digest = buildOracleDigest(
-        chainId,
-        await core.getAddress(),
-        marketId,
-        1n,
-        priceTimestamp
-      );
-      const sig = await oracleSigner.signMessage(ethers.getBytes(digest));
-
       await time.setNextBlockTimestamp(Number(priceTimestamp + 1n));
-      await core.submitSettlementPrice(
-        marketId,
-        1n,
-        Number(priceTimestamp),
-        sig
+      const payload = buildRedstonePayload(
+        tickToHumanPrice(1n),
+        Number(priceTimestamp)
       );
-      await time.setNextBlockTimestamp(Number(priceTimestamp + 50n));
-      await core.settleMarket(marketId);
+      await submitWithPayload(core, seeder, marketId, payload);
+      // finalize after PendingOps ends (submitWindow=300, pendingOpsWindow=60)
+      const opsEnd = tSet + 300n + 60n;
+      await time.setNextBlockTimestamp(Number(opsEnd + 1n));
+      await core.finalizePrimarySettlement(marketId);
 
       // Advance time past claim window
-      const claimOpenTime = priceTimestamp + 50n + 61n;
+      const claimOpenTime = opsEnd + 1n + 61n;
       await time.setNextBlockTimestamp(Number(claimOpenTime));
       await core.processDailyBatch(batchId);
 
@@ -518,14 +479,13 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
   // ================================================================
   describe("SPEC-3: Payout reserve affects L_t", () => {
     it("L_t includes payout deduction (ΔC_t - Payout_t)", async () => {
-      const { core, seeder, oracleSigner, chainId, position, trader } =
-        await loadFixture(deployFullSystem);
+      const { core, seeder, position, trader } = await loadFixture(
+        deployFullSystem
+      );
 
       const { marketId, tSet, batchId } = await setupMarketWithPosition(
         core,
-        seeder,
-        oracleSigner,
-        chainId
+        seeder
       );
 
       // Create a position that will win
@@ -540,29 +500,20 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
       );
 
       // Phase 6: Set exposure ledger to match the position
-      // Position covers ticks [0, 2), so set exposure at each tick in range
       await core.harnessAddExposure(marketId, 0, 2, positionQuantity);
 
       // Settle
       const priceTimestamp = tSet + 1n;
-      const digest = buildOracleDigest(
-        chainId,
-        await core.getAddress(),
-        marketId,
-        1n,
-        priceTimestamp
-      );
-      const sig = await oracleSigner.signMessage(ethers.getBytes(digest));
-
       await time.setNextBlockTimestamp(Number(priceTimestamp + 1n));
-      await core.submitSettlementPrice(
-        marketId,
-        1n,
-        Number(priceTimestamp),
-        sig
+      const payload = buildRedstonePayload(
+        tickToHumanPrice(1n),
+        Number(priceTimestamp)
       );
-      await time.setNextBlockTimestamp(Number(priceTimestamp + 50n));
-      await core.settleMarket(marketId);
+      await submitWithPayload(core, seeder, marketId, payload);
+      // finalize after PendingOps ends (submitWindow=300, pendingOpsWindow=60)
+      const opsEnd = tSet + 300n + 60n;
+      await time.setNextBlockTimestamp(Number(opsEnd + 1n));
+      await core.finalizePrimarySettlement(marketId);
 
       // Check L_t recorded in daily PnL snapshot
       const [lt] = await core.getDailyPnl.staticCall(batchId);
@@ -574,8 +525,6 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
       // This test verifies the payout is factored into L_t
 
       // For now, verify L_t is not zero (indicating some P&L calculation happened)
-      // The exact value depends on the implementation
-      // This assertion will need refinement based on actual implementation
       expect(lt).to.not.equal(0n, "L_t should reflect payout reserve");
     });
   });
@@ -586,22 +535,12 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
   // ================================================================
   describe("SPEC-4: Payout reserve invariant", () => {
     it("total winning payouts equals escrow reserve", async () => {
-      const {
-        core,
-        seeder,
-        trader,
-        owner,
-        oracleSigner,
-        chainId,
-        position,
-        payment,
-      } = await loadFixture(deployFullSystem);
+      const { core, seeder, trader, owner, position, payment } =
+        await loadFixture(deployFullSystem);
 
       const { marketId, tSet, batchId } = await setupMarketWithPosition(
         core,
-        seeder,
-        oracleSigner,
-        chainId
+        seeder
       );
 
       // Create positions: some winning, some losing
@@ -614,34 +553,25 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
       await position.mockMint(trader.address, 3n, marketId, 2, 4, losingQty); // loses (tick 1 not in [2,4))
 
       // Phase 6: Set exposure ledger to match positions
-      // Winning positions cover [0, 2), losing covers [2, 4)
       await core.harnessAddExposure(marketId, 0, 2, winningQty1);
       await core.harnessAddExposure(marketId, 0, 2, winningQty2);
       await core.harnessAddExposure(marketId, 2, 4, losingQty);
 
       // Settle at tick 1
       const priceTimestamp = tSet + 1n;
-      const digest = buildOracleDigest(
-        chainId,
-        await core.getAddress(),
-        marketId,
-        1n,
-        priceTimestamp
-      );
-      const sig = await oracleSigner.signMessage(ethers.getBytes(digest));
-
       await time.setNextBlockTimestamp(Number(priceTimestamp + 1n));
-      await core.submitSettlementPrice(
-        marketId,
-        1n,
-        Number(priceTimestamp),
-        sig
+      const payload = buildRedstonePayload(
+        tickToHumanPrice(1n),
+        Number(priceTimestamp)
       );
-      await time.setNextBlockTimestamp(Number(priceTimestamp + 50n));
-      await core.settleMarket(marketId);
+      await submitWithPayload(core, seeder, marketId, payload);
+      // finalize after PendingOps ends (submitWindow=300, pendingOpsWindow=60)
+      const opsEnd = tSet + 300n + 60n;
+      await time.setNextBlockTimestamp(Number(opsEnd + 1n));
+      await core.finalizePrimarySettlement(marketId);
 
       // Advance time past claim window
-      const claimOpenTime = priceTimestamp + 50n + 61n;
+      const claimOpenTime = opsEnd + 1n + 61n;
       await time.setNextBlockTimestamp(Number(claimOpenTime));
       await core.processDailyBatch(batchId);
 
@@ -681,17 +611,13 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
   describe("Failure Path & Batch/Claim Separation", () => {
     let core: SignalsCoreHarness;
     let payment: MockERC20;
-    let chainId: bigint;
     let seeder: HardhatEthersSigner;
-    let oracleSigner: HardhatEthersSigner;
 
     beforeEach(async () => {
       const fixture = await loadFixture(deployFullSystem);
       core = fixture.core;
       payment = fixture.payment;
-      chainId = fixture.chainId;
       seeder = fixture.seeder;
-      oracleSigner = fixture.oracleSigner;
     });
 
     it("markFailed → manualSettleFailedMarket records PnL to batch", async () => {
@@ -727,7 +653,7 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
       await time.setNextBlockTimestamp(Number(expireTime));
 
       // Mark as failed (oracle didn't submit in time)
-      await core.markFailed(1n);
+      await core.markSettlementFailed(1n);
 
       // Verify market is marked failed
       const marketAfterFail = await core.harnessGetMarket(1n);
@@ -737,7 +663,7 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
       // Manually settle with fallback value
       const manualSettleTime = expireTime + 10n;
       await time.setNextBlockTimestamp(Number(manualSettleTime));
-      await core.manualSettleFailedMarket(1n, 50); // Middle tick as fallback
+      await core.finalizeSecondarySettlement(1n, 50); // Middle tick as fallback
 
       // Verify market is now settled (secondary)
       const marketAfterSettle = await core.harnessGetMarket(1n);
@@ -781,21 +707,18 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
 
       // Submit oracle price
       const priceTimestamp = tSet + 1n;
-      const digest = buildOracleDigest(
-        chainId,
-        await core.getAddress(),
-        1n,
-        50n,
-        priceTimestamp
-      );
-      const sig = await oracleSigner.signMessage(ethers.getBytes(digest));
-
       await time.setNextBlockTimestamp(Number(priceTimestamp));
-      await core.submitSettlementPrice(1n, 50n, Number(priceTimestamp), sig);
+      const payload = buildRedstonePayload(
+        tickToHumanPrice(50n),
+        Number(priceTimestamp),
+        authorisedWallets
+      );
+      await submitWithPayload(core, seeder, 1n, payload);
 
-      // Settle market
-      await time.setNextBlockTimestamp(Number(priceTimestamp + 1n));
-      await core.settleMarket(1n);
+      // finalize after PendingOps ends (submitWindow=300, pendingOpsWindow=60)
+      const opsEnd = tSet + 300n + 60n;
+      await time.setNextBlockTimestamp(Number(opsEnd + 1n));
+      await core.finalizePrimarySettlement(1n);
 
       // Process batch - should succeed regardless of claim timing
       const batchId = tSet / BATCH_SECONDS;
@@ -843,8 +766,8 @@ describe("PayoutReserve Spec Tests (WP v2 Sec 3.5)", () => {
       // Fail and manually settle
       const expireTime = tSet + 400n;
       await time.setNextBlockTimestamp(Number(expireTime));
-      await core.markFailed(1n);
-      await core.manualSettleFailedMarket(1n, 50);
+      await core.markSettlementFailed(1n);
+      await core.finalizeSecondarySettlement(1n, 50);
 
       // Process batch
       const batchId = tSet / BATCH_SECONDS;

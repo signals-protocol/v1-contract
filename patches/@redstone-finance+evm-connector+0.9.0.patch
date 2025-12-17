@@ -1,0 +1,205 @@
+diff --git a/node_modules/@redstone-finance/evm-connector/contracts/core/CalldataExtractor.sol b/node_modules/@redstone-finance/evm-connector/contracts/core/CalldataExtractor.sol
+index 3c95863..c52e7c7 100644
+--- a/node_modules/@redstone-finance/evm-connector/contracts/core/CalldataExtractor.sol
++++ b/node_modules/@redstone-finance/evm-connector/contracts/core/CalldataExtractor.sol
+@@ -33,7 +33,7 @@ contract CalldataExtractor is RedstoneConstants {
+       uint48 dataPackageTimestamp; // uint48, because timestamp uses 6 bytes
+       uint256 timestampNegativeOffset = (calldataNegativeOffset + TIMESTAMP_NEGATIVE_OFFSET_IN_DATA_PACKAGE_WITH_STANDARD_SLOT_BS);
+       uint256 timestampOffset = msg.data.length - timestampNegativeOffset;
+-      assembly {
++      assembly ("memory-safe") {
+         dataPackageTimestamp := calldataload(timestampOffset)
+       }
+ 
+@@ -66,7 +66,7 @@ contract CalldataExtractor is RedstoneConstants {
+   function _extractByteSizeOfUnsignedMetadata() internal pure returns (uint256) {
+     // Checking if the calldata ends with the RedStone marker
+     bool hasValidRedstoneMarker;
+-    assembly {
++    assembly ("memory-safe") {
+       let calldataLast32Bytes := calldataload(sub(calldatasize(), STANDARD_SLOT_BS))
+       hasValidRedstoneMarker := eq(
+         REDSTONE_MARKER_MASK,
+@@ -82,7 +82,7 @@ contract CalldataExtractor is RedstoneConstants {
+     if (REDSTONE_MARKER_BS_PLUS_STANDARD_SLOT_BS > msg.data.length) {
+       revert CalldataOverOrUnderFlow();
+     }
+-    assembly {
++    assembly ("memory-safe") {
+       unsignedMetadataByteSize := calldataload(
+         sub(calldatasize(), REDSTONE_MARKER_BS_PLUS_STANDARD_SLOT_BS)
+       )
+@@ -106,7 +106,7 @@ contract CalldataExtractor is RedstoneConstants {
+     if (calldataNegativeOffsetWithStandardSlot > msg.data.length) {
+       revert CalldataOverOrUnderFlow();
+     }
+-    assembly {
++    assembly ("memory-safe") {
+       dataPackagesCount := calldataload(
+         sub(calldatasize(), calldataNegativeOffsetWithStandardSlot)
+       )
+@@ -119,7 +119,7 @@ contract CalldataExtractor is RedstoneConstants {
+     uint256 dataPointValueByteSize
+   ) internal pure virtual returns (bytes32 dataPointDataFeedId, uint256 dataPointValue) {
+     uint256 dataPointCalldataOffset = msg.data.length - dataPointNegativeOffset;
+-    assembly {
++    assembly ("memory-safe") {
+       dataPointDataFeedId := calldataload(dataPointCalldataOffset)
+       dataPointValue := calldataload(add(dataPointCalldataOffset, DATA_POINT_SYMBOL_BS))
+     }
+@@ -144,13 +144,13 @@ contract CalldataExtractor is RedstoneConstants {
+ 
+     // Extract data points count
+     uint256 calldataOffset = msg.data.length - (calldataNegativeOffsetForDataPackage + SIG_BS + STANDARD_SLOT_BS);
+-    assembly {
++    assembly ("memory-safe") {
+       dataPointsCount_ := calldataload(calldataOffset)
+     }
+ 
+     // Extract each data point value size
+     calldataOffset = calldataOffset - DATA_POINTS_COUNT_BS;
+-    assembly {
++    assembly ("memory-safe") {
+       eachDataPointValueByteSize_ := calldataload(calldataOffset)
+     }
+ 
+diff --git a/node_modules/@redstone-finance/evm-connector/contracts/core/ProxyConnector.sol b/node_modules/@redstone-finance/evm-connector/contracts/core/ProxyConnector.sol
+index bbac818..ed61425 100644
+--- a/node_modules/@redstone-finance/evm-connector/contracts/core/ProxyConnector.sol
++++ b/node_modules/@redstone-finance/evm-connector/contracts/core/ProxyConnector.sol
+@@ -57,7 +57,7 @@ contract ProxyConnector is RedstoneConstants, CalldataExtractor {
+ 
+     bytes memory message;
+ 
+-    assembly {
++    assembly ("memory-safe") {
+       message := mload(FREE_MEMORY_PTR) // sets message pointer to first free place in memory
+ 
+       // Saving the byte size of the result message (it's a standard in EVM)
+@@ -119,14 +119,14 @@ contract ProxyConnector is RedstoneConstants, CalldataExtractor {
+         revert ProxyCalldataFailedWithoutErrMsg();
+       } else {
+         bool isStringErrorMessage;
+-        assembly {
++        assembly ("memory-safe") {
+           let first32BytesOfResult := mload(add(result, BYTES_ARR_LEN_VAR_BS))
+           isStringErrorMessage := eq(first32BytesOfResult, STRING_ERR_MESSAGE_MASK)
+         }
+ 
+         if (isStringErrorMessage) {
+           string memory receivedErrMsg;
+-          assembly {
++          assembly ("memory-safe") {
+             receivedErrMsg := add(result, REVERT_MSG_OFFSET)
+           }
+           revert ProxyCalldataFailedWithStringMessage(receivedErrMsg);
+diff --git a/node_modules/@redstone-finance/evm-connector/contracts/core/RedstoneConsumerBase.sol b/node_modules/@redstone-finance/evm-connector/contracts/core/RedstoneConsumerBase.sol
+index 93bf441..1974944 100644
+--- a/node_modules/@redstone-finance/evm-connector/contracts/core/RedstoneConsumerBase.sol
++++ b/node_modules/@redstone-finance/evm-connector/contracts/core/RedstoneConsumerBase.sol
+@@ -111,7 +111,7 @@ abstract contract RedstoneConsumerBase is CalldataExtractor {
+ 
+     // Saving current free memory pointer
+     uint256 freeMemPtr;
+-    assembly {
++    assembly ("memory-safe") {
+       freeMemPtr := mload(FREE_MEMORY_PTR)
+     }
+ 
+@@ -143,7 +143,7 @@ abstract contract RedstoneConsumerBase is CalldataExtractor {
+       // Resetting the memory pointer to the initial "safe" value
+       // We add STANDARD_SLOT_BS (32 bytes) to account for potential allocation
+       // of the dataPackageIndex variable, which may or may not be stored in memory
+-      assembly {
++      assembly ("memory-safe") {
+         mstore(FREE_MEMORY_PTR, add(freeMemPtr, STANDARD_SLOT_BS))
+       }
+       unchecked {
+@@ -202,7 +202,7 @@ abstract contract RedstoneConsumerBase is CalldataExtractor {
+       uint256 signedMessageCalldataOffset = msg.data.length - 
+         (calldataNegativeOffset + SIG_BS + signedMessageBytesCount);
+ 
+-      assembly {
++      assembly ("memory-safe") {
+         // Extracting the signed message
+         signedMessage := extractBytesFromCalldata(
+           signedMessageCalldataOffset,
+diff --git a/node_modules/@redstone-finance/evm-connector/contracts/core/RedstoneConsumerBytesBase.sol b/node_modules/@redstone-finance/evm-connector/contracts/core/RedstoneConsumerBytesBase.sol
+index bdba665..7a5563d 100644
+--- a/node_modules/@redstone-finance/evm-connector/contracts/core/RedstoneConsumerBytesBase.sol
++++ b/node_modules/@redstone-finance/evm-connector/contracts/core/RedstoneConsumerBytesBase.sol
+@@ -94,7 +94,7 @@ abstract contract RedstoneConsumerBytesBase is RedstoneConsumerBase {
+       revert InvalidCalldataPointer();
+     }
+ 
+-    assembly {
++    assembly ("memory-safe") {
+       bytesValueInCalldata.offset := calldataOffset
+       bytesValueInCalldata.length := valueByteSize
+     }
+@@ -137,7 +137,7 @@ abstract contract RedstoneConsumerBytesBase is RedstoneConsumerBase {
+     // for the data extraction and validation
+     (uint256[] memory arrayOfExtractedValues, uint256 timestamp) = _securelyExtractOracleValuesAndTimestampFromTxMsg(dataFeedIds);
+     validateTimestamp(timestamp);
+-    assembly {
++    assembly ("memory-safe") {
+       arrayOfMemoryPointers := arrayOfExtractedValues
+     }
+   }
+@@ -165,7 +165,7 @@ abstract contract RedstoneConsumerBytesBase is RedstoneConsumerBase {
+     returns (uint256 pointerToResultBytesInMemory)
+   {
+     bytes memory aggregatedBytes = aggregateByteValues(calldataPointersToValues);
+-    assembly {
++    assembly ("memory-safe") {
+       pointerToResultBytesInMemory := aggregatedBytes
+     }
+   }
+@@ -185,7 +185,7 @@ abstract contract RedstoneConsumerBytesBase is RedstoneConsumerBase {
+     uint256 dataPointValueByteSize
+   ) internal pure override returns (bytes32 dataPointDataFeedId, uint256 dataPointValue) {
+     uint256 dataPointCalldataOffset = msg.data.length - dataPointNegativeOffset;
+-    assembly {
++    assembly ("memory-safe") {
+       dataPointDataFeedId := calldataload(dataPointCalldataOffset)
+       dataPointValue := prepareTrickyCalldataPointer(
+         add(dataPointCalldataOffset, DATA_POINT_SYMBOL_BS),
+diff --git a/node_modules/@redstone-finance/evm-connector/contracts/core/RedstoneConsumerNumericBase.sol b/node_modules/@redstone-finance/evm-connector/contracts/core/RedstoneConsumerNumericBase.sol
+index 14eb83d..160ad52 100644
+--- a/node_modules/@redstone-finance/evm-connector/contracts/core/RedstoneConsumerNumericBase.sol
++++ b/node_modules/@redstone-finance/evm-connector/contracts/core/RedstoneConsumerNumericBase.sol
+@@ -114,7 +114,7 @@ abstract contract RedstoneConsumerNumericBase is RedstoneConsumerBase {
+ 
+     // Overriding dataFeedIdsWithoutDuplicates.length
+     // Equivalent to: dataFeedIdsWithoutDuplicates.length = uniqueDataFeedIdsCount;
+-    assembly {
++    assembly ("memory-safe") {
+       mstore(dataFeedIdsWithoutDuplicates, uniqueDataFeedIdsCount)
+     }
+ 
+diff --git a/node_modules/@redstone-finance/evm-connector/contracts/libs/NumericArrayLib.sol b/node_modules/@redstone-finance/evm-connector/contracts/libs/NumericArrayLib.sol
+index b839ef7..30db8b0 100644
+--- a/node_modules/@redstone-finance/evm-connector/contracts/libs/NumericArrayLib.sol
++++ b/node_modules/@redstone-finance/evm-connector/contracts/libs/NumericArrayLib.sol
+@@ -30,7 +30,7 @@ library NumericArrayLib {
+   }
+ 
+   function sort(uint256[] memory arr) internal pure {
+-    assembly {
++    assembly ("memory-safe") {
+       let arrLength := mload(arr)
+       let valuesPtr := add(arr, BYTES_ARR_LEN_VAR_BS)
+       let endPtr := add(valuesPtr, mul(arrLength, UINT256_VALUE_BS))
+diff --git a/node_modules/@redstone-finance/evm-connector/contracts/libs/SignatureLib.sol b/node_modules/@redstone-finance/evm-connector/contracts/libs/SignatureLib.sol
+index b36e92c..ac753ba 100644
+--- a/node_modules/@redstone-finance/evm-connector/contracts/libs/SignatureLib.sol
++++ b/node_modules/@redstone-finance/evm-connector/contracts/libs/SignatureLib.sol
+@@ -23,7 +23,7 @@ library SignatureLib {
+     bytes32 r;
+     bytes32 s;
+     uint8 v;
+-    assembly {
++    assembly ("memory-safe") {
+       let signatureCalldataStartPos := sub(calldatasize(), signatureCalldataNegativeOffset)
+       r := calldataload(signatureCalldataStartPos)
+       signatureCalldataStartPos := add(signatureCalldataStartPos, ECDSA_SIG_R_BS)

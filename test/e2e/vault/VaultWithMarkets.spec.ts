@@ -11,33 +11,33 @@ import {
   SignalsCoreHarness,
   TestERC1967Proxy,
 } from "../../../typechain-types";
+import {
+  DATA_FEED_ID,
+  FEED_DECIMALS,
+  authorisedWallets,
+  buildRedstonePayload,
+  submitWithPayload,
+} from "../../helpers/redstone";
 
-const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 const BATCH_SECONDS = 86_400n;
 const WAD = ethers.parseEther("1");
 
-function buildOracleDigest(
-  chainId: bigint,
-  core: string,
-  marketId: bigint,
-  settlementValue: bigint,
-  priceTimestamp: bigint
-) {
-  const encoded = abiCoder.encode(
-    ["uint256", "address", "uint256", "int256", "uint64"],
-    [chainId, core, marketId, settlementValue, priceTimestamp]
-  );
-  return ethers.keccak256(encoded);
+// Redstone feed config (for setRedstoneConfig)
+const FEED_ID = ethers.encodeBytes32String(DATA_FEED_ID);
+const MAX_SAMPLE_DISTANCE = 600n;
+const FUTURE_TOLERANCE = 60n;
+
+// Human price to tick mapping: humanPrice equals desired tick
+function tickToHumanPrice(tick: bigint): number {
+  return Number(tick);
 }
 
 describe("VaultWithMarkets E2E", () => {
   async function deploySystem() {
-    const [owner, seeder, oracleSigner] = await ethers.getSigners();
-    const { chainId } = await ethers.provider.getNetwork();
+    const [owner, seeder] = await ethers.getSigners();
 
-    // Use 18-decimal token for vault accounting tests (WAD-aligned)
+    // Use 6-decimal token as per WP v2 Sec 6.2 (paymentToken = USDC6)
     const MockERC20Factory = await ethers.getContractFactory("MockERC20");
-    // Phase 6: Use 6-decimal token as per WP v2 Sec 6.2 (paymentToken = USDC6)
     const payment = (await MockERC20Factory.deploy(
       "MockVaultToken",
       "MVT",
@@ -57,8 +57,9 @@ describe("VaultWithMarkets E2E", () => {
       })
     ).deploy()) as MarketLifecycleModule;
 
+    // Use OracleModuleTest to allow Hardhat local signers for Redstone verification
     const oracle = (await (
-      await ethers.getContractFactory("OracleModule")
+      await ethers.getContractFactory("OracleModuleTest")
     ).deploy()) as OracleModule;
     const vault = (await (
       await ethers.getContractFactory("LPVaultModule")
@@ -96,7 +97,9 @@ describe("VaultWithMarkets E2E", () => {
       vault.target,
       oracle.target
     );
-    await core.setOracleConfig(oracleSigner.address);
+    
+    // Configure Redstone oracle params
+    await core.setRedstoneConfig(FEED_ID, FEED_DECIMALS, MAX_SAMPLE_DISTANCE, FUTURE_TOLERANCE);
 
     // Vault config needed for batch processing
     await core.setMinSeedAmount(ethers.parseEther("100"));
@@ -116,12 +119,11 @@ describe("VaultWithMarkets E2E", () => {
     );
     await core.setCapitalStack(0n, 0n);
 
-    return { owner, seeder, oracleSigner, chainId, core, payment };
+    return { owner, seeder, core, payment };
   }
 
-  it("settleMarket records daily PnL and vault consumes it in processDailyBatch", async () => {
-    const { owner, seeder, oracleSigner, chainId, core, payment } =
-      await loadFixture(deploySystem);
+  it("finalizePrimary records daily PnL and vault consumes it in processDailyBatch", async () => {
+    const { owner, seeder, core, payment } = await loadFixture(deploySystem);
 
     // Fix timestamp so batchId (day-key) is deterministic and monotonic
     const latest = BigInt(await time.latest());
@@ -143,7 +145,6 @@ describe("VaultWithMarkets E2E", () => {
     expect(currentBatchId).to.equal(expectedFirstBatchId - 1n);
 
     // Create a market that settles on the same day-key as the first vault batch
-    // Use a Tset after seeding to keep block timestamps monotonic.
     const tSet = seedTime + 10n;
     const start = tSet - 200n;
     const end = tSet - 20n;
@@ -185,21 +186,14 @@ describe("VaultWithMarkets E2E", () => {
 
     // Submit oracle price candidate within window [Tset, Tset + submitWindow]
     const priceTimestamp = tSet + 1n;
-    const digest = buildOracleDigest(
-      chainId,
-      await core.getAddress(),
-      marketId,
-      1n,
-      priceTimestamp
-    );
-    const sig = await oracleSigner.signMessage(ethers.getBytes(digest));
-
     await time.setNextBlockTimestamp(Number(priceTimestamp + 1n));
-    await core.submitSettlementPrice(marketId, 1n, Number(priceTimestamp), sig);
+    const payload = buildRedstonePayload(tickToHumanPrice(1n), Number(priceTimestamp), authorisedWallets);
+    await submitWithPayload(core, owner, marketId, payload);
 
-    // Finalize settlement and record P&L into _dailyPnl[batchId]
-    await time.setNextBlockTimestamp(Number(priceTimestamp + 2n));
-    await core.connect(owner).settleMarket(marketId);
+    // Finalize after PendingOps ends (submitWindow=300, pendingOpsWindow=60)
+    const opsEnd = tSet + 300n + 60n;
+    await time.setNextBlockTimestamp(Number(opsEnd + 1n));
+    await core.connect(owner).finalizePrimarySettlement(marketId);
 
     const [ltBefore, ftotBefore, , , , , processedBefore] =
       await core.getDailyPnl.staticCall(batchId);
@@ -226,13 +220,11 @@ describe("VaultWithMarkets E2E", () => {
   // ==================================================================
   describe("ΔEₜ Grant Cap Wiring", () => {
     it("batch succeeds when grantNeed ≤ ΔEₜ (uniform prior, no grant needed)", async () => {
-      const { seeder, oracleSigner, chainId, core, payment } =
-        await loadFixture(deploySystem);
+      const { seeder, core, payment } = await loadFixture(deploySystem);
 
       const latest = BigInt(await time.latest());
       const seedTime = (latest / BATCH_SECONDS + 1n) * BATCH_SECONDS + 1_000n;
 
-      // Seed vault (use parseEther for consistency with minSeedAmount comparison)
       const seedAmount = ethers.parseEther("1000");
       await payment.mint(seeder.address, seedAmount);
       await payment
@@ -257,19 +249,13 @@ describe("VaultWithMarkets E2E", () => {
 
       // Submit oracle and settle
       const priceTimestamp = tSet + 1n;
-      const digest = buildOracleDigest(
-        chainId,
-        await core.getAddress(),
-        1n,
-        50n,
-        priceTimestamp
-      );
-      const sig = await oracleSigner.signMessage(ethers.getBytes(digest));
-
       await time.setNextBlockTimestamp(Number(priceTimestamp));
-      await core.submitSettlementPrice(1n, 50n, Number(priceTimestamp), sig);
-      await time.setNextBlockTimestamp(Number(priceTimestamp + 1n));
-      await core.settleMarket(1n);
+      const payload1 = buildRedstonePayload(tickToHumanPrice(50n), Number(priceTimestamp), authorisedWallets);
+      await submitWithPayload(core, seeder, 1n, payload1);
+      // finalize after PendingOps ends (submitWindow=300, pendingOpsWindow=60)
+      const opsEnd = tSet + 300n + 60n;
+      await time.setNextBlockTimestamp(Number(opsEnd + 1n));
+      await core.finalizePrimarySettlement(1n);
 
       // Process batch - should succeed (uniform prior has ΔEₜ = 0, and no grant needed with no loss)
       const batchId = tSet / BATCH_SECONDS;
@@ -282,8 +268,7 @@ describe("VaultWithMarkets E2E", () => {
     });
 
     it("market ΔEₜ is stored and propagated to batch snapshot", async () => {
-      const { seeder, oracleSigner, chainId, core, payment } =
-        await loadFixture(deploySystem);
+      const { seeder, core, payment } = await loadFixture(deploySystem);
 
       const latest = BigInt(await time.latest());
       const seedTime = (latest / BATCH_SECONDS + 1n) * BATCH_SECONDS + 1_000n;
@@ -325,19 +310,13 @@ describe("VaultWithMarkets E2E", () => {
 
       // Submit oracle and settle
       const priceTimestamp = tSet + 1n;
-      const digest = buildOracleDigest(
-        chainId,
-        await core.getAddress(),
-        1n,
-        50n,
-        priceTimestamp
-      );
-      const sig = await oracleSigner.signMessage(ethers.getBytes(digest));
-
       await time.setNextBlockTimestamp(Number(priceTimestamp));
-      await core.submitSettlementPrice(1n, 50n, Number(priceTimestamp), sig);
-      await time.setNextBlockTimestamp(Number(priceTimestamp + 1n));
-      await core.settleMarket(1n);
+      const payload2 = buildRedstonePayload(tickToHumanPrice(50n), Number(priceTimestamp), authorisedWallets);
+      await submitWithPayload(core, seeder, 1n, payload2);
+      // finalize after PendingOps ends (submitWindow=300, pendingOpsWindow=60)
+      const opsEnd = tSet + 300n + 60n;
+      await time.setNextBlockTimestamp(Number(opsEnd + 1n));
+      await core.finalizePrimarySettlement(1n);
 
       // Process batch
       const batchId = tSet / BATCH_SECONDS;
@@ -348,21 +327,10 @@ describe("VaultWithMarkets E2E", () => {
         batchId
       );
       expect(processed).to.equal(true);
-
-      // Note: getDailyPnl doesn't expose DeltaEtSum, but we verified:
-      // 1. market.deltaEt > 0 (stored at creation)
-      // 2. _recordPnlToBatch is called at settlement (code review)
-      // 3. batch processed without GrantExceedsTailBudget (wiring works)
     });
 
     it("GrantExceedsTailBudget reverts batch when grantNeed > ΔEₜ (simulated)", async () => {
       // This test verifies FeeWaterfallLib's grant cap behavior
-      // In a real scenario, this would require:
-      // 1. Concentrated prior with small ΔEₜ
-      // 2. Large loss that requires grant > ΔEₜ
-      //
-      // Since directly simulating large losses is complex in E2E,
-      // this test verifies the unit-level behavior is wired correctly.
       // Full integration is covered by FeeWaterfallLib unit tests.
 
       const { seeder, core, payment } = await loadFixture(deploySystem);
@@ -377,13 +345,6 @@ describe("VaultWithMarkets E2E", () => {
         .approve(await core.getAddress(), ethers.MaxUint256);
       await time.setNextBlockTimestamp(Number(seedTime));
       await core.connect(seeder).seedVault(seedAmount);
-
-      // The FeeWaterfallLib has thorough unit tests for GrantExceedsTailBudget
-      // This E2E test confirms the wiring exists:
-      // - createMarket calculates and stores deltaEt
-      // - settleMarket records deltaEt to batch
-      // - processDailyBatch passes deltaEt to FeeWaterfallLib
-      // - FeeWaterfallLib enforces grantNeed ≤ deltaEt
 
       // Test passes if setup completes without error, demonstrating wiring
       expect(true).to.equal(true);

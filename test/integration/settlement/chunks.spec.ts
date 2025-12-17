@@ -11,9 +11,26 @@ import {
   LazyMulSegmentTree,
 } from "../../../typechain-types";
 import { WAD } from "../../helpers/constants";
+import {
+  DATA_FEED_ID,
+  FEED_DECIMALS,
+  authorisedWallets,
+  buildRedstonePayload,
+  submitWithPayload,
+} from "../../helpers/redstone";
+
+// Redstone feed config (for setRedstoneConfig)
+const FEED_ID = ethers.encodeBytes32String(DATA_FEED_ID);
+const MAX_SAMPLE_DISTANCE = 600n;
+const FUTURE_TOLERANCE = 60n;
+
+// Human price to tick mapping: humanPrice equals desired tick
+function tickToHumanPrice(tick: bigint): number {
+  return Number(tick);
+}
 
 async function deploySystem() {
-  const [owner, u1, u2, u3, oracleSigner] = await ethers.getSigners();
+  const [owner, u1, u2, u3] = await ethers.getSigners();
 
   const payment = await (
     await ethers.getContractFactory("MockPaymentToken")
@@ -50,8 +67,9 @@ async function deploySystem() {
       libraries: { LazyMulSegmentTree: lazy.target },
     })
   ).deploy()) as MarketLifecycleModule;
+  // Use OracleModuleTest to allow Hardhat local signers for Redstone verification
   const oracleModule = (await (
-    await ethers.getContractFactory("OracleModule")
+    await ethers.getContractFactory("OracleModuleTest")
   ).deploy()) as OracleModule;
   const riskModule = await (
     await ethers.getContractFactory("RiskModule")
@@ -85,7 +103,9 @@ async function deploySystem() {
     ethers.ZeroAddress,
     oracleModule.target
   );
-  await core.setOracleConfig(oracleSigner.address);
+  
+  // Configure Redstone oracle params
+  await core.setRedstoneConfig(FEED_ID, FEED_DECIMALS, MAX_SAMPLE_DISTANCE, FUTURE_TOLERANCE);
   await position.connect(owner).setCore(await core.getAddress());
 
   // fund users and approve
@@ -103,7 +123,6 @@ async function deploySystem() {
     u1,
     u2,
     u3,
-    oracleSigner,
     core,
     payment,
     position,
@@ -113,7 +132,7 @@ async function deploySystem() {
 
 describe("Settlement chunks and claim totals", () => {
   it("handles multiple users/positions across chunks and preserves payout totals", async () => {
-    const { u1, u2, u3, oracleSigner, core, payment, lifecycleModule } =
+    const { owner, u1, u2, u3, core, payment, lifecycleModule } =
       await deploySystem();
 
     const now = BigInt(await time.latest());
@@ -145,21 +164,12 @@ describe("Settlement chunks and claim totals", () => {
     // priceTimestamp must be >= Tset (settlementTimestamp)
     const priceTimestamp = settleTs + 5n;
     await time.setNextBlockTimestamp(Number(priceTimestamp + 1n));
-    const digest = ethers.keccak256(
-      ethers.AbiCoder.defaultAbiCoder().encode(
-        ["uint256", "address", "uint256", "int256", "uint64"],
-        [
-          BigInt((await ethers.provider.getNetwork()).chainId),
-          await core.getAddress(),
-          1,
-          1n,
-          Number(priceTimestamp),
-        ]
-      )
-    );
-    const sig = await oracleSigner.signMessage(ethers.getBytes(digest));
-    await core.submitSettlementPrice(1, 1n, Number(priceTimestamp), sig);
-    await core.settleMarket(1);
+    const payload = buildRedstonePayload(tickToHumanPrice(1n), Number(priceTimestamp), authorisedWallets);
+    await submitWithPayload(core, owner, 1, payload);
+    // finalize after PendingOps ends (submitWindow=200, pendingOpsWindow=60)
+    const opsEnd = settleTs + 200n + 60n;
+    await time.setNextBlockTimestamp(Number(opsEnd + 1n));
+    await core.finalizePrimarySettlement(1);
 
     // chunk emission: with 4 positions totalChunks=1, ensure snapshot completes and further calls revert
     const tx1 = await core.requestSettlementChunks(1, 10);

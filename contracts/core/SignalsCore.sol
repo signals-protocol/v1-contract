@@ -69,7 +69,7 @@ contract SignalsCore is
         paymentToken = IERC20(_paymentToken);
         positionContract = ISignalsPosition(_positionContract);
         settlementSubmitWindow = _settlementSubmitWindow;
-        settlementFinalizeDeadline = _settlementFinalizeDeadline;
+        claimDelaySeconds = _settlementFinalizeDeadline;
     }
 
     /// @notice Set module addresses
@@ -340,20 +340,20 @@ contract SignalsCore is
         if (ret.length > 0) marketId = abi.decode(ret, (uint256));
     }
 
-    function settleMarket(uint256 marketId) external override onlyOwner whenNotPaused {
-        _delegate(lifecycleModule, abi.encodeWithSignature("settleMarket(uint256)", marketId));
+    function finalizePrimarySettlement(uint256 marketId) external override onlyOwner whenNotPaused {
+        _delegate(lifecycleModule, abi.encodeWithSignature("finalizePrimarySettlement(uint256)", marketId));
     }
 
-    function markFailed(uint256 marketId) external override onlyOwner whenNotPaused {
-        _delegate(lifecycleModule, abi.encodeWithSignature("markFailed(uint256)", marketId));
+    function markSettlementFailed(uint256 marketId) external override onlyOwner whenNotPaused {
+        _delegate(lifecycleModule, abi.encodeWithSignature("markSettlementFailed(uint256)", marketId));
     }
 
-    function manualSettleFailedMarket(
+    function finalizeSecondarySettlement(
         uint256 marketId,
         int256 settlementValue
     ) external override onlyOwner whenNotPaused {
         _delegate(lifecycleModule, abi.encodeWithSignature(
-            "manualSettleFailedMarket(uint256,int256)",
+            "finalizeSecondarySettlement(uint256,int256)",
             marketId,
             settlementValue
         ));
@@ -390,23 +390,71 @@ contract SignalsCore is
         ));
     }
 
-    function submitSettlementPrice(
-        uint256 marketId,
-        int256 settlementValue,
-        uint64 priceTimestamp,
-        bytes calldata signature
-    ) external override whenNotPaused {
+    /// @notice Submit settlement sample with Redstone signed-pull oracle (WP v2 Sec 7.4)
+    /// @dev Permissionless during SettlementOpen. Redstone payload is appended to calldata.
+    ///      Signatures are verified on-chain by the OracleModule.
+    /// @param marketId Market to submit settlement for
+    function submitSettlementSample(uint256 marketId) external whenNotPaused {
+        // Forward full msg.data to preserve Redstone payload appended by WrapperBuilder
+        (marketId); // silence unused parameter warning
+        _delegate(oracleModule, msg.data);
+    }
+
+    /// @notice Configure Redstone oracle parameters
+    /// @dev WP v2 Sec 7.1: Set feed ID, decimals, and timing constraints
+    function setRedstoneConfig(
+        bytes32 feedId,
+        uint8 feedDecimals,
+        uint64 _maxSampleDistance,
+        uint64 _futureTolerance
+    ) external onlyOwner whenNotPaused {
         _delegate(oracleModule, abi.encodeWithSignature(
-            "submitSettlementPrice(uint256,int256,uint64,bytes)",
-            marketId,
-            settlementValue,
-            priceTimestamp,
-            signature
+            "setRedstoneConfig(bytes32,uint8,uint64,uint64)",
+            feedId,
+            feedDecimals,
+            _maxSampleDistance,
+            _futureTolerance
         ));
     }
 
-    function setOracleConfig(address signer) external override onlyOwner whenNotPaused {
-        _delegate(oracleModule, abi.encodeWithSignature("setOracleConfig(address)", signer));
+    /// @notice Set settlement timeline parameters (WP v2 state machine)
+    /// @param _sampleWindow Δsettle: SettlementOpen duration for sample submission
+    /// @param _opsWindow Δops: PendingOps duration
+    /// @param _claimDelay Δclaim: Delay before claims open after finalization
+    function setSettlementTimeline(
+        uint64 _sampleWindow,
+        uint64 _opsWindow,
+        uint64 _claimDelay
+    ) external onlyOwner whenNotPaused {
+        settlementSubmitWindow = _sampleWindow;
+        pendingOpsWindow = _opsWindow;
+        claimDelaySeconds = _claimDelay;
+    }
+
+    /// @notice Get market state (derived from timestamps)
+    /// @return state 0=Trading, 1=SettlementOpen, 2=PendingOps, 3=FinalizedPrimary, 4=FinalizedSecondary, 5=FailedPendingManual
+    function getMarketState(uint256 marketId) external returns (uint8 state) {
+        bytes memory ret = _delegateView(oracleModule, abi.encodeWithSignature(
+            "getMarketState(uint256)",
+            marketId
+        ));
+        if (ret.length > 0) state = abi.decode(ret, (uint8));
+    }
+
+    /// @notice Get settlement windows for a market
+    function getSettlementWindows(uint256 marketId) external returns (
+        uint64 tSet,
+        uint64 settleEnd,
+        uint64 opsEnd,
+        uint64 claimOpen
+    ) {
+        bytes memory ret = _delegateView(oracleModule, abi.encodeWithSignature(
+            "getSettlementWindows(uint256)",
+            marketId
+        ));
+        if (ret.length > 0) {
+            (tSet, settleEnd, opsEnd, claimOpen) = abi.decode(ret, (uint64, uint64, uint64, uint64));
+        }
     }
 
     function getSettlementPrice(uint256 marketId)

@@ -7,22 +7,14 @@ import {
   SignalsCoreHarness,
 } from "../../../typechain-types";
 import { ISignalsCore } from "../../../typechain-types/contracts/harness/TradeModuleHarness";
-
-const abiCoder = ethers.AbiCoder.defaultAbiCoder();
-
-function buildDigest(
-  chainId: bigint,
-  core: string,
-  marketId: number,
-  settlementValue: bigint,
-  priceTimestamp: bigint
-) {
-  const encoded = abiCoder.encode(
-    ["uint256", "address", "uint256", "int256", "uint64"],
-    [chainId, core, marketId, settlementValue, priceTimestamp]
-  );
-  return ethers.keccak256(encoded);
-}
+import {
+  DATA_FEED_ID,
+  FEED_DECIMALS,
+  authorisedWallets,
+  buildRedstonePayload,
+  submitWithPayload,
+  toSettlementValue,
+} from "../../helpers/redstone";
 
 const WAD = ethers.parseEther("1");
 
@@ -51,15 +43,26 @@ function cloneMarket(
     feePolicy: market.feePolicy,
     initialRootSum: market.initialRootSum,
     accumulatedFees: market.accumulatedFees,
-    minFactor: market.minFactor ?? WAD, // Phase 7: Default to uniform prior
-    deltaEt: market.deltaEt ?? 0n, // Phase 7: Default to 0 (uniform prior)
+    minFactor: market.minFactor ?? WAD,
+    deltaEt: market.deltaEt ?? 0n,
     ...overrides,
   };
 }
 
+// Redstone feed config (for setRedstoneConfig)
+const FEED_ID = ethers.encodeBytes32String(DATA_FEED_ID);
+const MAX_SAMPLE_DISTANCE = 600n; // 10 min
+const FUTURE_TOLERANCE = 60n; // 1 min
+
+// Human price value (maps to tick 2 with proper market config)
+// Redstone encodes as 2 * 10^8 = 200_000_000
+// On-chain extraction: 200_000_000
+// SettlementValue = 200_000_000 / 100 = 2_000_000 (6 decimals)
+const HUMAN_PRICE = 2;
+
 describe("MarketLifecycleModule", () => {
   async function setup() {
-    const [owner, oracleSigner] = await ethers.getSigners();
+    const [owner] = await ethers.getSigners();
     const payment = await (
       await ethers.getContractFactory("MockPaymentToken")
     ).deploy();
@@ -75,8 +78,9 @@ describe("MarketLifecycleModule", () => {
         libraries: { LazyMulSegmentTree: lazyLib.target },
       })
     ).deploy()) as MarketLifecycleModule;
+    // Use OracleModuleTest to allow Hardhat local signers for Redstone verification
     const oracleModule = (await (
-      await ethers.getContractFactory("OracleModule")
+      await ethers.getContractFactory("OracleModuleTest")
     ).deploy()) as OracleModule;
     const riskModule = await (
       await ethers.getContractFactory("RiskModule")
@@ -91,8 +95,8 @@ describe("MarketLifecycleModule", () => {
     const initData = coreImpl.interface.encodeFunctionData("initialize", [
       payment.target,
       position.target,
-      120,
-      60,
+      120, // settlementSubmitWindow
+      60, // pendingOpsWindow
     ]);
     const proxy = await (
       await ethers.getContractFactory("TestERC1967Proxy")
@@ -109,18 +113,16 @@ describe("MarketLifecycleModule", () => {
       ethers.ZeroAddress,
       oracleModule.target
     );
-    await core.setOracleConfig(oracleSigner.address);
-
-    const { chainId } = await ethers.provider.getNetwork();
+    
+    // Configure Redstone oracle params
+    await core.setRedstoneConfig(FEED_ID, FEED_DECIMALS, MAX_SAMPLE_DISTANCE, FUTURE_TOLERANCE);
 
     return {
       owner,
-      oracleSigner,
       core,
       lifecycle: lifecycleImpl,
       oracleModule,
       lazyLib,
-      chainId,
     };
   }
 
@@ -248,90 +250,86 @@ describe("MarketLifecycleModule", () => {
   });
 
   it("settles market when candidate exists and marks snapshot state", async () => {
-    const { core, lifecycle, oracleModule, oracleSigner, chainId } =
-      await setup();
+    const { core, lifecycle, oracleModule } = await setup();
     const { end } = await createDefaultMarket(core);
     const lifecycleEvents = lifecycle.attach(await core.getAddress());
 
+    // Submit oracle candidate during settlement window
     const candidateTs = end + 10n;
     await time.setNextBlockTimestamp(Number(candidateTs + 1n));
-    const digest = buildDigest(
-      chainId,
-      await core.getAddress(),
-      1,
-      2n,
-      candidateTs
-    );
-    const sig = await oracleSigner.signMessage(ethers.getBytes(digest));
-    await core.submitSettlementPrice(1, 2n, candidateTs, sig);
+    const payload = buildRedstonePayload(HUMAN_PRICE, Number(candidateTs), authorisedWallets);
+    await submitWithPayload(core, (await ethers.getSigners())[0], 1, payload);
 
-    // set open positions to keep snapshotChunksDone false
+    // Set open positions to keep snapshotChunksDone false
     const marketBefore = await core.markets(1);
     await core.harnessSetMarket(
       1,
       cloneMarket(marketBefore, { openPositionCount: 10 })
     );
 
-    await time.setNextBlockTimestamp(Number(candidateTs + 5n));
-    await expect(core.settleMarket(1)).to.emit(
+    // Finalize after PendingOps ends (submitWindow=120, pendingOpsWindow=60)
+    // tSet = end for this market
+    const tSet = end;
+    const opsEnd = tSet + 120n + 60n;
+    await time.setNextBlockTimestamp(Number(opsEnd + 1n));
+    await expect(core.finalizePrimarySettlement(1)).to.emit(
       lifecycleEvents,
       "MarketSettled"
     );
 
     const market = await core.markets(1);
     expect(market.settled).to.equal(true);
-    expect(market.settlementValue).to.equal(2);
-    expect(market.settlementTick).to.equal(2);
+    expect(market.settlementValue).to.equal(toSettlementValue(HUMAN_PRICE));
     expect(market.snapshotChunkCursor).to.equal(0);
     expect(market.snapshotChunksDone).to.equal(false);
 
+    // Candidate should be cleared after settlement
     await expect(core.getSettlementPrice(1)).to.be.revertedWithCustomError(
       oracleModule,
       "SettlementOracleCandidateMissing"
     );
   });
 
-  it("settleMarket enforces candidate and window checks", async () => {
-    const { core, lifecycle, oracleModule, oracleSigner, chainId } =
-      await setup();
+  it("finalizePrimary enforces candidate and window checks", async () => {
+    const { core, lifecycle, oracleModule } = await setup();
     const { end } = await createDefaultMarket(core);
-    lifecycle.attach(await core.getAddress()); // Attach for event access
+    const tSet = end; // settlementTimestamp = endTimestamp
+    const opsEnd = tSet + 120n + 60n; // submitWindow + pendingOpsWindow
 
-    await expect(core.settleMarket(1)).to.be.revertedWithCustomError(
-      lifecycle,
-      "SettlementOracleCandidateMissing"
-    );
-
-    // too early candidate timestamp
-    const earlyTs = end - 5n;
-    let digest = buildDigest(chainId, await core.getAddress(), 1, 1n, earlyTs);
-    let sig = await oracleSigner.signMessage(ethers.getBytes(digest));
+    const owner = (await ethers.getSigners())[0];
+    
+    // Test 1: Submit before Tset: should revert
+    const earlyBlockTs = tSet - 1n;
+    await time.setNextBlockTimestamp(Number(earlyBlockTs));
+    const earlyPayload = buildRedstonePayload(HUMAN_PRICE, Number(earlyBlockTs), authorisedWallets);
     await expect(
-      core.submitSettlementPrice(1, 1n, earlyTs, sig)
-    ).to.be.revertedWithCustomError(oracleModule, "SettlementTooEarly");
+      submitWithPayload(core, owner, 1, earlyPayload)
+    ).to.be.revertedWithCustomError(oracleModule, "OracleSampleTooEarly");
 
-    // too late candidate
-    const lateTs = end + 130n; // submit window 120
-    digest = buildDigest(chainId, await core.getAddress(), 1, 1n, lateTs);
-    sig = await oracleSigner.signMessage(ethers.getBytes(digest));
-    await expect(
-      core.submitSettlementPrice(1, 1n, lateTs, sig)
-    ).to.be.revertedWithCustomError(
-      oracleModule,
-      "SettlementFinalizeWindowClosed"
-    );
-
-    // valid candidate but finalize deadline expired
-    const goodTs = end + 10n;
+    // Test 2: Valid candidate submission within window
+    const goodTs = tSet + 10n;
     await time.setNextBlockTimestamp(Number(goodTs + 1n));
-    digest = buildDigest(chainId, await core.getAddress(), 1, 1n, goodTs);
-    sig = await oracleSigner.signMessage(ethers.getBytes(digest));
-    await core.submitSettlementPrice(1, 1n, goodTs, sig);
-    await time.setNextBlockTimestamp(Number(goodTs + 100n)); // finalizeDeadline = 60
-    await expect(core.settleMarket(1)).to.be.revertedWithCustomError(
+    const goodPayload = buildRedstonePayload(HUMAN_PRICE, Number(goodTs), authorisedWallets);
+    await submitWithPayload(core, owner, 1, goodPayload);
+    
+    // Test 3: Finalize before opsEnd: should revert with PendingOpsNotStarted
+    await time.setNextBlockTimestamp(Number(goodTs + 10n));
+    await expect(core.finalizePrimarySettlement(1)).to.be.revertedWithCustomError(
       lifecycle,
-      "SettlementFinalizeWindowClosed"
+      "PendingOpsNotStarted"
     );
+
+    // Test 4: Submit after window: should revert
+    const lateBlockTs = tSet + 121n; // submitWindow = 120
+    await time.setNextBlockTimestamp(Number(lateBlockTs));
+    const latePayload = buildRedstonePayload(HUMAN_PRICE, Number(lateBlockTs), authorisedWallets);
+    await expect(
+      submitWithPayload(core, owner, 1, latePayload)
+    ).to.be.revertedWithCustomError(oracleModule, "SettlementWindowClosed");
+    
+    // Test 5: Finalize after opsEnd: should succeed
+    await time.setNextBlockTimestamp(Number(opsEnd + 2n));
+    await expect(core.finalizePrimarySettlement(1)).to.emit(lifecycle.attach(await core.getAddress()), "MarketSettled");
   });
 
   it("reopens settled market and resets state", async () => {
@@ -394,7 +392,6 @@ describe("MarketLifecycleModule", () => {
       cloneMarket(market, { settled: true, openPositionCount: 1000 })
     );
 
-    const totalChunks = 2; // ceil(1000/512)
     const tx1 = await core.requestSettlementChunks(1, 1);
     await expect(tx1)
       .to.emit(lifecycleEvents, "SettlementChunkRequested")
@@ -408,7 +405,7 @@ describe("MarketLifecycleModule", () => {
       .to.emit(lifecycleEvents, "SettlementChunkRequested")
       .withArgs(1, 1);
     updated = await core.markets(1);
-    expect(updated.snapshotChunkCursor).to.equal(totalChunks);
+    expect(updated.snapshotChunkCursor).to.equal(2); // ceil(1000/512)
     expect(updated.snapshotChunksDone).to.equal(true);
 
     await expect(
@@ -421,7 +418,7 @@ describe("MarketLifecycleModule", () => {
     await createDefaultMarket(core);
     const lifecycleEvents = lifecycle.attach(await core.getAddress());
 
-    // mark as settled with large openPositionCount to force multiple chunks
+    // Mark as settled with large openPositionCount to force multiple chunks
     const market = await core.markets(1);
     await core.harnessSetMarket(
       1,
@@ -433,7 +430,7 @@ describe("MarketLifecycleModule", () => {
       })
     );
 
-    await expect(core.settleMarket(1)).to.be.revertedWithCustomError(
+    await expect(core.finalizePrimarySettlement(1)).to.be.revertedWithCustomError(
       lifecycle,
       "MarketAlreadySettled"
     );

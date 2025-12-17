@@ -5,40 +5,43 @@ import "@openzeppelin/hardhat-upgrades";
 
 dotenv.config();
 
-const defaultAccounts = process.env.DEPLOYER_KEY ? [process.env.DEPLOYER_KEY] : [];
-const CITREA_RPC = process.env.CITREA_RPC_URL || "https://rpc.testnet.citrea.xyz";
+const defaultAccounts = process.env.DEPLOYER_KEY
+  ? [process.env.DEPLOYER_KEY]
+  : [];
+const CITREA_RPC =
+  process.env.CITREA_RPC_URL || "https://rpc.testnet.citrea.xyz";
 
 const config: HardhatUserConfig = {
   solidity: {
     version: "0.8.24",
     settings: {
       optimizer: { enabled: true, runs: 200 },
-      viaIR: true
-    }
+      viaIR: true,
+    },
   },
   paths: {
     sources: "./contracts",
-    tests: "./test"
+    tests: "./test",
   },
   networks: {
     localhost: {
-      chainId: 31337
+      chainId: 31337,
     },
     "citrea-dev": {
       url: process.env.CITREA_DEV_RPC_URL || CITREA_RPC,
       chainId: 5115,
-      accounts: defaultAccounts
+      accounts: defaultAccounts,
     },
     "citrea-prod": {
       url: process.env.CITREA_PROD_RPC_URL || CITREA_RPC,
       chainId: 5115,
-      accounts: defaultAccounts
-    }
+      accounts: defaultAccounts,
+    },
   },
   etherscan: {
     apiKey: {
       "citrea-dev": process.env.BLOCKSCOUT_API_KEY || "placeholder",
-      "citrea-prod": process.env.BLOCKSCOUT_API_KEY || "placeholder"
+      "citrea-prod": process.env.BLOCKSCOUT_API_KEY || "placeholder",
     },
     customChains: [
       {
@@ -46,19 +49,19 @@ const config: HardhatUserConfig = {
         chainId: 5115,
         urls: {
           apiURL: "https://explorer.testnet.citrea.xyz/api",
-          browserURL: "https://explorer.testnet.citrea.xyz"
-        }
+          browserURL: "https://explorer.testnet.citrea.xyz",
+        },
       },
       {
         network: "citrea-prod",
         chainId: 5115,
         urls: {
           apiURL: "https://explorer.testnet.citrea.xyz/api",
-          browserURL: "https://explorer.testnet.citrea.xyz"
-        }
-      }
-    ]
-  }
+          browserURL: "https://explorer.testnet.citrea.xyz",
+        },
+      },
+    ],
+  },
 };
 
 export default config;

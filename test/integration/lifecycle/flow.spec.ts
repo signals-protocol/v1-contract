@@ -9,27 +9,31 @@ import {
   SignalsPosition,
   TestERC1967Proxy,
 } from "../../../typechain-types";
+import {
+  DATA_FEED_ID,
+  FEED_DECIMALS,
+  authorisedWallets,
+  buildRedstonePayload,
+  submitWithPayload,
+} from "../../helpers/redstone";
 
-const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+// Redstone feed config (for setRedstoneConfig)
+const FEED_ID = ethers.encodeBytes32String(DATA_FEED_ID);
+const MAX_SAMPLE_DISTANCE = 600n;
+const FUTURE_TOLERANCE = 60n;
 
-function buildDigest(
-  chainId: bigint,
-  core: string,
-  marketId: bigint | number,
-  settlementValue: bigint,
-  priceTimestamp: bigint
-) {
-  const id = BigInt(marketId);
-  const encoded = abiCoder.encode(
-    ["uint256", "address", "uint256", "int256", "uint64"],
-    [chainId, core, id, settlementValue, priceTimestamp]
-  );
-  return ethers.keccak256(encoded);
+// Human price to tick mapping:
+// NumericDataPoint value (human price) * 10^8 = on-chain price
+// settlementValue = on-chain price / 100 = humanPrice * 10^6
+// settlementTick = settlementValue / 10^6 = humanPrice
+// So human price equals the desired tick!
+function tickToHumanPrice(tick: bigint): number {
+  return Number(tick);
 }
 
 describe("Lifecycle + Trade integration", () => {
   async function setup() {
-    const [owner, user, oracleSigner] = await ethers.getSigners();
+    const [owner, user] = await ethers.getSigners();
     const payment = await (
       await ethers.getContractFactory("MockPaymentToken")
     ).deploy();
@@ -66,8 +70,9 @@ describe("Lifecycle + Trade integration", () => {
         libraries: { LazyMulSegmentTree: lazyLib.target },
       })
     ).deploy()) as MarketLifecycleModule;
+    // Use OracleModuleTest to allow Hardhat local signers for Redstone verification
     const oracleModule = (await (
-      await ethers.getContractFactory("OracleModule")
+      await ethers.getContractFactory("OracleModuleTest")
     ).deploy()) as OracleModule;
     const riskModule = await (
       await ethers.getContractFactory("RiskModule")
@@ -100,15 +105,14 @@ describe("Lifecycle + Trade integration", () => {
       ethers.ZeroAddress,
       oracleModule.target
     );
-    await core.setOracleConfig(oracleSigner.address);
+    
+    // Configure Redstone oracle params
+    await core.setRedstoneConfig(FEED_ID, FEED_DECIMALS, MAX_SAMPLE_DISTANCE, FUTURE_TOLERANCE);
     await position.connect(owner).setCore(await core.getAddress());
-
-    const { chainId } = await ethers.provider.getNetwork();
 
     return {
       owner,
       user,
-      oracleSigner,
       payment,
       position,
       tradeModule,
@@ -117,20 +121,18 @@ describe("Lifecycle + Trade integration", () => {
       core,
       submitWindow,
       finalizeDeadline,
-      chainId,
     };
   }
 
   it("runs create -> trade -> settlement -> snapshot -> claim flow", async () => {
     const {
+      owner,
       user,
-      oracleSigner,
       payment,
       position,
       core,
       lifecycleModule,
       finalizeDeadline,
-      chainId,
     } = await setup();
 
     const lifecycleEvents = lifecycleModule.attach(await core.getAddress());
@@ -179,19 +181,13 @@ describe("Lifecycle + Trade integration", () => {
     // submit oracle price after settlementTimestamp (Tset)
     const priceTimestamp = settlementTs + 5n;
     await time.setNextBlockTimestamp(Number(priceTimestamp + 1n));
-    const digest = buildDigest(
-      chainId,
-      await core.getAddress(),
-      marketId,
-      2n,
-      priceTimestamp
-    );
-    const signature = await oracleSigner.signMessage(ethers.getBytes(digest));
-    await core.submitSettlementPrice(marketId, 2n, priceTimestamp, signature);
+    const payload = buildRedstonePayload(tickToHumanPrice(2n), Number(priceTimestamp), authorisedWallets);
+    await submitWithPayload(core, owner, marketId, payload);
 
-    // settle
-    await time.setNextBlockTimestamp(Number(priceTimestamp + 2n));
-    await core.settleMarket(marketId);
+    // finalize after PendingOps ends (submitWindow=300, pendingOpsWindow=60)
+    const opsEnd = settlementTs + 300n + 60n;
+    await time.setNextBlockTimestamp(Number(opsEnd + 1n));
+    await core.finalizePrimarySettlement(marketId);
     market = await core.markets(marketId);
     expect(market.settled).to.equal(true);
     expect(market.snapshotChunksDone).to.equal(false);
@@ -214,13 +210,12 @@ describe("Lifecycle + Trade integration", () => {
 
   it("burns loser positions with zero payout and prevents double-claim", async () => {
     const {
+      owner,
       user,
-      oracleSigner,
       payment,
       position,
       core,
       lifecycleModule,
-      chainId,
     } = await setup();
 
     const lifecycleEvents = lifecycleModule.attach(await core.getAddress());
@@ -254,17 +249,12 @@ describe("Lifecycle + Trade integration", () => {
     // priceTimestamp must be >= Tset (settlementTs)
     const priceTimestamp = settlementTs + 5n;
     await time.setNextBlockTimestamp(Number(priceTimestamp + 1n));
-    const digest = buildDigest(
-      chainId,
-      await core.getAddress(),
-      1,
-      1n,
-      priceTimestamp
-    );
-    const signature = await oracleSigner.signMessage(ethers.getBytes(digest));
-    await core.submitSettlementPrice(1, 1n, priceTimestamp, signature);
-    await time.setNextBlockTimestamp(Number(priceTimestamp + 2n));
-    await core.settleMarket(1);
+    const payload2 = buildRedstonePayload(tickToHumanPrice(1n), Number(priceTimestamp), authorisedWallets);
+    await submitWithPayload(core, owner, 1, payload2);
+    // finalize after PendingOps ends (submitWindow=300, pendingOpsWindow=60)
+    const opsEnd = settlementTs + 300n + 60n;
+    await time.setNextBlockTimestamp(Number(opsEnd + 1n));
+    await core.finalizePrimarySettlement(1);
     await expect(core.requestSettlementChunks(1, 5))
       .to.emit(lifecycleEvents, "SettlementChunkRequested")
       .withArgs(1, 0);
@@ -283,7 +273,7 @@ describe("Lifecycle + Trade integration", () => {
   });
 
   it("enforces time gates for trading, settlement, and claim windows", async () => {
-    const { user, oracleSigner, payment, core, chainId } = await setup();
+    const { owner, user, payment, core } = await setup();
     const now = BigInt(await time.latest());
     const start = now + 100n;
     const end = start + 100n;
@@ -317,24 +307,21 @@ describe("Lifecycle + Trade integration", () => {
     await expect(core.connect(user).increasePosition(1, 1_000, 5_000_000)).to.be
       .reverted;
 
-    // settlement too early
-    await expect(core.settleMarket(1)).to.be.reverted;
+    // settlement too early (before PendingOps ends)
+    await expect(core.finalizePrimarySettlement(1)).to.be.reverted;
 
-    // submit settlement and settle within window (priceTimestamp >= Tset)
+    // submit settlement within window (priceTimestamp >= Tset)
     const priceTimestamp = settlementTs + 10n;
     await time.setNextBlockTimestamp(Number(priceTimestamp + 1n));
-    const digest = buildDigest(
-      chainId,
-      await core.getAddress(),
-      1,
-      1n,
-      priceTimestamp
-    );
-    const sig = await oracleSigner.signMessage(ethers.getBytes(digest));
-    await core.submitSettlementPrice(1, 1n, priceTimestamp, sig);
-    await core.settleMarket(1);
+    const payload3 = buildRedstonePayload(tickToHumanPrice(1n), Number(priceTimestamp), authorisedWallets);
+    await submitWithPayload(core, owner, 1, payload3);
+    
+    // finalize after PendingOps ends (submitWindow=300, pendingOpsWindow=60)
+    const opsEnd = settlementTs + 300n + 60n;
+    await time.setNextBlockTimestamp(Number(opsEnd + 1n));
+    await core.finalizePrimarySettlement(1);
 
-    // claim too early (claim gate = settlementTimestamp + finalizeDeadline(60))
+    // claim too early (claim gate = settlementFinalizedAt + finalizeDeadline(60))
     await expect(core.connect(user).claimPayout(1)).to.be.reverted;
 
     await time.increase(61);

@@ -127,7 +127,7 @@ interface ISignalsCore {
         uint256[] calldata baseFactors
     ) external returns (uint256 marketId);
 
-    function settleMarket(uint256 marketId) external;
+    function finalizePrimarySettlement(uint256 marketId) external;
 
     function reopenMarket(uint256 marketId) external;
 
@@ -140,22 +140,42 @@ interface ISignalsCore {
         uint64 settlementTimestamp
     ) external;
 
-    function submitSettlementPrice(
-        uint256 marketId,
-        int256 settlementValue,
-        uint64 priceTimestamp,
-        bytes calldata signature
+    /// @notice Submit settlement sample with Redstone signed-pull oracle (permissionless during SettlementOpen)
+    function submitSettlementSample(uint256 marketId) external;
+
+    /// @notice Configure Redstone oracle parameters
+    function setRedstoneConfig(
+        bytes32 feedId,
+        uint8 feedDecimals,
+        uint64 maxSampleDistance,
+        uint64 futureTolerance
     ) external;
 
-    function setOracleConfig(address signer) external;
+    /// @notice Set settlement timeline parameters
+    function setSettlementTimeline(
+        uint64 sampleWindow,
+        uint64 opsWindow,
+        uint64 claimDelay
+    ) external;
 
-    /// @notice Mark a market as failed due to oracle not providing valid settlement
-    /// @dev Can only be called after settlement window expires without valid candidate
-    function markFailed(uint256 marketId) external;
+    /// @notice Get market state (derived from timestamps)
+    function getMarketState(uint256 marketId) external returns (uint8 state);
 
-    /// @notice Manually settle a failed market (secondary settlement path)
-    /// @dev Can only be called by ops on a failed market
-    function manualSettleFailedMarket(
+    /// @notice Get settlement windows for a market
+    function getSettlementWindows(uint256 marketId) external returns (
+        uint64 tSet,
+        uint64 settleEnd,
+        uint64 opsEnd,
+        uint64 claimOpen
+    );
+
+    /// @notice Mark a market's settlement as failed due to oracle issue
+    /// @dev Operations can call during PendingOps window
+    function markSettlementFailed(uint256 marketId) external;
+
+    /// @notice Finalize secondary settlement for a failed market
+    /// @dev Can only be called by ops on a market marked as failed
+    function finalizeSecondarySettlement(
         uint256 marketId,
         int256 settlementValue
     ) external;

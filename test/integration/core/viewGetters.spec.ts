@@ -92,7 +92,8 @@ describe("Core View Getters", () => {
     const LPVaultModule = await ethers.getContractFactory("LPVaultModule");
     const vaultModule = await LPVaultModule.deploy();
 
-    const OracleModule = await ethers.getContractFactory("OracleModule");
+    // Use OracleModuleTest to allow Hardhat local signers for Redstone verification
+    const OracleModule = await ethers.getContractFactory("OracleModuleTest");
     const oracleModule = await OracleModule.deploy();
 
     await core.setModules(
