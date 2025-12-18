@@ -471,10 +471,11 @@ contract TradeModule is SignalsCoreStorage {
 
     /**
      * @notice Get free balance (total balance minus reserved amounts)
+     * @dev HIGH-01: Includes _totalPendingWithdrawals6 to protect withdrawal funds
      */
     function _getFreeBalance() internal view returns (uint256) {
         uint256 balance = paymentToken.balanceOf(address(this));
-        uint256 reserved = _totalPendingDeposits6 + _totalPayoutReserve6;
+        uint256 reserved = _totalPendingDeposits6 + _totalPayoutReserve6 + _totalPendingWithdrawals6;
         return balance > reserved ? balance - reserved : 0;
     }
 

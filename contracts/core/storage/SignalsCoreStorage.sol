@@ -266,6 +266,12 @@ abstract contract SignalsCoreStorage {
     ///      Incremented at settlement, decremented on claimPayout
     uint256 internal _totalPayoutReserve6;
 
+    /// @notice Total pending withdrawals in 6-decimal token units (HIGH-01 fix)
+    /// @dev Incremented at processDailyBatch when withdrawals are processed,
+    ///      decremented on claimWithdraw. Ensures withdrawal funds are reserved
+    ///      and cannot be used for other payments (payout claims, transfers, etc.)
+    uint256 internal _totalPendingWithdrawals6;
+
     // ============================================================
     // Phase 7: Risk Configuration
     // ============================================================

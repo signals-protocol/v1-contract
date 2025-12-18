@@ -351,12 +351,17 @@ contract LPVaultModule is SignalsCoreStorage {
         uint256 currentShares = lpVault.shares;
 
         if (totalWithdraws > 0) {
-            (currentNav, currentShares, ) = VaultAccountingLib.applyWithdraw(
+            uint256 withdrawAssetsWad;
+            (currentNav, currentShares, withdrawAssetsWad) = VaultAccountingLib.applyWithdraw(
                 currentNav,
                 currentShares,
                 batchPrice,
                 totalWithdraws
             );
+            // HIGH-01: Reserve withdrawal funds (conservative floor rounding)
+            // Use floor to ensure we never over-reserve
+            uint256 withdrawAssets6 = withdrawAssetsWad.fromWad();
+            _totalPendingWithdrawals6 += withdrawAssets6;
         }
 
         // Step 5: Process deposits (at batch price)
@@ -446,14 +451,15 @@ contract LPVaultModule is SignalsCoreStorage {
     }
 
     /**
-     * @notice Calculate free balance available for withdrawals and payouts
-     * @dev Free balance = token balance - pending deposits - payout reserves
-     *      Ensures pending deposits are isolated and cannot be used for other payments
+     * @notice Calculate free balance available for payouts (excludes withdrawals)
+     * @dev Free balance = token balance - pending deposits - payout reserves - pending withdrawals
+     *      HIGH-01 fix: Includes _totalPendingWithdrawals6 to ensure withdrawal funds are reserved
+     *      and cannot be used for payout claims, transfers, or other payments
      * @return Free balance in 6-decimal token units
      */
     function _getFreeBalance() internal view returns (uint256) {
         uint256 balance = paymentToken.balanceOf(address(this));
-        uint256 reserved = _totalPendingDeposits6 + _totalPayoutReserve6;
+        uint256 reserved = _totalPendingDeposits6 + _totalPayoutReserve6 + _totalPendingWithdrawals6;
         return balance > reserved ? balance - reserved : 0;
     }
 
@@ -522,9 +528,11 @@ contract LPVaultModule is SignalsCoreStorage {
         // WP v2 Appendix C: "Withdrawal dust stays in vault (LP benefit)" - truncate (round down)
         uint256 assets6 = assets.fromWad();
         
-        // Phase 6: Verify free balance (escrow safety)
-        // Withdrawals must not use pending deposits or payout reserves
-        _requireFreeBalance(assets6);
+        // HIGH-01: Draw from withdrawal reserve (reserved at batch processing time)
+        // Withdrawal funds were reserved in _totalPendingWithdrawals6, now release them
+        // Note: No _requireFreeBalance check needed as funds are already reserved
+        _totalPendingWithdrawals6 -= assets6;
+        
         paymentToken.safeTransfer(msg.sender, assets6);
 
         emit WithdrawClaimed(requestId, msg.sender, req.shares, assets);
