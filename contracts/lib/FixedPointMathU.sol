@@ -2,10 +2,11 @@
 pragma solidity ^0.8.24;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {UD60x18, ud, unwrap, exp, ln} from "@prb/math/src/UD60x18.sol";
 
 /// @notice Fixed-point math utilities (WAD = 1e18) with 512-bit safe arithmetic.
 /// @dev Uses OpenZeppelin Math.mulDiv for overflow-safe multiplication/division.
-///      This implementation mirrors v0's PRB-Math based approach for numerical stability.
+///      exp/ln operations use PRBMath for production-grade numerical stability.
 library FixedPointMathU {
     uint256 internal constant WAD = 1e18;
     uint256 internal constant HALF_WAD = 5e17;
@@ -144,138 +145,28 @@ library FixedPointMathU {
     }
 
     // ============================================================
-    // Exponential & Logarithm (range-reduction based)
+    // Exponential & Logarithm (PRBMath based)
     // ============================================================
 
-    /// @dev ln(2) in WAD = 0.693147180559945309...
-    uint256 internal constant LN2_WAD = 693147180559945309;
+    /// @dev PRBMath exp input upper bound: exp(133.084...) overflows UD60x18
+    uint256 internal constant MAX_EXP_INPUT_WAD = 133_084258667509499440;
 
-    /// @notice High-precision exponential with range reduction
-    /// @dev Uses identity: exp(x) = 2^k * exp(r) where x = k*ln(2) + r, r ∈ [0, ln(2))
-    ///      Taylor series converges fast for small r (< 0.7)
-    ///      Supports full domain up to MAX_EXP_INPUT_WAD ≈ 135.3
-    /// @param xWad Input in WAD
+    /// @notice High-precision exponential using PRBMath
+    /// @dev Wraps PRBMath UD60x18.exp() for production-grade numerical stability
+    /// @param xWad Input in WAD (must be <= MAX_EXP_INPUT_WAD ≈ 133.084)
     function wExp(uint256 xWad) internal pure returns (uint256) {
         if (xWad == 0) return WAD;
-
-        // exp(135.305...) overflows uint256, use same constant as codebase
-        uint256 MAX_INPUT = 135305999368893231588;
-        if (xWad > MAX_INPUT) revert FP_Overflow();
-
-        // Range reduction: x = k * ln(2) + r, where r ∈ [0, ln(2))
-        // k = floor(x / ln(2))
-        uint256 k = xWad / LN2_WAD;
-        uint256 r = xWad - k * LN2_WAD; // r = x mod ln(2), guaranteed r < ln(2) ≈ 0.693
-
-        // Compute exp(r) using Taylor series
-        // For r < ln(2) ≈ 0.693, Taylor converges very fast
-        uint256 term = WAD;
-        uint256 expR = WAD;
-
-        unchecked {
-            for (uint256 i = 1; i <= 20; i++) {
-                term = Math.mulDiv(term, r, WAD * i);
-                if (term == 0) break;
-                expR += term;
-            }
-        }
-
-        // exp(x) = 2^k * exp(r)
-        // 2^k in WAD = WAD << k, but we need to handle overflow
-        if (k == 0) return expR;
-
-        // For large k, compute 2^k * expR carefully
-        // 2^k * expR = expR << k (in integer terms)
-        // But expR is in WAD, so result = expR * 2^k
-        if (k >= 196) revert FP_Overflow(); // 2^196 * WAD overflows uint256
-
-        return expR << k;
+        if (xWad > MAX_EXP_INPUT_WAD) revert FP_Overflow();
+        return unwrap(exp(ud(xWad)));
     }
 
-    /// @notice High-precision natural logarithm with range reduction
-    /// @dev Uses identity: ln(x) = k*ln(2) + ln(y) where x = 2^k * y, y ∈ [1, 2)
-    ///      Atanh series converges fast for y ∈ [1, 2) since z ∈ [0, 1/3)
+    /// @notice High-precision natural logarithm using PRBMath
+    /// @dev Wraps PRBMath UD60x18.ln() for production-grade numerical stability
     /// @param xWad Input value in WAD (MUST be >= WAD = 1e18)
     function wLn(uint256 xWad) internal pure returns (uint256) {
         if (xWad < WAD) revert FP_InvalidInput();
         if (xWad == WAD) return 0;
-
-        // Range reduction: find k such that y = xWad / 2^k ∈ [WAD, 2*WAD)
-        // First find MSB position, then calculate k
-        uint256 k = 0;
-        uint256 y = xWad;
-
-        // Find MSB position via binary search (supports full uint256 range)
-        // MSB of WAD ≈ 59, so k = msb(xWad) - 59 roughly
-        if (y >= 1 << 128) { y >>= 128; k += 128; }
-        if (y >= 1 << 64)  { y >>= 64;  k += 64;  }
-        if (y >= 1 << 32)  { y >>= 32;  k += 32;  }
-        if (y >= 1 << 16)  { y >>= 16;  k += 16;  }
-        if (y >= 1 << 8)   { y >>= 8;   k += 8;   }
-        if (y >= 1 << 4)   { y >>= 4;   k += 4;   }
-        if (y >= 1 << 2)   { y >>= 2;   k += 2;   }
-        if (y >= 1 << 1)   { y >>= 1;   k += 1;   }
-
-        // Now y is in [1, 2), and xWad = y * 2^k
-        // We need xWad / 2^? to be in [WAD, 2*WAD)
-        // xWad / 2^(k - 59) ≈ y * 2^59 ≈ WAD (since WAD ≈ 2^59.79)
-
-        // Recalculate properly: find k such that xWad >> k ∈ [WAD, 2*WAD)
-        y = xWad;
-        k = 0;
-
-        // Binary search for the right shift amount
-        // Target: WAD <= (xWad >> k) < 2*WAD
-        // Equivalent: xWad >= WAD << k AND xWad < 2*WAD << k
-        if (y >= WAD << 128) { y >>= 128; k += 128; }
-        if (y >= WAD << 64)  { y >>= 64;  k += 64;  }
-        if (y >= WAD << 32)  { y >>= 32;  k += 32;  }
-        if (y >= WAD << 16)  { y >>= 16;  k += 16;  }
-        if (y >= WAD << 8)   { y >>= 8;   k += 8;   }
-        if (y >= WAD << 4)   { y >>= 4;   k += 4;   }
-        if (y >= WAD << 2)   { y >>= 2;   k += 2;   }
-        if (y >= WAD << 1)   { y >>= 1;   k += 1;   }
-
-        // Now y ∈ [WAD, 2*WAD), compute ln(y/WAD) using atanh series
-        // ln(t) = 2 * atanh((t-1)/(t+1)) for t > 0
-        // Here t = y/WAD, so z = (y-WAD)/(y+WAD)
-        uint256 num = y - WAD;
-        uint256 den = y + WAD;
-        uint256 z = Math.mulDiv(num, WAD, den);
-        uint256 z2 = Math.mulDiv(z, z, WAD);
-
-        // atanh(z) = z + z³/3 + z⁵/5 + ...
-        // For z ∈ [0, 1/3), converges fast. 12 terms give error < 1e-18
-        uint256 result = z;
-        uint256 zPow = Math.mulDiv(z, z2, WAD);
-
-        unchecked {
-            result += zPow / 3;
-            zPow = Math.mulDiv(zPow, z2, WAD);
-            result += zPow / 5;
-            zPow = Math.mulDiv(zPow, z2, WAD);
-            result += zPow / 7;
-            zPow = Math.mulDiv(zPow, z2, WAD);
-            result += zPow / 9;
-            zPow = Math.mulDiv(zPow, z2, WAD);
-            result += zPow / 11;
-            zPow = Math.mulDiv(zPow, z2, WAD);
-            result += zPow / 13;
-            zPow = Math.mulDiv(zPow, z2, WAD);
-            result += zPow / 15;
-            zPow = Math.mulDiv(zPow, z2, WAD);
-            result += zPow / 17;
-            zPow = Math.mulDiv(zPow, z2, WAD);
-            result += zPow / 19;
-            zPow = Math.mulDiv(zPow, z2, WAD);
-            result += zPow / 21;
-            zPow = Math.mulDiv(zPow, z2, WAD);
-            result += zPow / 23;
-        }
-
-        // ln(y/WAD) = 2 * atanh(z)
-        // ln(xWad/WAD) = k * ln(2) + ln(y/WAD)
-        return k * LN2_WAD + (result << 1);
+        return unwrap(ln(ud(xWad)));
     }
 
     // ============================================================

@@ -195,8 +195,8 @@ describe("FixedPointMath Precision", () => {
     it("wExp handles MAX_EXP_INPUT without overflow", async () => {
       const { mathTest } = await loadFixture(deployMathFixture);
       
-      // MAX_EXP_INPUT_WAD ≈ 135.305... * 1e18
-      const maxInput = 135305999368893231588n;
+      // PRBMath MAX_EXP_INPUT_WAD ≈ 133.084... * 1e18
+      const maxInput = 133_084258667509499440n;
       
       // Should not revert
       const result = await mathTest.wExp(maxInput);
@@ -206,7 +206,8 @@ describe("FixedPointMath Precision", () => {
     it("wExp reverts above MAX_EXP_INPUT", async () => {
       const { mathTest } = await loadFixture(deployMathFixture);
       
-      const tooLarge = 135305999368893231588n + WAD;
+      // PRBMath domain: exp(133.084...) is the limit
+      const tooLarge = 133_084258667509499440n + WAD;
       await expect(mathTest.wExp(tooLarge)).to.be.revertedWithCustomError(
         mathTest,
         "FP_Overflow"

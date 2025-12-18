@@ -8,7 +8,7 @@ import {CE} from "../../errors/CLMSRErrors.sol";
 library SignalsClmsrMath {
     using FixedPointMathU for uint256;
 
-    uint256 internal constant MAX_EXP_INPUT_WAD = 135305999368893231588; // matches v0
+    uint256 internal constant MAX_EXP_INPUT_WAD = 133_084258667509499440; // PRBMath exp domain
 
     function _safeExp(uint256 numeratorWad, uint256 alpha) internal pure returns (uint256) {
         if (alpha == 0) revert CE.MathMulOverflow();

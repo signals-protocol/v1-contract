@@ -12,7 +12,7 @@ library SignalsDistributionMath {
     using LazyMulSegmentTree for LazyMulSegmentTree.Tree;
 
     uint256 internal constant WAD = 1e18;
-    uint256 internal constant MAX_EXP_INPUT_WAD = 135305999368893231588; // matches v0
+    uint256 internal constant MAX_EXP_INPUT_WAD = 133_084258667509499440; // PRBMath exp domain
     uint256 internal constant MAX_CHUNKS_PER_TX = 100;
     uint256 internal constant OVERFLOW_GUARD_MULTIPLIER = 50e18; // 50 * WAD
 
