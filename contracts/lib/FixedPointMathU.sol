@@ -170,55 +170,18 @@ library FixedPointMathU {
     }
 
     // ============================================================
-    // Safe ln(n) Lookup Table for α Safety Bounds
+    // Safe ln(n) for α Safety Bounds (PRBMath based)
     // ============================================================
 
-    /// @notice Pre-computed ln values in WAD precision (rounded UP for safety)
-    /// @dev ln(n) values computed with high precision, rounded up to ensure
-    ///      α_base = λE/ln(n) is CONSERVATIVE (smaller α_base = safer)
-    ///      Per whitepaper v2: α_base must never exceed the safety bound.
-    uint256 internal constant LN_2 = 693147180559945310;
-    uint256 internal constant LN_5 = 1609437912434100375;
-    uint256 internal constant LN_10 = 2302585092994045685;
-    uint256 internal constant LN_20 = 2995732273553991095;
-    uint256 internal constant LN_50 = 3912023005428146060;
-    uint256 internal constant LN_100 = 4605170185988091369;
-    uint256 internal constant LN_200 = 5298317366548036678;
-    uint256 internal constant LN_500 = 6214608098422191781;
-    uint256 internal constant LN_1000 = 6907755278982137053;
-    uint256 internal constant LN_2000 = 7600902459542082362;
-    uint256 internal constant LN_5000 = 8517193191416237509;
-    uint256 internal constant LN_10000 = 9210340371976182818;
-
     /// @notice Calculate ln(n) with safe (upward) rounding for α calculation
-    /// @dev Returns ln(n) in WAD, rounded UP to ensure α_base is conservative
+    /// @dev Returns ln(n) in WAD, rounded UP (+1 wei) to ensure α_base is conservative
+    ///      Per whitepaper v2: α_base = λE/ln(n) must never exceed the safety bound
+    ///      Using PRBMath for precision, +1 wei for conservative upper bound
     /// @param n Number of bins (integer, not WAD)
     /// @return lnN ln(n) in WAD, rounded up for safety
     function lnWadUp(uint256 n) internal pure returns (uint256 lnN) {
         if (n <= 1) return 0;
-
-        if (n == 2) return LN_2;
-        if (n <= 5) return LN_5;
-        if (n <= 10) return LN_10;
-        if (n <= 20) return LN_20;
-        if (n <= 50) return LN_50;
-        if (n <= 100) return LN_100;
-        if (n <= 200) return LN_200;
-        if (n <= 500) return LN_500;
-        if (n <= 1000) return LN_1000;
-        if (n <= 2000) return LN_2000;
-        if (n <= 5000) return LN_5000;
-        if (n <= 10000) return LN_10000;
-
-        // For n > 10000, use conservative upper bound
-        // ln(n) < digits * ln(10) where digits = floor(log10(n)) + 1
-        uint256 digits = 0;
-        uint256 temp = n;
-        while (temp >= 10) {
-            temp /= 10;
-            digits++;
-        }
-        // Upper bound: (digits + 1) * ln(10) (always over-estimates)
-        return (digits + 1) * LN_10;
+        // ln(n) = ln(n * WAD) using PRBMath, then +1 wei for conservative upper bound
+        return unwrap(ln(ud(n * WAD))) + 1;
     }
 }

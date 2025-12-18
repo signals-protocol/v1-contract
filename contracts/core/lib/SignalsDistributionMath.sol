@@ -12,13 +12,12 @@ library SignalsDistributionMath {
     using LazyMulSegmentTree for LazyMulSegmentTree.Tree;
 
     uint256 internal constant WAD = 1e18;
-    uint256 internal constant MAX_EXP_INPUT_WAD = 133_084258667509499440; // PRBMath exp domain
     uint256 internal constant MAX_CHUNKS_PER_TX = 100;
     uint256 internal constant OVERFLOW_GUARD_MULTIPLIER = 50e18; // 50 * WAD
 
     /// @notice Maximum safe quantity per chunk to keep exp input within bounds.
     function _maxSafeChunkQuantity(uint256 alpha) private pure returns (uint256) {
-        uint256 raw = alpha.wMul(MAX_EXP_INPUT_WAD);
+        uint256 raw = alpha.wMul(FixedPointMathU.MAX_EXP_INPUT_WAD);
         if (raw == 0) return 0;
         return raw;
     }
@@ -256,7 +255,7 @@ library SignalsDistributionMath {
         uint256 minProgress = (remainingQty + chunksLeft - 1) / chunksLeft;
         if (minProgress == 0) minProgress = 1;
 
-        uint256 maxSafeQuantity = alpha.wMul(MAX_EXP_INPUT_WAD);
+        uint256 maxSafeQuantity = alpha.wMul(FixedPointMathU.MAX_EXP_INPUT_WAD);
         if (currentSum > alpha.wMul(OVERFLOW_GUARD_MULTIPLIER)) {
             maxSafeQuantity = alpha / 10;
         }

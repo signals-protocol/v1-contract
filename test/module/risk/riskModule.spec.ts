@@ -124,49 +124,49 @@ describe("RiskModule", () => {
   });
 
   // ============================================================
-  // lnWadUp Safety: Conservative (over-estimated) ln calculation
+  // lnWadUp Safety: Conservative (PRBMath + 1 wei) ln calculation
   // ============================================================
-  describe("lnWadUp Safety (Phase 7 blocker fix)", () => {
-    it("returns ln(2) for n=2 (exact)", async () => {
+  describe("lnWadUp Safety (PRBMath based)", () => {
+    it("returns ln(2) + 1 wei for n=2", async () => {
       const lnN = await riskModule.lnWad(2n);
-      // ln(2) ≈ 0.693147... WAD, but rounded UP for safety
-      expect(lnN).to.be.closeTo(ethers.parseEther("0.693147180559945310"), 10n);
+      // PRBMath ln(2) ≈ 0.693147... WAD, +1 wei for safety
+      const expectedLn2 = 693147180559945309n; // PRBMath ln(2*WAD)
+      expect(lnN).to.equal(expectedLn2 + 1n);
     });
 
-    it("returns ln(100) for n=100 (rounded up)", async () => {
+    it("returns ln(100) + 1 wei for n=100", async () => {
       const lnN = await riskModule.lnWad(100n);
-      // ln(100) ≈ 4.605170... WAD
-      expect(lnN).to.be.gte(ethers.parseEther("4.605170185988091368"));
+      // PRBMath ln(100*WAD) = 4605170185988091359, +1 wei for safety
+      const expectedLn100 = 4605170185988091359n;
+      expect(lnN).to.equal(expectedLn100 + 1n);
     });
 
-    it("uses next lookup value for non-exact n (over-estimates ln)", async () => {
-      // For n=75, should use ln(100) which over-estimates ln(75)
+    it("returns exact ln(n) + 1 wei for any n (PRBMath precision)", async () => {
+      // For n=75, should use exact PRBMath ln(75) + 1 wei
       const ln75 = await riskModule.lnWad(75n);
       const ln100 = await riskModule.lnWad(100n);
       
-      // lnWadUp(75) should equal lnWadUp(100) since 50 < 75 <= 100
-      expect(ln75).to.equal(ln100);
+      // ln(75) ≈ 4.317... < ln(100) ≈ 4.605...
+      // PRBMath gives exact values, not bucketed
+      expect(ln75).to.be.lt(ln100);
     });
 
-    it("over-estimated ln results in conservative (smaller) αbase", async () => {
+    it("+1 wei ensures conservative (smaller) αbase", async () => {
       const Et = ethers.parseEther("10000");
-      const numBins = 75n; // Will use ln(100) instead of exact ln(75)
+      const numBins = 75n;
       
       // αbase = λ * Et / ln(n)
-      // Over-estimated ln → smaller αbase → more conservative
+      // +1 wei to ln → slightly smaller αbase → conservative
       const alphaBase = await riskModule.calculateAlphaBase(Et, numBins, LAMBDA);
       
-      // Exact ln(75) ≈ 4.317 WAD
-      // Used ln(100) ≈ 4.605 WAD (over-estimated)
-      // This makes αbase smaller (safer)
+      // Exact ln(75) ≈ 4.317 WAD (PRBMath)
+      // Used ln(75) + 1 wei (conservative)
       
-      // If we used exact ln, αbase would be ~695
-      // Using over-estimated ln, αbase should be ~651
       const lnUsed = await riskModule.lnWad(numBins);
       const expectedAlphaBase = (LAMBDA * Et) / lnUsed;
       
       expect(alphaBase).to.equal(expectedAlphaBase);
-      // αbase should be less than if we used exact ln(75)
+      // αbase is conservative due to +1 wei in denominator
       const exactLn75 = ethers.parseEther("4.317488"); // Approximate
       const alphaBaseExact = (LAMBDA * Et) / exactLn75;
       expect(alphaBase).to.be.lt(alphaBaseExact);
