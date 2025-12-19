@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 /// @notice Strategy interface for overlay trade fees applied after core settlement (ported from v0).
 interface IFeePolicy {

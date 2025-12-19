@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import {LazyMulSegmentTree} from "../../modules/trade/lib/LazyMulSegmentTree.sol";
 import {FixedPointMathU} from "../../lib/FixedPointMathU.sol";
 import {SignalsClmsrMath} from "./SignalsClmsrMath.sol";
-import {CE} from "../../errors/CLMSRErrors.sol";
+import {SignalsErrors as SE} from "../../errors/SignalsErrors.sol";
 
 /// @notice CLMSR distribution math (buy/sell cost/proceeds, quantity from cost) over a segment tree.
 library SignalsDistributionMath {
@@ -39,12 +39,10 @@ library SignalsDistributionMath {
 
         uint256 sumBefore = tree.nodes[tree.root].sum;
         uint256 affectedSum = tree.getRangeSum(loBin, hiBin);
-        if (sumBefore == 0) revert CE.TreeNotInitialized();
+        require(sumBefore != 0, SE.TreeNotInitialized());
 
         uint256 requiredChunks = (totalQuantity + maxSafeQuantityPerChunk - 1) / maxSafeQuantityPerChunk;
-        if (requiredChunks > MAX_CHUNKS_PER_TX) {
-            revert CE.ChunkLimitExceeded(requiredChunks, MAX_CHUNKS_PER_TX);
-        }
+        require(requiredChunks <= MAX_CHUNKS_PER_TX, SE.ChunkLimitExceeded(requiredChunks, MAX_CHUNKS_PER_TX));
 
         uint256 cumulativeCostWad;
         uint256 remainingQuantity = totalQuantity;
@@ -74,19 +72,17 @@ library SignalsDistributionMath {
                 factor = quantityScaled.wExp();
             }
 
-            if (currentAffectedSum != 0 && factor > type(uint256).max / currentAffectedSum) {
-                revert CE.MathMulOverflow();
-            }
+            require(currentAffectedSum == 0 || factor <= type(uint256).max / currentAffectedSum, SE.MathMulOverflow());
 
             uint256 newAffectedSum = currentAffectedSum.wMulNearest(factor);
             uint256 sumAfter = currentSumBefore - currentAffectedSum + newAffectedSum;
-            if (sumAfter <= currentSumBefore) revert CE.NonIncreasingSum(currentSumBefore, sumAfter);
+            require(sumAfter > currentSumBefore, SE.NonIncreasingSum(currentSumBefore, sumAfter));
 
             uint256 ratio = sumAfter.wDivUp(currentSumBefore);
             uint256 chunkCost = alpha.wMul(ratio.wLn());
             cumulativeCostWad += chunkCost;
 
-            if (chunkQuantity == 0) revert CE.NoChunkProgress();
+            require(chunkQuantity != 0, SE.NoChunkProgress());
 
             currentSumBefore = sumAfter;
             currentAffectedSum = newAffectedSum;
@@ -94,7 +90,7 @@ library SignalsDistributionMath {
             chunkCount++;
         }
 
-        if (remainingQuantity != 0) revert CE.ResidualQuantity(remainingQuantity);
+        require(remainingQuantity == 0, SE.ResidualQuantity(remainingQuantity));
         return cumulativeCostWad;
     }
 
@@ -106,11 +102,11 @@ library SignalsDistributionMath {
         uint256 quantityWad
     ) private view returns (uint256 cost) {
         uint256 sumBefore = tree.nodes[tree.root].sum;
-        if (sumBefore == 0) revert CE.TreeNotInitialized();
+        require(sumBefore != 0, SE.TreeNotInitialized());
         uint256 quantityScaled = quantityWad.wDiv(alpha);
         uint256 factor = quantityScaled.wExp();
         uint256 affectedSum = tree.getRangeSum(loBin, hiBin);
-        if (affectedSum == 0) revert CE.AffectedSumZero();
+        require(affectedSum != 0, SE.AffectedSumZero());
         if (affectedSum > type(uint256).max / factor) {
             return calculateTradeCost(tree, alpha, loBin, hiBin, quantityWad);
         }
@@ -136,10 +132,10 @@ library SignalsDistributionMath {
 
         uint256 sumBefore = tree.nodes[tree.root].sum;
         uint256 affectedSum = tree.getRangeSum(loBin, hiBin);
-        if (sumBefore == 0) revert CE.TreeNotInitialized();
+        require(sumBefore != 0, SE.TreeNotInitialized());
 
         uint256 requiredChunks = (totalQuantity + maxSafeQuantityPerChunk - 1) / maxSafeQuantityPerChunk;
-        if (requiredChunks > MAX_CHUNKS_PER_TX) revert CE.ChunkLimitExceeded(requiredChunks, MAX_CHUNKS_PER_TX);
+        require(requiredChunks <= MAX_CHUNKS_PER_TX, SE.ChunkLimitExceeded(requiredChunks, MAX_CHUNKS_PER_TX));
 
         uint256 cumulativeProceeds;
         uint256 remainingQuantity = totalQuantity;
@@ -171,20 +167,18 @@ library SignalsDistributionMath {
                 inverseFactor = WAD.wDivUp(factor);
             }
 
-            if (currentAffectedSum != 0 && inverseFactor > type(uint256).max / currentAffectedSum) {
-                revert CE.MathMulOverflow();
-            }
+            require(currentAffectedSum == 0 || inverseFactor <= type(uint256).max / currentAffectedSum, SE.MathMulOverflow());
 
             uint256 newAffectedSum = currentAffectedSum.wMulNearest(inverseFactor);
             uint256 sumAfter = currentSumBefore - currentAffectedSum + newAffectedSum;
-            if (sumAfter == 0) revert CE.SumAfterZero();
+            require(sumAfter != 0, SE.SumAfterZero());
             if (sumBefore <= sumAfter) return 0;
 
             uint256 ratio = currentSumBefore.wDivUp(sumAfter);
             uint256 chunkProceeds = alpha.wMul(ratio.wLn());
             cumulativeProceeds += chunkProceeds;
 
-            if (chunkQuantity == 0) revert CE.NoChunkProgress();
+            require(chunkQuantity != 0, SE.NoChunkProgress());
 
             currentSumBefore = sumAfter;
             currentAffectedSum = newAffectedSum;
@@ -192,7 +186,7 @@ library SignalsDistributionMath {
             chunkCount++;
         }
 
-        if (remainingQuantity != 0) revert CE.ResidualQuantity(remainingQuantity);
+        require(remainingQuantity == 0, SE.ResidualQuantity(remainingQuantity));
         return cumulativeProceeds;
     }
 
@@ -204,20 +198,20 @@ library SignalsDistributionMath {
         uint256 quantityWad
     ) private view returns (uint256 proceeds) {
         uint256 sumBefore = tree.nodes[tree.root].sum;
-        if (sumBefore == 0) revert CE.TreeNotInitialized();
+        require(sumBefore != 0, SE.TreeNotInitialized());
 
         uint256 quantityScaled = quantityWad.wDiv(alpha);
         uint256 factor = quantityScaled.wExp();
         uint256 inverseFactor = WAD.wDivUp(factor);
 
         uint256 affectedSum = tree.getRangeSum(loBin, hiBin);
-        if (affectedSum == 0) revert CE.AffectedSumZero();
+        require(affectedSum != 0, SE.AffectedSumZero());
         if (affectedSum > type(uint256).max / inverseFactor) {
             return calculateSellProceeds(tree, alpha, loBin, hiBin, quantityWad);
         }
 
         uint256 sumAfter = sumBefore - affectedSum + affectedSum.wMulNearest(inverseFactor);
-        if (sumAfter == 0) revert CE.SumAfterZero();
+        require(sumAfter != 0, SE.SumAfterZero());
         if (sumBefore <= sumAfter) return 0;
 
         uint256 ratio = sumBefore.wDivUp(sumAfter);
@@ -234,8 +228,8 @@ library SignalsDistributionMath {
     ) internal view returns (uint256 quantityWad) {
         uint256 sumBefore = tree.nodes[tree.root].sum;
         uint256 affectedSum = tree.getRangeSum(loBin, hiBin);
-        if (sumBefore == 0) revert CE.TreeNotInitialized();
-        if (affectedSum == 0) revert CE.AffectedSumZero();
+        require(sumBefore != 0, SE.TreeNotInitialized());
+        require(affectedSum != 0, SE.AffectedSumZero());
 
         uint256 expValue = SignalsClmsrMath._safeExp(costWad, alpha);
         uint256 targetSumAfter = sumBefore.wMul(expValue);

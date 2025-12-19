@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import "../../lib/FixedPointMathU.sol";
 import "./FeeWaterfallLib.sol";
+import {SignalsErrors as SE} from "../../errors/SignalsErrors.sol";
 
 /**
  * @title VaultAccountingLib
  * @notice Pure math library for LP Vault accounting
- * @dev Implements whitepaper Section 3 formulas:
+ * @dev Formulas:
  *      - N^pre_t = N_{t-1} + Π_t  where Π_t = L_t + F_t + G_t
  *      - P^e_t = N^pre_t / S_{t-1}
  *      - Deposit: (N', S') = (N + D, S + D/P)
@@ -18,19 +19,6 @@ library VaultAccountingLib {
     using FixedPointMathU for uint256;
 
     uint256 internal constant WAD = 1e18;
-
-    // ============================================================
-    // Errors
-    // ============================================================
-    error VaultNotSeeded();
-    error ZeroSharesNotAllowed();
-    error ZeroPriceNotAllowed();
-    error InsufficientShares(uint256 requested, uint256 available);
-    error InsufficientNAV(uint256 requested, uint256 available);
-    /// @notice NAV would go negative after applying P&L (Safety Layer should prevent this)
-    error NAVUnderflow(uint256 navPrev, uint256 loss);
-    /// @notice Pre-batch NAV consistency check failed
-    error PreBatchNavMismatch(uint256 expected, uint256 actual);
 
     // ============================================================
     // Structs
@@ -66,9 +54,8 @@ library VaultAccountingLib {
 
     /**
      * @notice Compute batch price from FeeWaterfallLib result
-     * @dev Phase 6: Uses FeeWaterfallLib.Result.Npre directly and validates invariant
-     *      Invariant: Npre == Nprev + Lt + Ft + Gt
-     * 
+     * @dev Uses FeeWaterfallLib.Result.Npre directly and validates invariant:
+     *      Npre == Nprev + Lt + Ft + Gt
      * @param navPrev Previous NAV N_{t-1} (WAD)
      * @param sharesPrev Previous shares S_{t-1} (WAD)
      * @param lt CLMSR P&L L_t (signed, WAD)
@@ -82,7 +69,7 @@ library VaultAccountingLib {
         int256 lt,
         FeeWaterfallLib.Result memory wf
     ) internal pure returns (uint256 navPre, uint256 batchPrice) {
-        if (sharesPrev == 0) revert ZeroSharesNotAllowed();
+        if (sharesPrev == 0) revert SE.ZeroSharesNotAllowed();
         
         // Validate invariant: Npre == Nprev + Lt + Ft + Gt
         int256 pi = lt + int256(wf.Ft) + int256(wf.Gt);
@@ -91,16 +78,12 @@ library VaultAccountingLib {
             expected = navPrev + uint256(pi);
         } else {
             uint256 loss = uint256(-pi);
-            if (loss > navPrev) {
-                revert NAVUnderflow(navPrev, loss);
-            }
+            if (loss > navPrev) revert SE.NAVUnderflow(navPrev, loss);
             expected = navPrev - loss;
         }
         
         // Consistency check: FeeWaterfallLib.Npre should match our calculation
-        if (wf.Npre != expected) {
-            revert PreBatchNavMismatch(expected, wf.Npre);
-        }
+        if (wf.Npre != expected) revert SE.PreBatchNavMismatch(expected, wf.Npre);
         
         navPre = wf.Npre;
         batchPrice = navPre.wDiv(sharesPrev);
@@ -110,10 +93,9 @@ library VaultAccountingLib {
      * @notice Compute pre-batch NAV and batch price
      * @dev N^pre_t = N_{t-1} + L_t + F_t + G_t
      *      P^e_t = N^pre_t / S_{t-1}
-     * 
-     *      Per whitepaper Section 3: Safety Layer should ensure NAV never goes negative
-     *      via Backstop Grants (G_t). If NAV would go negative, this reverts with NAVUnderflow.
-     * 
+     *
+     *      Safety Layer ensures NAV never goes negative via Backstop Grants (G_t).
+     *      If NAV would go negative, this reverts with NAVUnderflow.
      * @param inputs Pre-batch inputs
      * @return result Pre-batch NAV and price
      */
@@ -126,17 +108,16 @@ library VaultAccountingLib {
             result.navPre = inputs.navPrev + uint256(pi);
         } else {
             uint256 loss = uint256(-pi);
-            // Per whitepaper: Safety Layer must prevent NAV from going negative
-            // If this happens, it indicates a Safety Layer failure - revert rather than silently clamp
+            // Safety Layer must prevent NAV from going negative - revert if violated
             if (loss > inputs.navPrev) {
-                revert NAVUnderflow(inputs.navPrev, loss);
+                revert SE.NAVUnderflow(inputs.navPrev, loss);
             }
             result.navPre = inputs.navPrev - loss;
         }
 
         // P^e_t = N^pre_t / S_{t-1}
         if (inputs.sharesPrev == 0) {
-            revert ZeroSharesNotAllowed();
+            revert SE.ZeroSharesNotAllowed();
         }
         result.batchPrice = result.navPre.wDiv(inputs.sharesPrev);
     }
@@ -165,7 +146,7 @@ library VaultAccountingLib {
             uint256 loss = uint256(-pi);
             // For seeding, NAV underflow should never happen, but revert if it does
             if (loss > navPrev) {
-                revert NAVUnderflow(navPrev, loss);
+                revert SE.NAVUnderflow(navPrev, loss);
             }
             navPre = navPrev - loss;
         }
@@ -179,13 +160,9 @@ library VaultAccountingLib {
 
     /**
      * @notice Apply deposit to vault state
-     * @dev Per whitepaper Appendix C (b1):
-     *      S_mint = floor(A / P)
-     *      A_used = S_mint * P
-     *      Residual A - A_used is refunded (handled by caller)
-     * 
+     * @dev S_mint = floor(A / P), A_used = S_mint * P
+     *      Residual A - A_used is refunded (handled by caller).
      *      This preserves N'/S' = P within 1 wei tolerance.
-     * 
      * @param nav Current NAV (WAD)
      * @param shares Current shares (WAD)
      * @param price Batch price P (WAD)
@@ -201,7 +178,7 @@ library VaultAccountingLib {
         uint256 price,
         uint256 depositAmount
     ) internal pure returns (uint256 newNav, uint256 newShares, uint256 mintedShares, uint256 refundAmount) {
-        if (price == 0) revert ZeroPriceNotAllowed();
+        if (price == 0) revert SE.ZeroPriceNotAllowed();
         
         // S_mint = floor(A / P) - round down shares to favor protocol
         mintedShares = depositAmount.wDiv(price);
@@ -215,7 +192,7 @@ library VaultAccountingLib {
         // S' = S + S_mint
         newShares = shares + mintedShares;
         
-        // Refund = A - A_used (at most 1 wei per whitepaper)
+        // Refund = A - A_used (at most 1 wei due to rounding)
         refundAmount = depositAmount - amountUsed;
     }
 
@@ -241,7 +218,7 @@ library VaultAccountingLib {
         uint256 withdrawShares
     ) internal pure returns (uint256 newNav, uint256 newShares, uint256 withdrawAmount) {
         if (withdrawShares > shares) {
-            revert InsufficientShares(withdrawShares, shares);
+            revert SE.InsufficientShares(withdrawShares, shares);
         }
         
         // W = x · P (amount to pay out)
@@ -249,7 +226,7 @@ library VaultAccountingLib {
         withdrawAmount = withdrawShares.wMul(price);
         
         if (withdrawAmount > nav) {
-            revert InsufficientNAV(withdrawAmount, nav);
+            revert SE.InsufficientNAV(withdrawAmount, nav);
         }
         
         // N'' = N - x·P

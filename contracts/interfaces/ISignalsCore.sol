@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 interface ISignalsCore {
     struct Market {
@@ -7,7 +7,7 @@ interface ISignalsCore {
         bool isActive;
         bool settled;
         bool snapshotChunksDone;
-        bool failed; // Phase 7: oracle failure marked
+        bool failed; // Oracle failure marked
         uint32 numBins;
         uint32 openPositionCount;
         uint32 snapshotChunkCursor;
@@ -29,22 +29,21 @@ interface ISignalsCore {
         // policy
         address feePolicy;
 
-        // Phase 6: Fee tracking and P&L calculation
+        // Fee tracking and P&L calculation
         // Initial root sum for P&L calculation: C_start = α * ln(Z_start)
         uint256 initialRootSum;
-        // Gross fees collected from trades, stored in WAD units (Phase 6)
+        // Gross fees collected from trades, stored in WAD units
         uint256 accumulatedFees;
 
-        // Phase 7: Prior-based ΔEₜ calculation
+        // Prior-based ΔEₜ calculation
         // minFactor = min(baseFactors) at market creation (WAD)
         // Used to compute ΔEₜ = α * ln(rootSum / (n * minFactor))
         // Uniform prior: minFactor = 1 WAD → ΔEₜ = 0
         uint256 minFactor;
 
-        // Phase 7: Tail budget (ΔEₜ) calculated at market creation (WAD)
-        // Per whitepaper v2: ΔEₜ := E_ent(q₀,t) - αₜ ln n
+        // Tail budget (ΔEₜ) calculated at market creation (WAD)
+        // ΔEₜ := E_ent(q₀,t) - αₜ ln n
         // Used in batch processing: grantNeed > ΔEₜ → revert
-        // Stored at creation to avoid re-computation and ensure consistency
         uint256 deltaEt;
     }
 

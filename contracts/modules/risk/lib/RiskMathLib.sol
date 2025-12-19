@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import "../../../lib/FixedPointMathU.sol";
+import {SignalsErrors as SE} from "../../../errors/SignalsErrors.sol";
 
 /// @title RiskMathLib
 /// @notice Core risk calculation library for Signals Protocol
-/// @dev Implements whitepaper v2 Sec 4.1-4.5:
+/// @dev Implements:
 ///      - ΔEₜ (tail budget) calculation from prior
 ///      - αbase/αlimit calculation with drawdown
 ///      - Prior admissibility check
@@ -16,36 +17,20 @@ library RiskMathLib {
     using FixedPointMathU for uint256;
 
     // ============================================================
-    // Errors
-    // ============================================================
-
-    /// @notice Invalid number of bins (must be > 1)
-    error InvalidNumBins(uint256 numBins);
-
-    /// @notice Prior not admissible: ΔEₜ > B^eff_{t-1}
-    error PriorNotAdmissible(uint256 deltaEt, uint256 effectiveBackstop);
-
-    /// @notice Market α exceeds safety limit
-    error AlphaExceedsLimit(uint256 alpha, uint256 limit);
-
-    // ============================================================
     // Constants
     // ============================================================
 
     uint256 internal constant WAD = 1e18;
 
     // ============================================================
-    // ΔEₜ (Tail Budget) Calculation - WP v2 Sec 4.1
+    // ΔEₜ (Tail Budget) Calculation
     // ============================================================
 
     /**
      * @notice Calculate tail budget ΔEₜ from prior factors
-     * @dev Per whitepaper v2 Eq. 4.1:
-     *      ΔEₜ = α * ln(rootSum / (n * minFactor))
-     *      
+     * @dev ΔEₜ = α * ln(rootSum / (n * minFactor))
      *      Uniform prior (all factors equal) → ΔEₜ = 0
      *      Concentrated prior (factors vary) → ΔEₜ > 0
-     * 
      * @param alpha Market liquidity parameter α (WAD)
      * @param numBins Number of outcome bins n
      * @param baseFactors Prior factor weights
@@ -113,17 +98,13 @@ library RiskMathLib {
     }
 
     // ============================================================
-    // α Safety Bounds - WP v2 Sec 4.3-4.5
+    // α Safety Bounds
     // ============================================================
 
     /**
      * @notice Calculate αbase from NAV and bins
-     * @dev Per whitepaper v2 Eq. 4.9:
-     *      αbase,t = λ * E_t / ln(n)
-     *      where E_t = N_{t-1} (vault NAV from previous batch)
-     * 
-     *      This ensures uniform-prior worst-case loss ≤ λ * E_t
-     * 
+     * @dev αbase,t = λ * E_t / ln(n), where E_t = vault NAV.
+     *      Ensures uniform-prior worst-case loss ≤ λ * E_t
      * @param Et Vault NAV (WAD)
      * @param numBins Number of outcome bins n
      * @param lambda Safety parameter λ (WAD, e.g., 0.3 = 30% max drawdown)
@@ -134,7 +115,7 @@ library RiskMathLib {
         uint256 numBins,
         uint256 lambda
     ) internal pure returns (uint256 alphaBase) {
-        if (numBins <= 1) revert InvalidNumBins(numBins);
+        if (numBins <= 1) revert SE.InvalidNumBins(numBins);
         
         // Use safe (upward-rounded) ln to ensure conservative α_base
         uint256 lnN = FixedPointMathU.lnWadUp(numBins);
@@ -146,10 +127,8 @@ library RiskMathLib {
 
     /**
      * @notice Calculate αlimit from αbase and drawdown
-     * @dev Per whitepaper v2 Eq. 4.15:
-     *      αlimit,t+1 = max{0, αbase,t+1 * (1 - k * DD_t)}
+     * @dev αlimit,t+1 = max{0, αbase,t+1 * (1 - k * DD_t)}
      *      where DD_t = 1 - P_t / P^peak_t
-     * 
      * @param alphaBase Base liquidity parameter (WAD)
      * @param drawdown Current drawdown DD_t (WAD, 0 to WAD)
      * @param k Drawdown sensitivity factor (WAD, typically 1.0)
@@ -174,10 +153,7 @@ library RiskMathLib {
 
     /**
      * @notice Calculate drawdown from current price and peak
-     * @dev Per whitepaper v2:
-     *      DD_t = 1 - P_t / P^peak_t
-     *      Returns 0 if price >= peak or peak == 0
-     * 
+     * @dev DD_t = 1 - P_t / P^peak_t. Returns 0 if price >= peak.
      * @param price Current price (WAD)
      * @param pricePeak Peak price (WAD)
      * @return drawdown Drawdown ratio (WAD, 0 to WAD)
@@ -193,14 +169,12 @@ library RiskMathLib {
     }
 
     // ============================================================
-    // Prior Admissibility - WP v2 Sec 4.1
+    // Prior Admissibility
     // ============================================================
 
     /**
      * @notice Check if prior is admissible
-     * @dev Per whitepaper v2: ΔEₜ ≤ B^eff_{t-1}
-     *      Reverts with PriorNotAdmissible if violated
-     * 
+     * @dev Invariant: ΔEₜ ≤ B^eff_{t-1}. Reverts if violated.
      * @param deltaEt Tail budget from prior (WAD)
      * @param effectiveBackstop Effective backstop budget B^eff (WAD)
      */
@@ -209,7 +183,7 @@ library RiskMathLib {
         uint256 effectiveBackstop
     ) internal pure {
         if (deltaEt > effectiveBackstop) {
-            revert PriorNotAdmissible(deltaEt, effectiveBackstop);
+            revert SE.PriorNotAdmissible(deltaEt, effectiveBackstop);
         }
     }
 
@@ -225,7 +199,7 @@ library RiskMathLib {
         uint256 alphaLimit
     ) internal pure {
         if (alpha > alphaLimit) {
-            revert AlphaExceedsLimit(alpha, alphaLimit);
+            revert SE.AlphaExceedsLimit(alpha, alphaLimit);
         }
     }
 

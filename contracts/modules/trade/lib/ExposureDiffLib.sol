@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
+
+import {SignalsErrors as SE} from "../../../errors/SignalsErrors.sol";
 
 /**
  * @title ExposureDiffLib
@@ -37,8 +39,8 @@ library ExposureDiffLib {
         int256 delta,
         uint32 numBins
     ) internal {
-        require(lo <= hi, "ExposureDiff: invalid range");
-        require(hi < numBins, "ExposureDiff: bin out of bounds");
+        if (lo > hi) revert SE.ExposureDiffInvalidRange(int256(uint256(lo)), int256(uint256(hi)));
+        if (hi >= numBins) revert SE.ExposureDiffBinOutOfBounds(int256(uint256(hi)), numBins);
         
         // Add delta at lo
         diff[lo] += delta;
@@ -67,7 +69,7 @@ library ExposureDiffLib {
         }
         
         // Exposure must be non-negative (invariant check)
-        require(sum >= 0, "ExposureDiff: negative exposure");
+        if (sum < 0) revert SE.ExposureDiffNegativeExposure(int256(uint256(bin)), sum);
         
         return uint256(sum);
     }

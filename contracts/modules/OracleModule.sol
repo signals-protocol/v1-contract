@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import "../core/storage/SignalsCoreStorage.sol";
-import "../errors/ModuleErrors.sol";
-import "../errors/CLMSRErrors.sol";
+import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
 import "@redstone-finance/evm-connector/contracts/data-services/PrimaryProdDataServiceConsumerBase.sol";
 
 /// @title OracleModule
-/// @notice Delegate-only oracle module with Redstone signed-pull oracle (WP v2 Sec 7)
+/// @notice Delegate-only oracle module with Redstone signed-pull oracle
 /// @dev Implements:
 ///      - Redstone signed-pull oracle verification (v0 compatible)
 ///      - Closest-sample selection: |priceTimestamp - Tset| minimum, tie-break to past
@@ -17,7 +16,7 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
     address private immutable self;
 
     modifier onlyDelegated() {
-        if (address(this) == self) revert ModuleErrors.NotDelegated();
+        if (address(this) == self) revert SE.NotDelegated();
         _;
     }
 
@@ -77,25 +76,25 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
     // Settlement Submission (Redstone Signed-Pull)
     // ============================================================
 
-    /// @notice Submit settlement sample with Redstone signed-pull oracle (WP v2 Sec 7.4)
+    /// @notice Submit settlement sample with Redstone signed-pull oracle
     /// @dev Permissionless during SettlementOpen window. Price/timestamp extracted from
-    ///      Redstone payload in calldata. Signatures verified on-chain via PrimaryProdDataServiceConsumerBase.
+    ///      Redstone payload in calldata. Signatures verified on-chain.
     ///      Closest-sample selection: |priceTimestamp - Tset| minimum, tie-break to past
     /// @param marketId Market to submit settlement for
     function submitSettlementSample(
         uint256 marketId
     ) external onlyDelegated {
         ISignalsCore.Market storage market = markets[marketId];
-        if (market.numBins == 0) revert CE.MarketNotFound(marketId);
-        if (market.settled) revert CE.MarketAlreadySettled(marketId);
-        if (market.failed) revert CE.MarketAlreadyFailed(marketId);
+        require(market.numBins != 0, SE.MarketNotFound(marketId));
+        require(!market.settled, SE.MarketAlreadySettled(marketId));
+        require(!market.failed, SE.MarketAlreadyFailed(marketId));
 
         uint64 tSet = market.settlementTimestamp;
         uint64 nowTs = uint64(block.timestamp);
 
-        // WP v2: SettlementOpen = [Tset, Tset + Δsettle)
-        if (nowTs < tSet) revert CE.OracleSampleTooEarly(tSet, nowTs);
-        if (nowTs >= tSet + settlementSubmitWindow) revert CE.SettlementWindowClosed();
+        // SettlementOpen = [Tset, Tset + Δsettle)
+        require(nowTs >= tSet, SE.OracleSampleTooEarly(tSet, nowTs));
+        require(nowTs < tSet + settlementSubmitWindow, SE.SettlementWindowClosed());
 
         // Extract price and timestamp from Redstone payload in calldata
         // PrimaryProdDataServiceConsumerBase validates signatures and unique signer threshold
@@ -104,22 +103,18 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
         uint64 priceTimestamp = uint64(timestampMs / 1000);
 
         // δfuture check: reject future-dated samples
-        if (priceTimestamp > nowTs + futureTolerance) {
-            revert CE.OracleSampleInFuture(priceTimestamp, nowTs);
-        }
+        require(priceTimestamp <= nowTs + futureTolerance, SE.OracleSampleInFuture(priceTimestamp, nowTs));
 
         // Δmax check: |priceTimestamp - Tset| ≤ maxSampleDistance
         uint64 distance = priceTimestamp >= tSet
             ? priceTimestamp - tSet
             : tSet - priceTimestamp;
-        if (maxSampleDistance > 0 && distance > maxSampleDistance) {
-            revert CE.OracleSampleTooFarFromTset(distance, maxSampleDistance);
-        }
+        require(maxSampleDistance == 0 || distance <= maxSampleDistance, SE.OracleSampleTooFarFromTset(distance, maxSampleDistance));
 
         // Convert price to settlementValue (scale from feedDecimals to 6 decimals)
         int256 settlementValue = _convertPriceToSettlementValue(price);
 
-        // Closest-sample selection (WP v2 Sec 7.4)
+        // Closest-sample selection: prefer sample closest to Tset
         _updateCandidate(marketId, settlementValue, priceTimestamp, tSet);
 
         emit SettlementPriceSubmitted(marketId, settlementValue, priceTimestamp, msg.sender);
@@ -127,7 +122,7 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
 
 
     // ============================================================
-    // Closest-Sample Selection (WP v2 Sec 7.4)
+    // Closest-Sample Selection
     // ============================================================
 
     /// @dev Update candidate using closest-sample rule
@@ -186,7 +181,7 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
         returns (int256 price, uint64 priceTimestamp)
     {
         SettlementOracleState storage state = settlementOracleState[marketId];
-        if (state.candidatePriceTimestamp == 0) revert CE.SettlementOracleCandidateMissing();
+        require(state.candidatePriceTimestamp != 0, SE.SettlementOracleCandidateMissing());
         price = state.candidateValue;
         priceTimestamp = state.candidatePriceTimestamp;
     }
@@ -195,7 +190,7 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
     /// @return state 0=Trading, 1=SettlementOpen, 2=PendingOps, 3=FinalizedPrimary, 4=FinalizedSecondary, 5=FailedPendingManual
     function getMarketState(uint256 marketId) external view returns (uint8 state) {
         ISignalsCore.Market storage market = markets[marketId];
-        if (market.numBins == 0) revert CE.MarketNotFound(marketId);
+        require(market.numBins != 0, SE.MarketNotFound(marketId));
         
         if (market.settled) {
             return market.failed ? 4 : 3; // FinalizedSecondary or FinalizedPrimary
@@ -221,7 +216,7 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
         uint64 claimOpen
     ) {
         ISignalsCore.Market storage market = markets[marketId];
-        if (market.numBins == 0) revert CE.MarketNotFound(marketId);
+        require(market.numBins != 0, SE.MarketNotFound(marketId));
         
         tSet = market.settlementTimestamp;
         settleEnd = tSet + settlementSubmitWindow;
@@ -241,13 +236,13 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
             // Scale up if feed has fewer decimals
             uint256 scaleFactor = 10 ** uint256(6 - redstoneFeedDecimals);
             uint256 scaled = price * scaleFactor;
-            require(scaled <= uint256(type(int256).max), "PriceOverflow");
+            if (scaled > uint256(type(int256).max)) revert SE.PriceOverflow(scaled);
             return int256(scaled);
         } else {
             // Scale down if feed has more decimals
             uint256 scaleDivisor = 10 ** uint256(redstoneFeedDecimals - 6);
             uint256 scaled = price / scaleDivisor;
-            require(scaled <= uint256(type(int256).max), "PriceOverflow");
+            if (scaled > uint256(type(int256).max)) revert SE.PriceOverflow(scaled);
             return int256(scaled);
         }
     }

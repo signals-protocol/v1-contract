@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "../errors/SignalsErrors.sol";
 
 /// @title SignalsLPShare
 /// @notice ERC-4626 compliant LP share token for Signals Protocol
@@ -17,24 +18,15 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 ///
 ///      The vault is the SignalsCore contract which holds actual NAV.
 ///      This token represents claims on the vault.
-contract SignalsLPShare is ERC20, ERC20Permit, Ownable {
+contract SignalsLPShare is ERC20, ERC20Permit, SignalsErrors, Ownable {
     /// @notice The SignalsCore contract that manages the vault
     address public immutable core;
     
     /// @notice The underlying asset (payment token, e.g., USDC)
     address public immutable asset;
 
-    /// @notice Only SignalsCore can mint/burn shares
-    error OnlyCore();
-    
-    /// @notice Async vault - direct deposit not supported
-    error AsyncVaultUseRequestDeposit();
-    
-    /// @notice Async vault - direct withdraw not supported  
-    error AsyncVaultUseRequestWithdraw();
-
     modifier onlyCore() {
-        if (msg.sender != core) revert OnlyCore();
+        if (msg.sender != core) revert SignalsErrors.OnlyCore();
         _;
     }
 
@@ -128,22 +120,22 @@ contract SignalsLPShare is ERC20, ERC20Permit, Ownable {
 
     /// @notice Standard deposit not supported - use requestDeposit on Core
     function deposit(uint256, address) external pure returns (uint256) {
-        revert AsyncVaultUseRequestDeposit();
+        revert SignalsErrors.AsyncVaultUseRequestDeposit();
     }
 
     /// @notice Standard mint not supported - use requestDeposit on Core
     function mintShares(uint256, address) external pure returns (uint256) {
-        revert AsyncVaultUseRequestDeposit();
+        revert SignalsErrors.AsyncVaultUseRequestDeposit();
     }
 
     /// @notice Standard withdraw not supported - use requestWithdraw on Core
     function withdraw(uint256, address, address) external pure returns (uint256) {
-        revert AsyncVaultUseRequestWithdraw();
+        revert SignalsErrors.AsyncVaultUseRequestWithdraw();
     }
 
     /// @notice Standard redeem not supported - use requestWithdraw on Core
     function redeem(uint256, address, address) external pure returns (uint256) {
-        revert AsyncVaultUseRequestWithdraw();
+        revert SignalsErrors.AsyncVaultUseRequestWithdraw();
     }
 
     // ============================================================

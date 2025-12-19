@@ -1,48 +1,26 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import "../core/storage/SignalsCoreStorage.sol";
 import "../lib/FixedPointMathU.sol";
 import "./risk/lib/RiskMathLib.sol";
-import "../errors/ModuleErrors.sol";
+import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
 
 /// @title RiskModule
-/// @notice Delegate-only module for Risk calculations AND enforcement (Phase 8)
-/// @dev Implements whitepaper v2 Sec 4.1-4.5:
+/// @notice Delegate-only module for Risk calculations and enforcement
+/// @dev Implements:
 ///      - ΔEₜ (tail budget) calculation from prior
 ///      - αbase/αlimit calculation with drawdown
 ///      - Prior admissibility check
 ///
-///      Phase 8: Core-first Risk Gate Architecture
-///      This module now provides BOTH calculations AND enforcement via gate functions.
+///      Core-first Risk Gate Architecture:
+///      This module provides BOTH calculations AND enforcement via gate functions.
 ///      SignalsCore calls gate* functions BEFORE delegating to target modules.
-///      This ensures:
-///      - Bypass-proof enforcement (Core always calls gate first)
-///      - Clear single point of risk validation
-///      - Testable call-order via mock modules
+///      This ensures bypass-proof enforcement and clear single point of risk validation.
 contract RiskModule is SignalsCoreStorage {
     using FixedPointMathU for uint256;
 
     address private immutable self;
-
-    // ============================================================
-    // Errors
-    // ============================================================
-
-    /// @notice Invalid number of bins (must be > 1)
-    error InvalidNumBins(uint256 numBins);
-
-    /// @notice Market α exceeds safety limit
-    error AlphaExceedsLimit(uint256 alpha, uint256 limit);
-
-    /// @notice Prior not admissible: ΔEₜ > B^eff_{t-1}
-    error PriorNotAdmissible(uint256 deltaEt, uint256 effectiveBackstop);
-
-    /// @notice Single trade quantity exceeds per-ticket cap (Phase 9)
-    error PerTicketCapExceeded(uint128 quantity, uint128 cap);
-
-    /// @notice Account total exposure exceeds per-account cap (Phase 9)
-    error PerAccountCapExceeded(uint256 totalExposure, uint256 cap);
 
     // ============================================================
     // Constants
@@ -55,7 +33,7 @@ contract RiskModule is SignalsCoreStorage {
     // ============================================================
 
     modifier onlyDelegated() {
-        if (address(this) == self) revert ModuleErrors.NotDelegated();
+        if (address(this) == self) revert SE.NotDelegated();
         _;
     }
 
@@ -64,18 +42,17 @@ contract RiskModule is SignalsCoreStorage {
     }
 
     // ============================================================
-    // ΔEₜ (Tail Budget) Calculation - WP v2 Sec 4.1
+    // ΔEₜ (Tail Budget) Calculation
     // ============================================================
 
     /**
      * @notice Calculate tail budget ΔEₜ from prior concentration
-     * @dev Per whitepaper v2 Eq. 4.1:
-     *      E_ent(q₀,t) = C(q₀,t) - min_j q₀,t,j  (entropy budget)
+     * @dev E_ent(q₀,t) = C(q₀,t) - min_j q₀,t,j  (entropy budget)
      *      ΔEₜ := E_ent(q₀,t) - α ln n           (tail budget)
-     * 
+     *
      *      For uniform prior (q₀ = 0): E_ent = α ln n, so ΔEₜ = 0
      *      For concentrated prior: E_ent > α ln n, so ΔEₜ > 0
-     * 
+     *
      * @param alpha Market liquidity parameter α (WAD)
      * @param numBins Number of outcome bins n
      * @param priorConcentration Measure of prior concentration (WAD)
@@ -87,7 +64,7 @@ contract RiskModule is SignalsCoreStorage {
         uint256 numBins,
         uint256 priorConcentration
     ) external pure returns (uint256 deltaEt) {
-        if (numBins <= 1) revert InvalidNumBins(numBins);
+        if (numBins <= 1) revert SE.InvalidNumBins(numBins);
         
         // For uniform prior (concentration = 0), ΔEₜ = 0
         if (priorConcentration == 0) {
@@ -116,7 +93,7 @@ contract RiskModule is SignalsCoreStorage {
     }
 
     // ============================================================
-    // α Safety Bounds - WP v2 Sec 4.3-4.5
+    // α Safety Bounds
     // ============================================================
 
     /**
@@ -172,14 +149,12 @@ contract RiskModule is SignalsCoreStorage {
     }
 
     // ============================================================
-    // Prior Admissibility - WP v2 Sec 4.1
+    // Prior Admissibility
     // ============================================================
 
     /**
      * @notice Check if prior is admissible
-     * @dev Per whitepaper v2: ΔEₜ ≤ B^eff_{t-1}
-     *      If violated, reverts with Risk_PriorNotAdmissible
-     * 
+     * @dev Invariant: ΔEₜ ≤ B^eff_{t-1}. Reverts if violated.
      * @param deltaEt Tail budget from prior (WAD)
      * @param effectiveBackstop Effective backstop budget B^eff (WAD)
      */
@@ -188,7 +163,7 @@ contract RiskModule is SignalsCoreStorage {
         uint256 effectiveBackstop
     ) external pure {
         if (deltaEt > effectiveBackstop) {
-            revert PriorNotAdmissible(deltaEt, effectiveBackstop);
+            revert SE.PriorNotAdmissible(deltaEt, effectiveBackstop);
         }
     }
 
@@ -207,16 +182,15 @@ contract RiskModule is SignalsCoreStorage {
     }
 
     // ============================================================
-    // Phase 8: Gate Functions (Enforcement)
+    // Gate Functions (Enforcement)
     // ============================================================
 
     /**
      * @notice Gate for market creation - validates α limit and prior admissibility
      * @dev Called by SignalsCore BEFORE MarketLifecycleModule.createMarket
-     *      Calculates ΔEₜ from baseFactors internally (no calculation in Core)
-     *      Per WP v2:
-     *      - αlimit,t+1 = max{0, αbase,t+1 * (1 - k * DD_t)}
-     *      - ΔEₜ ≤ B^eff_{t-1} (prior admissibility)
+     *      Calculates ΔEₜ from baseFactors internally.
+     *      Enforces: αlimit,t+1 = max{0, αbase,t+1 * (1 - k * DD_t)}
+     *      Enforces: ΔEₜ ≤ B^eff_{t-1} (prior admissibility)
      * @param liquidityParameter Market α to validate (WAD)
      * @param numBins Number of outcome bins
      * @param baseFactors Prior factor weights (passed from Core, calculation done here)
@@ -251,8 +225,7 @@ contract RiskModule is SignalsCoreStorage {
 
     /**
      * @notice Gate for position open - validates exposure caps
-     * @dev Phase 9 (DEFERRED): perTicketCap and perAccountCap enforcement
-     *      Currently no-op - exposure cap implementation is pending
+     * @dev Currently no-op. Exposure cap enforcement to be implemented.
      * @param marketId Market ID
      * @param trader Trader address
      * @param quantity Position quantity
@@ -262,7 +235,7 @@ contract RiskModule is SignalsCoreStorage {
         address trader,
         uint128 quantity
     ) external view onlyDelegated {
-        // Phase 9 deferred: exposure cap enforcement pending
+        // Exposure cap enforcement pending implementation
         // Silence unused parameter warnings
         marketId;
         trader;
@@ -271,8 +244,7 @@ contract RiskModule is SignalsCoreStorage {
 
     /**
      * @notice Gate for position increase - validates exposure caps
-     * @dev Phase 9 (DEFERRED): perTicketCap and perAccountCap enforcement
-     *      Currently no-op - exposure cap implementation is pending
+     * @dev Currently no-op. Exposure cap enforcement to be implemented.
      * @param positionId Position ID
      * @param trader Trader address
      * @param additionalQuantity Additional quantity
@@ -282,7 +254,7 @@ contract RiskModule is SignalsCoreStorage {
         address trader,
         uint128 additionalQuantity
     ) external view onlyDelegated {
-        // Phase 9 deferred: exposure cap enforcement pending
+        // Exposure cap enforcement pending implementation
         // Silence unused parameter warnings
         positionId;
         trader;
@@ -315,7 +287,7 @@ contract RiskModule is SignalsCoreStorage {
         
         // Enforce: α ≤ αlimit (using RiskMathLib error)
         if (liquidityParameter > alphaLimit) {
-            revert AlphaExceedsLimit(liquidityParameter, alphaLimit);
+            revert SE.AlphaExceedsLimit(liquidityParameter, alphaLimit);
         }
     }
 
@@ -327,7 +299,7 @@ contract RiskModule is SignalsCoreStorage {
     function _enforcePriorAdmissibility(uint256 deltaEt) internal view {
         uint256 effectiveBackstop = capitalStack.backstopNav;
         if (deltaEt > effectiveBackstop) {
-            revert PriorNotAdmissible(deltaEt, effectiveBackstop);
+            revert SE.PriorNotAdmissible(deltaEt, effectiveBackstop);
         }
     }
 

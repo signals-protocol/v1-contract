@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import "../modules/trade/lib/LazyMulSegmentTree.sol";
 import "../core/lib/SignalsClmsrMath.sol";
 import "../core/lib/SignalsDistributionMath.sol";
+import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
 
 /// @notice Harness for CLMSR math: initializes a tree from bins and exposes quote helpers.
 /// @dev Uses the same LazyMulSegmentTree/SignalsDistributionMath stack that will back TradeModule,
@@ -15,7 +16,7 @@ contract ClmsrMathHarness {
 
     /// @notice Seed the tree with explicit bin factors.
     function seed(uint256[] memory factors) external {
-        if (factors.length == 0) revert("EMPTY_FACTORS");
+        if (factors.length == 0) revert SE.EmptyFactors();
         // reset just in case the harness is re-used
         tree.size = 0;
         tree.root = 0;

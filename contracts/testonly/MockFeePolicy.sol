@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import "../interfaces/IFeePolicy.sol";
 
@@ -15,11 +15,11 @@ contract MockFeePolicy is IFeePolicy {
         feeAmount = (params.baseAmount * bps) / 10_000;
     }
 
-    function name() external view returns (string memory) {
+    function name() external pure returns (string memory) {
         return "MockFeePolicy";
     }
 
-    function descriptor() external view returns (string memory) {
+    function descriptor() external pure returns (string memory) {
         return "{\"policy\":\"mock-bps\"}";
     }
 }

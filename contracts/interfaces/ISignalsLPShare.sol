@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 /// @title ISignalsLPShare
 /// @notice Interface for LP Share token (ERC-20 + ERC-4626 compatible)

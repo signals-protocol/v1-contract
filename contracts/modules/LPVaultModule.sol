@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import "../core/storage/SignalsCoreStorage.sol";
 import "../vault/lib/VaultAccountingLib.sol";
 import "../vault/lib/FeeWaterfallLib.sol";
 import "../lib/FixedPointMathU.sol";
-import "../errors/ModuleErrors.sol";
-import "../errors/CLMSRErrors.sol";
+import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
 import "../interfaces/ISignalsLPShare.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -26,8 +25,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  * 2. Request recorded with eligibleBatchId (D_lag applied for withdrawals)
  * 3. processDailyBatch(batchId) processes pre-aggregated totals
  * 4. User calls claimDeposit/claimWithdraw to receive shares/assets
- *
- * References: whitepaper Section 3, 4.3-4.6
  */
 contract LPVaultModule is SignalsCoreStorage {
     using SafeERC20 for IERC20;
@@ -83,27 +80,10 @@ contract LPVaultModule is SignalsCoreStorage {
     address public constant DEAD_ADDRESS = address(1);
 
     // ============================================================
-    // Errors
-    // ============================================================
-    error VaultNotSeeded();
-    error VaultAlreadySeeded();
-    error InsufficientSeedAmount(uint256 provided, uint256 required);
-    error ZeroAmount();
-    error BatchNotReady(uint64 batchId);
-    error BatchNotEnded(uint64 batchId, uint64 batchEndTime, uint64 currentTime);
-    error DailyBatchAlreadyProcessed(uint64 batchId);
-    error RequestNotFound(uint64 requestId);
-    error RequestNotOwned(uint64 requestId, address owner, address caller);
-    error RequestNotPending(uint64 requestId);
-    error BatchNotProcessed(uint64 batchId);
-    /// @notice Withdrawal would reduce total shares below minimum (HIGH-02 fix)
-    error WithdrawalWouldBrickVault(uint256 totalSharesAfter, uint256 minRequired);
-
-    // ============================================================
     // Modifiers
     // ============================================================
     modifier onlyDelegated() {
-        if (address(this) == self) revert ModuleErrors.NotDelegated();
+        if (address(this) == self) revert SE.NotDelegated();
         _;
     }
 
@@ -122,15 +102,12 @@ contract LPVaultModule is SignalsCoreStorage {
      * @param seedAmount Initial deposit amount (6 decimals)
      */
     function seedVault(uint256 seedAmount) external onlyDelegated {
-        if (lpVault.isSeeded) revert VaultAlreadySeeded();
-        if (seedAmount < minSeedAmount) {
-            revert InsufficientSeedAmount(seedAmount, minSeedAmount);
-        }
+        if (lpVault.isSeeded) revert SE.VaultAlreadySeeded();
+        if (seedAmount < minSeedAmount) revert SE.InsufficientSeedAmount(seedAmount, minSeedAmount);
 
         paymentToken.safeTransferFrom(msg.sender, address(this), seedAmount);
 
-        // Phase 6: Convert 6-decimal token amount to WAD (18) for internal accounting
-        // WP v2 Sec 6.2: "Internal state uses WAD; conversion at entry/exit"
+        // Convert 6-decimal token amount to WAD (18) for internal accounting
         uint256 seedAmountWad = seedAmount.toWad();
         
         lpVault.nav = seedAmountWad;
@@ -145,7 +122,7 @@ contract LPVaultModule is SignalsCoreStorage {
         // This ensures totalShares > MIN_DEAD_SHARES always after seeding
         uint256 seederShares = seedAmountWad - MIN_DEAD_SHARES;
         
-        // Phase 10: Mint LP share tokens (seeder gets all except dead shares)
+        // Mint LP share tokens (seeder gets all except dead shares)
         if (lpShareToken != address(0)) {
             ISignalsLPShare(lpShareToken).mint(msg.sender, seederShares);
             ISignalsLPShare(lpShareToken).mint(DEAD_ADDRESS, MIN_DEAD_SHARES);
@@ -170,21 +147,20 @@ contract LPVaultModule is SignalsCoreStorage {
     /**
      * @notice Request a deposit into the vault
      * @dev Tokens transferred immediately (6 decimals), internally stored as WAD
-     *      WP v2 Sec 6.2: "Convert at entry, internal ops in WAD"
      * @param amount Amount to deposit (in payment token decimals, 6)
      * @return requestId Unique request identifier
      */
     function requestDeposit(uint256 amount) external onlyDelegated returns (uint64 requestId) {
-        if (amount == 0) revert ZeroAmount();
-        if (!lpVault.isSeeded) revert VaultNotSeeded();
+        if (amount == 0) revert SE.ZeroAmount();
+        if (!lpVault.isSeeded) revert SE.VaultNotSeeded();
 
         // Transfer 6-decimal tokens
         paymentToken.safeTransferFrom(msg.sender, address(this), amount);
 
-        // Phase 6: Track pending deposits for free balance calculation
+        // Track pending deposits for free balance calculation
         _totalPendingDeposits6 += amount;
 
-        // Phase 6: Convert to WAD for internal accounting
+        // Convert to WAD for internal accounting
         uint256 amountWad = amount.toWad();
 
         requestId = nextDepositRequestId++;
@@ -210,11 +186,10 @@ contract LPVaultModule is SignalsCoreStorage {
      * @return requestId Unique request identifier
      */
     function requestWithdraw(uint256 shares) external onlyDelegated returns (uint64 requestId) {
-        if (shares == 0) revert ZeroAmount();
-        if (!lpVault.isSeeded) revert VaultNotSeeded();
+        if (shares == 0) revert SE.ZeroAmount();
+        if (!lpVault.isSeeded) revert SE.VaultNotSeeded();
 
-        // Phase 10: Burn LP share tokens from user at request time
-        // This ensures shares are escrowed and can't be double-spent
+        // Burn LP share tokens from user at request time (escrow against double-spending)
         if (lpShareToken != address(0)) {
             ISignalsLPShare(lpShareToken).burn(msg.sender, shares);
         }
@@ -243,9 +218,9 @@ contract LPVaultModule is SignalsCoreStorage {
     function cancelDeposit(uint64 requestId) external onlyDelegated {
         DepositRequest storage req = _depositRequests[requestId];
 
-        if (req.owner == address(0)) revert RequestNotFound(requestId);
-        if (req.owner != msg.sender) revert RequestNotOwned(requestId, req.owner, msg.sender);
-        if (req.status != RequestStatus.Pending) revert RequestNotPending(requestId);
+        if (req.owner == address(0)) revert SE.RequestNotFound(requestId);
+        if (req.owner != msg.sender) revert SE.RequestNotOwned(requestId, req.owner, msg.sender);
+        if (req.status != RequestStatus.Pending) revert SE.RequestNotPending(requestId);
 
         uint256 amountWad = req.amount;  // Stored as WAD
         uint64 eligibleBatchId = req.eligibleBatchId;
@@ -253,18 +228,15 @@ contract LPVaultModule is SignalsCoreStorage {
         // CRITICAL-01: Prevent cancel after batch processed (too-late check)
         // Once batch is processed, deposit is already reflected in NAV/shares
         // Allowing cancel would enable double-spending of funds
-        if (_batchAggregations[eligibleBatchId].processed) {
-            revert CE.CancelTooLate(requestId, eligibleBatchId);
-        }
+        if (_batchAggregations[eligibleBatchId].processed) revert SE.CancelTooLate(requestId, eligibleBatchId);
 
         req.status = RequestStatus.Cancelled;
         _pendingBatchTotals[eligibleBatchId].deposits -= amountWad;
 
-        // Phase 6: Convert WAD to 6 decimals for token transfer
-        // WP v2 Appendix C: deposit residual refunded to depositor (no dust retained)
+        // Convert WAD to 6 decimals for token transfer (deposit residual refunded to depositor)
         uint256 amount6 = amountWad.fromWad();
         
-        // Phase 6: Decrease pending deposits (funds are reserved, no free balance check needed)
+        // Decrease pending deposits (funds are reserved, no free balance check needed)
         _totalPendingDeposits6 -= amount6;
         paymentToken.safeTransfer(msg.sender, amount6);
 
@@ -278,23 +250,21 @@ contract LPVaultModule is SignalsCoreStorage {
     function cancelWithdraw(uint64 requestId) external onlyDelegated {
         WithdrawRequest storage req = _withdrawRequests[requestId];
 
-        if (req.owner == address(0)) revert RequestNotFound(requestId);
-        if (req.owner != msg.sender) revert RequestNotOwned(requestId, req.owner, msg.sender);
-        if (req.status != RequestStatus.Pending) revert RequestNotPending(requestId);
+        if (req.owner == address(0)) revert SE.RequestNotFound(requestId);
+        if (req.owner != msg.sender) revert SE.RequestNotOwned(requestId, req.owner, msg.sender);
+        if (req.status != RequestStatus.Pending) revert SE.RequestNotPending(requestId);
 
         uint256 shares = req.shares;
         uint64 eligibleBatchId = req.eligibleBatchId;
 
         // CRITICAL-03: Prevent cancel after batch processed (too-late check)
         // Once batch is processed, withdrawal is reserved in vault accounting
-        if (_batchAggregations[eligibleBatchId].processed) {
-            revert CE.CancelTooLate(requestId, eligibleBatchId);
-        }
+        if (_batchAggregations[eligibleBatchId].processed) revert SE.CancelTooLate(requestId, eligibleBatchId);
 
         req.status = RequestStatus.Cancelled;
         _pendingBatchTotals[eligibleBatchId].withdraws -= shares;
 
-        // Phase 10: Refund LP share tokens to user on cancel
+        // Refund LP share tokens to user on cancel
         if (lpShareToken != address(0)) {
             ISignalsLPShare(lpShareToken).mint(msg.sender, shares);
         }
@@ -313,32 +283,28 @@ contract LPVaultModule is SignalsCoreStorage {
      *      Flow:
      *      1. Validate batch ID sequence
      *      2. Read pre-aggregated totals from _pendingBatchTotals
-     *      3. Apply Fee Waterfall (whitepaper Sec 4.3-4.6)
+     *      3. Apply Fee Waterfall
      *      4. Process withdrawals then deposits
      *      5. Store batch result for claims
      *
      * @param batchId Batch identifier (must be currentBatchId + 1)
      */
     function processDailyBatch(uint64 batchId) external onlyDelegated {
-        if (!lpVault.isSeeded) revert VaultNotSeeded();
-        if (batchId != currentBatchId + 1) revert BatchNotReady(batchId);
+        if (!lpVault.isSeeded) revert SE.VaultNotSeeded();
+        if (batchId != currentBatchId + 1) revert SE.BatchNotReady(batchId);
 
         // Prevent processing future batches - batch can only be processed after its time period ends
         uint64 batchEndTime = (batchId + 1) * BATCH_SECONDS;
-        if (block.timestamp < batchEndTime) {
-            revert BatchNotEnded(batchId, batchEndTime, uint64(block.timestamp));
-        }
+        if (block.timestamp < batchEndTime) revert SE.BatchNotEnded(batchId, batchEndTime, uint64(block.timestamp));
 
         DailyPnlSnapshot storage snap = _dailyPnl[batchId];
-        if (snap.processed) revert DailyBatchAlreadyProcessed(batchId);
+        if (snap.processed) revert SE.DailyBatchAlreadyProcessed(batchId);
 
         // CRITICAL-02: Verify batch's market is settled (prevents settlement DoS)
         // If batch has an associated market, it must be settled before batch processing
         // Otherwise, _recordPnlToBatch would revert with BatchAlreadyProcessed
         uint256 marketId = _batchIdToMarketId[batchId];
-        if (marketId != 0 && !markets[marketId].settled) {
-            revert CE.BatchMarketNotSettled(batchId, marketId);
-        }
+        if (marketId != 0 && !markets[marketId].settled) revert SE.BatchMarketNotSettled(batchId, marketId);
 
         // Step 1: Get pre-aggregated totals (O(1))
         PendingBatchTotal storage pending = _pendingBatchTotals[batchId];
@@ -385,9 +351,7 @@ contract LPVaultModule is SignalsCoreStorage {
             
             // HIGH-02: Prevent shares from dropping below MIN_DEAD_SHARES
             // This ensures the vault can never brick due to zero shares
-            if (currentShares < MIN_DEAD_SHARES) {
-                revert WithdrawalWouldBrickVault(currentShares, MIN_DEAD_SHARES);
-            }
+            if (currentShares < MIN_DEAD_SHARES) revert SE.WithdrawalWouldBrickVault(currentShares, MIN_DEAD_SHARES);
             
             // HIGH-01: Reserve withdrawal funds (conservative floor rounding)
             // Use floor to ensure we never over-reserve
@@ -468,8 +432,7 @@ contract LPVaultModule is SignalsCoreStorage {
 
     /**
      * @notice Get tail budget (ΔEₜ) sum for a batch
-     * @dev Per whitepaper v2 Sec 4.1:
-     *      ΔEₜ := E_ent(q₀,t) - αₜ ln n
+     * @dev ΔEₜ := E_ent(q₀,t) - αₜ ln n
      *
      *      Each market calculates its ΔEₜ at creation from baseFactors (prior).
      *      At settlement, market's ΔEₜ is added to the batch's DeltaEtSum.
@@ -500,12 +463,12 @@ contract LPVaultModule is SignalsCoreStorage {
 
     /**
      * @notice Revert if requested amount exceeds free balance
-     * @dev Phase 6 escrow safety: prevents use of pending deposits for payouts
+     * @dev Escrow safety: prevents use of pending deposits for payouts
      * @param amount6 Amount requested in 6-decimal token units
      */
     function _requireFreeBalance(uint256 amount6) internal view {
         uint256 free = _getFreeBalance();
-        if (amount6 > free) revert CE.InsufficientFreeBalance(amount6, free);
+        if (amount6 > free) revert SE.InsufficientFreeBalance(amount6, free);
     }
 
     // ============================================================
@@ -521,24 +484,24 @@ contract LPVaultModule is SignalsCoreStorage {
     function claimDeposit(uint64 requestId) external onlyDelegated returns (uint256 shares) {
         DepositRequest storage req = _depositRequests[requestId];
 
-        if (req.owner == address(0)) revert RequestNotFound(requestId);
-        if (req.owner != msg.sender) revert RequestNotOwned(requestId, req.owner, msg.sender);
-        if (req.status != RequestStatus.Pending) revert RequestNotPending(requestId);
+        if (req.owner == address(0)) revert SE.RequestNotFound(requestId);
+        if (req.owner != msg.sender) revert SE.RequestNotOwned(requestId, req.owner, msg.sender);
+        if (req.status != RequestStatus.Pending) revert SE.RequestNotPending(requestId);
 
         BatchAggregation storage agg = _batchAggregations[req.eligibleBatchId];
-        if (!agg.processed) revert BatchNotProcessed(req.eligibleBatchId);
+        if (!agg.processed) revert SE.BatchNotProcessed(req.eligibleBatchId);
 
-        // WP v2 Sec 3.4: shares = floor(amount / batchPrice)
+        // shares = floor(amount / batchPrice)
         shares = req.amount.wDiv(agg.batchPrice);
         
-        // WP v2 Appendix C: "Deposit residual refunded to depositor (vault never retains)"
+        // Deposit residual refunded to depositor (vault never retains)
         // Calculate: used = shares * batchPrice, refund = amount - used
         uint256 usedWad = shares.wMul(agg.batchPrice);
         uint256 refundWad = req.amount - usedWad;
         
         req.status = RequestStatus.Claimed;
 
-        // Phase 10: Mint LP share tokens to depositor
+        // Mint LP share tokens to depositor
         if (lpShareToken != address(0)) {
             ISignalsLPShare(lpShareToken).mint(msg.sender, shares);
         }
@@ -559,26 +522,25 @@ contract LPVaultModule is SignalsCoreStorage {
 
     /**
      * @notice Claim assets from a processed withdrawal request
-     * @dev Calculates assets = shares * batchPrice (WAD), converts to 6 decimals for transfer
-     *      WP v2 Appendix C: withdrawal dust stays in vault (LP benefit) - truncate
+     * @dev Calculates assets = shares * batchPrice (WAD), converts to 6 decimals for transfer.
+     *      Withdrawal dust stays in vault (LP benefit) via truncation.
      * @param requestId Withdraw request identifier
      * @return assets Amount of assets claimable (in WAD for return value)
      */
     function claimWithdraw(uint64 requestId) external onlyDelegated returns (uint256 assets) {
         WithdrawRequest storage req = _withdrawRequests[requestId];
 
-        if (req.owner == address(0)) revert RequestNotFound(requestId);
-        if (req.owner != msg.sender) revert RequestNotOwned(requestId, req.owner, msg.sender);
-        if (req.status != RequestStatus.Pending) revert RequestNotPending(requestId);
+        if (req.owner == address(0)) revert SE.RequestNotFound(requestId);
+        if (req.owner != msg.sender) revert SE.RequestNotOwned(requestId, req.owner, msg.sender);
+        if (req.status != RequestStatus.Pending) revert SE.RequestNotPending(requestId);
 
         BatchAggregation storage agg = _batchAggregations[req.eligibleBatchId];
-        if (!agg.processed) revert BatchNotProcessed(req.eligibleBatchId);
+        if (!agg.processed) revert SE.BatchNotProcessed(req.eligibleBatchId);
 
         assets = req.shares.wMul(agg.batchPrice);  // WAD result
         req.status = RequestStatus.Claimed;
 
-        // Phase 6: Convert WAD to 6 decimals for token transfer
-        // WP v2 Appendix C: "Withdrawal dust stays in vault (LP benefit)" - truncate (round down)
+        // Convert WAD to 6 decimals for token transfer (dust stays in vault)
         uint256 assets6 = assets.fromWad();
         
         // HIGH-01: Draw from withdrawal reserve (reserved at batch processing time)

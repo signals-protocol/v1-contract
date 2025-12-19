@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -12,7 +12,7 @@ import "./storage/SignalsCoreStorage.sol";
 import "../interfaces/ISignalsCore.sol";
 import "../interfaces/ISignalsPosition.sol";
 import "../interfaces/IRiskModule.sol";
-import "../errors/CLMSRErrors.sol";
+import "../errors/SignalsErrors.sol";
 
 /// @title SignalsCore
 /// @notice Upgradeable entry core that holds storage and delegates to modules
@@ -20,6 +20,7 @@ contract SignalsCore is
     Initializable,
     ISignalsCore,
     SignalsCoreStorage,
+    SignalsErrors,
     UUPSUpgradeable,
     OwnableUpgradeable,
     PausableUpgradeable,
@@ -34,13 +35,7 @@ contract SignalsCore is
     address public oracleModule;
 
     // ============================================================
-    // Errors
-    // ============================================================
-    error ModuleNotSet();
-    error InvalidFeeSplitSum(uint256 phiLP, uint256 phiBS, uint256 phiTR);
-
-    // ============================================================
-    // Events (Phase 10: Config changes for FE/Indexer)
+    // Events
     // ============================================================
     event RiskConfigUpdated(uint256 lambda, uint256 kDrawdown, bool enforceAlpha);
     event FeeWaterfallConfigUpdated(uint256 rhoBS, int256 pdd, uint256 phiLP, uint256 phiBS, uint256 phiTR);
@@ -89,15 +84,15 @@ contract SignalsCore is
     }
 
     // ============================================================
-    // Vault configuration (Phase 6)
+    // Vault Configuration
     // ============================================================
 
     function setMinSeedAmount(uint256 amount) external onlyOwner whenNotPaused {
-        if (amount == 0) revert CE.ZeroLimit();
+        if (amount == 0) revert SignalsErrors.ZeroLimit();
         minSeedAmount = amount;
     }
 
-    /// @notice Set LP Share token address (Phase 10: ERC-4626)
+    /// @notice Set LP Share token address for ERC-4626 compatibility
     function setLpShareToken(address _lpShareToken) external onlyOwner {
         lpShareToken = _lpShareToken;
         emit LpShareTokenUpdated(_lpShareToken);
@@ -118,7 +113,7 @@ contract SignalsCore is
         uint256 phiBS,
         uint256 phiTR
     ) external onlyOwner whenNotPaused {
-        if (phiLP + phiBS + phiTR != WAD) revert InvalidFeeSplitSum(phiLP, phiBS, phiTR);
+        if (phiLP + phiBS + phiTR != WAD) revert SignalsErrors.InvalidFeeSplitSum(phiLP, phiBS, phiTR);
         // pdd is NOT set here - it's controlled by setRiskConfig (pdd := -λ)
         feeWaterfallConfig.rhoBS = rhoBS;
         feeWaterfallConfig.phiLP = phiLP;
@@ -134,9 +129,9 @@ contract SignalsCore is
     }
 
     /// @notice Configure risk parameters for α Safety Bounds
-    /// @dev Per whitepaper v2: pdd := -λ (drawdown floor equals negative lambda)
+    /// @dev Invariant: pdd := -λ (drawdown floor equals negative lambda)
     ///      This function enforces the relationship by auto-updating pdd when lambda is set.
-    ///      WP v2: λ ∈ (0, 1) is required for safety invariants.
+    ///      λ ∈ (0, 1) is required for safety invariants.
     /// @param lambda λ: Safety parameter (WAD), e.g., 0.3e18 = 30% max drawdown. Must be in (0, 1).
     /// @param kDrawdown k: Drawdown sensitivity factor (WAD), typically 1.0e18
     /// @param enforceAlpha Whether to enforce α bounds at market configuration time (create/reopen)
@@ -145,16 +140,16 @@ contract SignalsCore is
         uint256 kDrawdown,
         bool enforceAlpha
     ) external onlyOwner whenNotPaused {
-        // WP v2: λ must be in (0, 1) for safety invariants
+        // λ must be in (0, 1) for safety invariants
         // λ = 0 would mean no drawdown limit (unsafe)
         // λ >= 1 would mean floor cannot be maintained (100%+ drop allowed is meaningless)
-        if (lambda == 0 || lambda >= WAD) revert CE.InvalidLambda(lambda);
+        if (lambda == 0 || lambda >= WAD) revert SignalsErrors.InvalidLambda(lambda);
 
         riskConfig.lambda = lambda;
         riskConfig.kDrawdown = kDrawdown;
         riskConfig.enforceAlpha = enforceAlpha;
         
-        // Whitepaper v2 invariant: pdd := -λ
+        // Invariant: pdd := -λ
         // Auto-update drawdown floor to maintain Safety guarantee
         feeWaterfallConfig.pdd = -int256(lambda);
         
@@ -170,7 +165,7 @@ contract SignalsCore is
         uint128 quantity,
         uint256 maxCost
     ) external override whenNotPaused nonReentrant returns (uint256 positionId) {
-        // Phase 8: Risk gate FIRST (no-op in Phase 8, exposure caps in Phase 9)
+        // Risk gate first: validate exposure caps before position modification
         _riskGate(abi.encodeCall(
             IRiskModule.gateOpenPosition,
             (marketId, msg.sender, quantity)
@@ -192,7 +187,7 @@ contract SignalsCore is
         uint128 quantity,
         uint256 maxCost
     ) external override whenNotPaused nonReentrant {
-        // Phase 8: Risk gate FIRST (no-op in Phase 8, exposure caps in Phase 9)
+        // Risk gate first: validate exposure caps before position modification
         _riskGate(abi.encodeCall(
             IRiskModule.gateIncreasePosition,
             (positionId, msg.sender, quantity)
@@ -301,10 +296,10 @@ contract SignalsCore is
     // --- Lifecycle / oracle ---
 
     /// @notice Create a new market with prior-based factors
-    /// @dev Phase 8 Core-first Risk Gate pattern:
+    /// @dev Core-first Risk Gate pattern:
     ///      1. Core calls RiskModule.gateCreateMarket FIRST (α limit + prior admissibility)
     ///      2. Core delegates to MarketLifecycleModule (state machine, storage)
-    ///      Per WP v2: baseFactors define the opening prior q₀,t
+    ///      baseFactors define the opening prior q₀,t:
     ///      - Uniform prior: all factors = 1 WAD → ΔEₜ = 0
     ///      - Concentrated prior: factors vary → ΔEₜ > 0
     function createMarket(
@@ -319,7 +314,7 @@ contract SignalsCore is
         address feePolicy,
         uint256[] calldata baseFactors
     ) external override onlyOwner whenNotPaused returns (uint256 marketId) {
-        // Phase 8: Risk gate FIRST - RiskModule calculates deltaEt from baseFactors
+        // Risk gate first: RiskModule calculates deltaEt from baseFactors and validates α bounds
         _riskGate(abi.encodeCall(
             IRiskModule.gateCreateMarket,
             (liquidityParameter, numBins, baseFactors)
@@ -362,7 +357,7 @@ contract SignalsCore is
     }
 
     function reopenMarket(uint256 marketId) external override onlyOwner whenNotPaused {
-        // Phase 8: Risk gate FIRST - get market data for validation
+        // Risk gate first: get market data for validation
         ISignalsCore.Market storage market = markets[marketId];
         
         _riskGate(abi.encodeCall(
@@ -392,7 +387,7 @@ contract SignalsCore is
         ));
     }
 
-    /// @notice Submit settlement sample with Redstone signed-pull oracle (WP v2 Sec 7.4)
+    /// @notice Submit settlement sample with Redstone signed-pull oracle
     /// @dev Permissionless during SettlementOpen. Redstone payload is appended to calldata.
     ///      Signatures are verified on-chain by the OracleModule.
     /// @param marketId Market to submit settlement for
@@ -403,7 +398,7 @@ contract SignalsCore is
     }
 
     /// @notice Configure Redstone oracle parameters
-    /// @dev WP v2 Sec 7.1: Set feed ID, decimals, and timing constraints
+    /// @dev Set feed ID, decimals, and timing constraints
     function setRedstoneConfig(
         bytes32 feedId,
         uint8 feedDecimals,
@@ -636,7 +631,7 @@ contract SignalsCore is
 
     /// @dev Delegate to a module preserving context, bubble up revert
     function _delegate(address module, bytes memory callData) internal returns (bytes memory) {
-        if (module == address(0)) revert ModuleNotSet();
+        if (module == address(0)) revert SignalsErrors.ModuleNotSet();
         (bool success, bytes memory ret) = module.delegatecall(callData);
         if (!success) {
             assembly ("memory-safe") {
@@ -648,7 +643,7 @@ contract SignalsCore is
 
     /// @dev Delegate to a module for view paths via staticcall; bubble up reverts.
     function _delegateView(address module, bytes memory callData) internal returns (bytes memory) {
-        if (module == address(0)) revert ModuleNotSet();
+        if (module == address(0)) revert SignalsErrors.ModuleNotSet();
         (bool success, bytes memory ret) = module.delegatecall(callData);
         if (!success) {
             assembly ("memory-safe") {
@@ -659,13 +654,13 @@ contract SignalsCore is
     }
 
     // ============================================================
-    // Phase 8: Risk Gate Pattern
+    // Risk Gate Pattern
     // ============================================================
 
     /// @dev Execute risk gate via delegatecall, bubble up revert
     /// @param gateCalldata Encoded call to RiskModule gate function
     function _riskGate(bytes memory gateCalldata) internal {
-        if (riskModule == address(0)) revert ModuleNotSet();
+        if (riskModule == address(0)) revert SignalsErrors.ModuleNotSet();
         (bool success, bytes memory ret) = riskModule.delegatecall(gateCalldata);
         if (!success) {
             assembly ("memory-safe") {

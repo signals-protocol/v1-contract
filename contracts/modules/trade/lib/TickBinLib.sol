@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
-import "../../../errors/CLMSRErrors.sol";
+import {SignalsErrors as SE} from "../../../errors/SignalsErrors.sol";
 
 /**
  * @title TickBinLib
@@ -36,14 +36,14 @@ library TickBinLib {
 
         // Tick must be >= minTick and aligned to tickSpacing
         if (offset < 0 || offset % tickSpacing != 0) {
-            revert CLMSRErrors.InvalidTickSpacing(tick, tickSpacing);
+            revert SE.InvalidTickSpacing(tick, tickSpacing);
         }
 
         bin = uint32(uint256(offset / tickSpacing));
 
         // Bin must be within valid range
         if (bin >= numBins) {
-            revert CLMSRErrors.RangeBinsOutOfBounds(bin, bin, numBins);
+            revert SE.RangeBinsOutOfBounds(bin, bin, numBins);
         }
     }
 
@@ -69,21 +69,21 @@ library TickBinLib {
     ) internal pure returns (uint32 loBin, uint32 hiBin) {
         // Validate tick range
         if (lowerTick >= upperTick) {
-            revert CLMSRErrors.InvalidTickRange(lowerTick, upperTick);
+            revert SE.InvalidTickRange(lowerTick, upperTick);
         }
         if (lowerTick < minTick) {
-            revert CLMSRErrors.InvalidTick(lowerTick, minTick, maxTick);
+            revert SE.InvalidTick(lowerTick, minTick, maxTick);
         }
         if (upperTick > maxTick + tickSpacing) {
-            revert CLMSRErrors.InvalidTick(upperTick, minTick, maxTick);
+            revert SE.InvalidTick(upperTick, minTick, maxTick);
         }
 
         // Check alignment
         if ((lowerTick - minTick) % tickSpacing != 0) {
-            revert CLMSRErrors.InvalidTickSpacing(lowerTick, tickSpacing);
+            revert SE.InvalidTickSpacing(lowerTick, tickSpacing);
         }
         if ((upperTick - minTick) % tickSpacing != 0) {
-            revert CLMSRErrors.InvalidTickSpacing(upperTick, tickSpacing);
+            revert SE.InvalidTickSpacing(upperTick, tickSpacing);
         }
 
         // Convert to 0-based bin indices
@@ -92,10 +92,10 @@ library TickBinLib {
 
         // Validate bin range
         if (loBin > hiBin) {
-            revert CLMSRErrors.InvalidRangeBins(loBin, hiBin);
+            revert SE.InvalidRangeBins(loBin, hiBin);
         }
         if (hiBin >= numBins) {
-            revert CLMSRErrors.RangeBinsOutOfBounds(loBin, hiBin, numBins);
+            revert SE.RangeBinsOutOfBounds(loBin, hiBin, numBins);
         }
     }
 }

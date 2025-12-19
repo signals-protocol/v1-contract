@@ -1,35 +1,16 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import "../../lib/FixedPointMathU.sol";
+import {SignalsErrors as SE} from "../../errors/SignalsErrors.sol";
 
 /// @title FeeWaterfallLib
-/// @notice Pure library implementing the Fee Waterfall algorithm from whitepaper Sec 4.3-4.6
+/// @notice Pure library implementing the Fee Waterfall algorithm
 /// @dev All calculations use WAD (1e18) fixed-point arithmetic
 library FeeWaterfallLib {
     using FixedPointMathU for uint256;
 
     uint256 internal constant WAD = 1e18;
-
-    // ============================================================
-    // Errors
-    // ============================================================
-
-    /// @notice Grant required exceeds available Backstop NAV
-    error InsufficientBackstopForGrant(uint256 required, uint256 available);
-
-    /// @notice Grant required exceeds tail budget (ΔEₜ) - drawdown floor invariant violated
-    /// @dev Per whitepaper v2: "if Gneed > ΔEₜ, batch must revert" (Safety Layer invariant)
-    error GrantExceedsTailBudget(uint256 grantNeed, uint256 deltaEt);
-
-    /// @notice Fee share ratios don't sum to WAD
-    error InvalidPhiSum(uint256 sum);
-
-    /// @notice Drawdown floor must be in range (-WAD, 0)
-    error InvalidDrawdownFloor(int256 pdd);
-
-    /// @notice Catastrophic loss: NAV would go negative
-    error CatastrophicLoss(uint256 loss, uint256 navPlusFloss);
 
     // ============================================================
     // Structs
@@ -72,16 +53,15 @@ library FeeWaterfallLib {
     // ============================================================
 
     /// @notice Apply Fee Waterfall algorithm
-    /// @dev Implements whitepaper Sec 4.3-4.6
     /// @param p Input parameters
     /// @return r Output result
     function calculate(Params memory p) internal pure returns (Result memory r) {
         // Validate inputs
         // pdd must be in range (-WAD, 0) - i.e., max 100% drawdown
-        if (p.pdd >= 0 || p.pdd < -int256(WAD)) revert InvalidDrawdownFloor(p.pdd);
+        if (p.pdd >= 0 || p.pdd < -int256(WAD)) revert SE.InvalidDrawdownFloor(p.pdd);
         
         uint256 phiSum = p.phiLP + p.phiBS + p.phiTR;
-        if (phiSum != WAD) revert InvalidPhiSum(phiSum);
+        if (phiSum != WAD) revert SE.InvalidPhiSum(phiSum);
 
         // ========================================
         // Step 1: Loss Compensation
@@ -111,7 +91,7 @@ library FeeWaterfallLib {
             } else {
                 // Catastrophic loss: loss > Nprev + Floss
                 // This should never happen if risk limits are enforced
-                revert CatastrophicLoss(loss, r.Nraw);
+                revert SE.CatastrophicLoss(loss, r.Nraw);
             }
         }
 
@@ -120,15 +100,13 @@ library FeeWaterfallLib {
         // ========================================
         // Nfloor = Nprev × (1 + pdd)
         // Since pdd is negative, (WAD + pdd) < WAD
-        // Per whitepaper v2: "G^need_t := max{0, ⌈G^min_t⌉}" requires ceil semantics
+        // G^need_t := max{0, ⌈G^min_t⌉} requires ceil semantics
         // We use wMulUp for Nfloor to ensure conservative (higher) floor calculation
-        // This guarantees grantNeed is never under-estimated (drawdown floor is invariant)
         uint256 Nfloor;
         if (p.Nprev > 0) {
             int256 wadPlusPdd = int256(WAD) + p.pdd;
             if (wadPlusPdd > 0) {
                 // Use wMulUp (ceil) to ensure Nfloor is conservatively high
-                // This implements the ceil requirement from whitepaper v2
                 Nfloor = p.Nprev.wMulUp(uint256(wadPlusPdd));
             } else {
                 Nfloor = 0;
@@ -138,9 +116,7 @@ library FeeWaterfallLib {
         }
 
         // grantNeed = max(0, Nfloor - Nraw)
-        // Per whitepaper v2: "G^need_t := max{0, ⌈G^min_t⌉}"
         // The ceil is achieved by using wMulUp in Nfloor calculation above
-        // This ensures grantNeed >= actual required grant (conservative)
         uint256 grantNeed;
         if (Nfloor > r.Nraw) {
             grantNeed = Nfloor - r.Nraw;
@@ -148,10 +124,9 @@ library FeeWaterfallLib {
             grantNeed = 0;
         }
         
-        // Per whitepaper v2: "if G^need_t > ΔE_t, batch must revert"
-        // This is a SAFETY INVARIANT - drawdown floor cannot be violated
+        // Safety invariant: if G^need_t > ΔE_t, batch must revert
         if (grantNeed > p.deltaEt) {
-            revert GrantExceedsTailBudget(grantNeed, p.deltaEt);
+            revert SE.GrantExceedsTailBudget(grantNeed, p.deltaEt);
         }
         
         // Gt = grantNeed (no capping - either we can afford it or we revert)
@@ -159,7 +134,7 @@ library FeeWaterfallLib {
         
         // Check Backstop has enough for grant
         if (r.Gt > p.Bprev) {
-            revert InsufficientBackstopForGrant(r.Gt, p.Bprev);
+            revert SE.InsufficientBackstopForGrant(r.Gt, p.Bprev);
         }
         
         // Ngrant = Nraw + Gt
@@ -195,8 +170,7 @@ library FeeWaterfallLib {
         // FcoreTR = floor(Fremain × phiTR / WAD)
         uint256 FcoreTR = Fremain.wMul(p.phiTR);
         
-        // Fdust = Fremain - FcoreLP - FcoreBS - FcoreTR
-        // Dust goes to LP per whitepaper
+        // Fdust = Fremain - FcoreLP - FcoreBS - FcoreTR (dust goes to LP)
         r.Fdust = Fremain - FcoreLP - FcoreBS - FcoreTR;
 
         // ========================================
@@ -206,10 +180,7 @@ library FeeWaterfallLib {
         r.Ft = r.Floss + FcoreLP + r.Fdust;
         
         // Npre = Ngrant + FcoreLP + Fdust (pre-batch NAV for VaultAccountingLib)
-        // Per whitepaper: N^pre_t = N_{t-1} + L_t + F_t + G_t
-        // where F_t = F_loss + F_LP = F_loss + F_core_LP + F_dust
-        // Ngrant already contains N_{t-1} + L_t + F_loss + G_t
-        // So Npre = Ngrant + FcoreLP + Fdust
+        // N^pre_t = N_{t-1} + L_t + F_t + G_t where F_t = F_loss + F_core_LP + F_dust
         r.Npre = Ngrant + FcoreLP + r.Fdust;
         
         // Bnext = Bgrant + Ffill + FcoreBS

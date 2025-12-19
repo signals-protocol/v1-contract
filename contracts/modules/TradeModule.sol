@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import "../core/storage/SignalsCoreStorage.sol";
 import "../interfaces/ISignalsCore.sol";
 import "../interfaces/IFeePolicy.sol";
 import "../interfaces/ISignalsPosition.sol";
-import "../errors/CLMSRErrors.sol";
-import "../errors/ModuleErrors.sol";
+import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
 import "../core/lib/SignalsDistributionMath.sol";
 import "../core/lib/SignalsClmsrMath.sol";
 import "./trade/lib/LazyMulSegmentTree.sol";
@@ -73,7 +72,7 @@ contract TradeModule is SignalsCoreStorage {
     using SafeERC20 for IERC20;
 
     modifier onlyDelegated() {
-        if (address(this) == self) revert ModuleErrors.NotDelegated();
+        if (address(this) == self) revert SE.NotDelegated();
         _;
     }
 
@@ -89,7 +88,7 @@ contract TradeModule is SignalsCoreStorage {
         uint128 quantity,
         uint256 maxCost
     ) external onlyDelegated returns (uint256 positionId) {
-        if (quantity == 0) revert CE.InvalidQuantity(quantity);
+        require(quantity != 0, SE.InvalidQuantity(quantity));
         ISignalsCore.Market storage market = _loadAndValidateMarket(marketId);
         address feePolicy = market.feePolicy != address(0) ? market.feePolicy : defaultFeePolicy;
 
@@ -98,9 +97,9 @@ contract TradeModule is SignalsCoreStorage {
         uint256 cost6 = _roundDebit(costWad);
 
         uint256 fee6 = _quoteFeeWithPolicy(feePolicy, true, msg.sender, marketId, lowerTick, upperTick, quantity, cost6);
-        if (fee6 > cost6) revert CE.FeeExceedsBase(fee6, cost6);
+        require(fee6 <= cost6, SE.FeeExceedsBase(fee6, cost6));
         uint256 totalCost = cost6 + fee6;
-        if (totalCost > maxCost) revert CE.CostExceedsMaximum(totalCost, maxCost);
+        require(totalCost <= maxCost, SE.CostExceedsMaximum(totalCost, maxCost));
 
         _pullPayment(msg.sender, totalCost);
 
@@ -121,9 +120,9 @@ contract TradeModule is SignalsCoreStorage {
         uint128 quantity,
         uint256 maxCost
     ) external onlyDelegated {
-        if (quantity == 0) revert CE.InvalidQuantity(quantity);
+        require(quantity != 0, SE.InvalidQuantity(quantity));
         ISignalsPosition.Position memory position = positionContract.getPosition(positionId);
-        if (positionContract.ownerOf(positionId) != msg.sender) revert CE.UnauthorizedCaller(msg.sender);
+        require(positionContract.ownerOf(positionId) == msg.sender, SE.UnauthorizedCaller(msg.sender));
 
         ISignalsCore.Market storage market = _loadAndValidateMarket(position.marketId);
         address feePolicy = market.feePolicy != address(0) ? market.feePolicy : defaultFeePolicy;
@@ -133,9 +132,9 @@ contract TradeModule is SignalsCoreStorage {
         uint256 cost6 = _roundDebit(costWad);
 
         uint256 fee6 = _quoteFeeWithPolicy(feePolicy, true, msg.sender, position.marketId, position.lowerTick, position.upperTick, quantity, cost6);
-        if (fee6 > cost6) revert CE.FeeExceedsBase(fee6, cost6);
+        require(fee6 <= cost6, SE.FeeExceedsBase(fee6, cost6));
         uint256 totalCost = cost6 + fee6;
-        if (totalCost > maxCost) revert CE.CostExceedsMaximum(totalCost, maxCost);
+        require(totalCost <= maxCost, SE.CostExceedsMaximum(totalCost, maxCost));
 
         _pullPayment(msg.sender, totalCost);
 
@@ -169,46 +168,37 @@ contract TradeModule is SignalsCoreStorage {
             position.quantity,
             minProceeds
         );
-        if (newQty != 0) revert CE.CloseInconsistent(0, newQty);
+        require(newQty == 0, SE.CloseInconsistent(0, newQty));
         emit PositionClosed(positionId, msg.sender, baseProceeds);
     }
 
     /**
      * @notice Claim payout for a winning position after market settlement
-     * @dev Phase 6 (WP v1.0):
-     *      - Claim is gated by time: settlementFinalizedAt + Δ_claim
-     *      - Payout draws from escrow (reserved at settlement finalization)
-     *      - NAV is unaffected because payout was already reserved in escrow at settlement
-     *      - Batch processing status is IRRELEVANT to claim eligibility
+     * @dev Claim is gated by time: settlementFinalizedAt + Δ_claim
+     *      Payout draws from escrow (reserved at settlement finalization).
+     *      NAV is unaffected because payout was already reserved at settlement.
+     *      Batch processing status is irrelevant to claim eligibility.
      * @param positionId Position ID to claim payout for
      */
     function claimPayout(uint256 positionId) external onlyDelegated {
         ISignalsPosition.Position memory position = positionContract.getPosition(positionId);
-        if (positionContract.ownerOf(positionId) != msg.sender) revert CE.UnauthorizedCaller(msg.sender);
+        require(positionContract.ownerOf(positionId) == msg.sender, SE.UnauthorizedCaller(msg.sender));
 
         ISignalsCore.Market storage market = markets[position.marketId];
-        if (!market.settled) revert CE.MarketNotSettled(position.marketId);
+        require(market.settled, SE.MarketNotSettled(position.marketId));
 
-        // Phase 6: Time-based gating (WP v1.0 Oracle & Settlement State Machine)
-        // Claim is allowed after settlementFinalizedAt + Δ_claim
-        // Note: Batch processing status is NOT a gating condition
+        // Time-based gating: claim allowed after settlementFinalizedAt + Δ_claim
         uint64 claimOpen = market.settlementFinalizedAt + claimDelaySeconds;
-        if (block.timestamp < claimOpen) revert CE.ClaimTooEarly(claimOpen, uint64(block.timestamp));
+        require(block.timestamp >= claimOpen, SE.ClaimTooEarly(claimOpen, uint64(block.timestamp)));
 
         uint256 payout = _calculateClaimAmount(position, market);
 
-        // Phase 6: Draw from payout escrow (reserved at settlement finalization)
-        // This ensures NAV is unaffected because:
-        // 1. At settlement, Payout_t was calculated from exposure ledger
-        // 2. Payout_t was reserved in escrow (deducted from core balance)
-        // 3. L_t = ΔC_t - Payout_t was recorded (payout already reflected in P&L)
-        // 4. Claim draws only from escrow, not affecting current NAV/price
+        // Draw from payout escrow (reserved at settlement finalization)
+        // NAV is unaffected since payout was already reflected in P&L at settlement
         if (payout > 0) {
             uint256 remaining = _payoutReserveRemaining[position.marketId];
             // Revert if reserve is insufficient - indicates critical accounting bug
-            if (payout > remaining) {
-                revert CE.InsufficientPayoutReserve(payout, remaining);
-            }
+            require(payout <= remaining, SE.InsufficientPayoutReserve(payout, remaining));
             _payoutReserveRemaining[position.marketId] = remaining - payout;
             
             // Track total payout reserve for free balance calculation
@@ -235,7 +225,7 @@ contract TradeModule is SignalsCoreStorage {
         int256 upperTick,
         uint128 quantity
     ) external view returns (uint256 cost) {
-        if (quantity == 0) revert CE.InvalidQuantity(quantity);
+        require(quantity != 0, SE.InvalidQuantity(quantity));
         _loadAndValidateMarket(marketId);
         uint256 costWad = _calculateTradeCost(marketId, lowerTick, upperTick, uint256(quantity).toWad());
         return _roundDebit(costWad);
@@ -245,7 +235,7 @@ contract TradeModule is SignalsCoreStorage {
         uint256 positionId,
         uint128 quantity
     ) external view returns (uint256 cost) {
-        if (quantity == 0) revert CE.InvalidQuantity(quantity);
+        require(quantity != 0, SE.InvalidQuantity(quantity));
         ISignalsPosition.Position memory position = positionContract.getPosition(positionId);
         _loadAndValidateMarket(position.marketId);
         uint256 costWad = _calculateTradeCost(position.marketId, position.lowerTick, position.upperTick, uint256(quantity).toWad());
@@ -256,7 +246,7 @@ contract TradeModule is SignalsCoreStorage {
         uint256 positionId,
         uint128 quantity
     ) external view returns (uint256 proceeds) {
-        if (quantity == 0) revert CE.InvalidQuantity(quantity);
+        require(quantity != 0, SE.InvalidQuantity(quantity));
         ISignalsPosition.Position memory position = positionContract.getPosition(positionId);
         _loadAndValidateMarket(position.marketId);
         uint256 proceedsWad = _calculateSellProceeds(position.marketId, position.lowerTick, position.upperTick, uint256(quantity).toWad());
@@ -293,11 +283,11 @@ contract TradeModule is SignalsCoreStorage {
         returns (ISignalsCore.Market storage market)
     {
         market = markets[marketId];
-        if (!_marketExists(marketId)) revert CE.MarketNotFound(marketId);
-        if (market.settled) revert CE.MarketAlreadySettled(marketId);
-        if (!market.isActive) revert CE.MarketNotActive();
-        if (block.timestamp < market.startTimestamp) revert CE.MarketNotStarted();
-        if (block.timestamp > market.endTimestamp) revert CE.MarketExpired();
+        require(_marketExists(marketId), SE.MarketNotFound(marketId));
+        require(!market.settled, SE.MarketAlreadySettled(marketId));
+        require(market.isActive, SE.MarketNotActive());
+        require(block.timestamp >= market.startTimestamp, SE.MarketNotStarted());
+        require(block.timestamp <= market.endTimestamp, SE.MarketExpired());
     }
 
     /// @dev Thin wrapper to calculate buy cost using shared library.
@@ -337,11 +327,11 @@ contract TradeModule is SignalsCoreStorage {
         uint128 quantity,
         uint256 minProceeds
     ) internal returns (uint128 newQuantity, uint256 baseProceeds) {
-        if (quantity == 0) revert CE.InvalidQuantity(quantity);
-        if (positionContract.ownerOf(positionId) != msg.sender) revert CE.UnauthorizedCaller(msg.sender);
+        require(quantity != 0, SE.InvalidQuantity(quantity));
+        require(positionContract.ownerOf(positionId) == msg.sender, SE.UnauthorizedCaller(msg.sender));
 
         ISignalsCore.Market storage market = _loadAndValidateMarket(position.marketId);
-        if (quantity > position.quantity) revert CE.InsufficientPositionQuantity(quantity, position.quantity);
+        require(quantity <= position.quantity, SE.InsufficientPositionQuantity(quantity, position.quantity));
         address feePolicy = market.feePolicy != address(0) ? market.feePolicy : defaultFeePolicy;
 
         uint256 qtyWad = uint256(quantity).toWad();
@@ -358,9 +348,9 @@ contract TradeModule is SignalsCoreStorage {
             quantity,
             baseProceeds
         );
-        if (fee6 > baseProceeds) revert CE.FeeExceedsBase(fee6, baseProceeds);
+        require(fee6 <= baseProceeds, SE.FeeExceedsBase(fee6, baseProceeds));
         uint256 netProceeds = baseProceeds - fee6;
-        if (netProceeds < minProceeds) revert CE.ProceedsBelowMinimum(netProceeds, minProceeds);
+        require(netProceeds >= minProceeds, SE.ProceedsBelowMinimum(netProceeds, minProceeds));
 
         _applyFactor(position.marketId, position.lowerTick, position.upperTick, qtyWad, false);
         market.accumulatedFees += fee6.toWad();
@@ -423,7 +413,7 @@ contract TradeModule is SignalsCoreStorage {
             context: bytes32(0)
         });
         fee6 = IFeePolicy(policyAddress).quoteFee(params);
-        if (fee6 > baseAmount) revert CE.FeeExceedsBase(fee6, baseAmount);
+        require(fee6 <= baseAmount, SE.FeeExceedsBase(fee6, baseAmount));
     }
 
     /**
@@ -452,13 +442,13 @@ contract TradeModule is SignalsCoreStorage {
             context: bytes32(0)
         });
         fee6 = IFeePolicy(policyAddress).quoteFee(params);
-        if (fee6 > baseAmount) revert CE.FeeExceedsBase(fee6, baseAmount);
+        require(fee6 <= baseAmount, SE.FeeExceedsBase(fee6, baseAmount));
     }
 
     function _pullPayment(address from, uint256 amount6) internal {
         if (amount6 == 0) return;
         uint256 balance = paymentToken.balanceOf(from);
-        if (balance < amount6) revert CE.InsufficientBalance(from, amount6, balance);
+        require(balance >= amount6, SE.InsufficientBalance(from, amount6, balance));
         paymentToken.safeTransferFrom(from, address(this), amount6);
     }
 
@@ -484,7 +474,7 @@ contract TradeModule is SignalsCoreStorage {
      */
     function _requireFreeBalance(uint256 amount6) internal view {
         uint256 free = _getFreeBalance();
-        if (amount6 > free) revert CE.InsufficientFreeBalance(amount6, free);
+        require(amount6 <= free, SE.InsufficientFreeBalance(amount6, free));
     }
 
     // --- Tree update helper ---

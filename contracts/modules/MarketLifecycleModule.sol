@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import "../core/storage/SignalsCoreStorage.sol";
-import "../errors/ModuleErrors.sol";
-import "../errors/CLMSRErrors.sol";
+import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
 import "./trade/lib/LazyMulSegmentTree.sol";
 import "../lib/FixedPointMathU.sol";
 import "./trade/lib/ExposureDiffLib.sol";
@@ -26,7 +25,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         int256 settlementTick,
         uint64 settlementTimestamp
     );
-    /// @dev Phase 6: P&L recorded to daily batch
+    /// @dev P&L recorded to daily batch for vault accounting
     event MarketPnlRecorded(
         uint256 indexed marketId,
         uint64 indexed batchId,
@@ -54,7 +53,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
     uint32 public constant CHUNK_SIZE = 512;
 
     modifier onlyDelegated() {
-        if (address(this) == self) revert ModuleErrors.NotDelegated();
+        if (address(this) == self) revert SE.NotDelegated();
         _;
     }
 
@@ -64,8 +63,8 @@ contract MarketLifecycleModule is SignalsCoreStorage {
 
     // --- External ---
 
-    /// @notice Create a new market with prior-based factors (Phase 7)
-    /// @dev Per WP v2: Factors define the opening prior q₀,t
+    /// @notice Create a new market with prior-based factors
+    /// @dev Factors define the opening prior q₀,t:
     ///      - Uniform prior: all factors = 1 WAD → ΔEₜ = 0
     ///      - Concentrated prior: factors vary → ΔEₜ > 0
     ///      Prior admissibility is checked: ΔEₜ ≤ B_eff
@@ -82,30 +81,27 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         uint256[] calldata baseFactors
     ) external onlyDelegated returns (uint256 marketId) {
         _validateMarketParams(minTick, maxTick, tickSpacing, startTimestamp, endTimestamp, settlementTimestamp);
-        if (numBins == 0) revert CE.BinCountExceedsLimit(0, MAX_BIN_COUNT);
-        if (numBins > MAX_BIN_COUNT) revert CE.BinCountExceedsLimit(numBins, MAX_BIN_COUNT);
+        require(numBins != 0, SE.BinCountExceedsLimit(0, MAX_BIN_COUNT));
+        require(numBins <= MAX_BIN_COUNT, SE.BinCountExceedsLimit(numBins, MAX_BIN_COUNT));
         uint32 expectedBins = uint32(uint256((maxTick - minTick) / tickSpacing));
-        if (expectedBins != numBins) revert CE.InvalidMarketParameters(minTick, maxTick, tickSpacing);
-        if (liquidityParameter == 0) revert CE.InvalidLiquidityParameter();
-        if (baseFactors.length != numBins) revert CE.InvalidMarketParameters(minTick, maxTick, tickSpacing);
+        require(expectedBins == numBins, SE.InvalidMarketParameters(minTick, maxTick, tickSpacing));
+        require(liquidityParameter != 0, SE.InvalidLiquidityParameter());
+        require(baseFactors.length == numBins, SE.InvalidMarketParameters(minTick, maxTick, tickSpacing));
 
         uint256 minFactor = type(uint256).max;
         uint256 rootSum = 0;
         for (uint256 i = 0; i < numBins; i++) {
-            if (baseFactors[i] == 0) revert CE.InvalidFactor(baseFactors[i]);
+            require(baseFactors[i] != 0, SE.InvalidFactor(baseFactors[i]));
             if (baseFactors[i] < minFactor) minFactor = baseFactors[i];
             rootSum += baseFactors[i];
         }
 
         uint256 deltaEt = _calculateDeltaEt(liquidityParameter, numBins, rootSum, minFactor);
 
-        // Phase 7: One market per batch invariant (WP v2)
-        // Each batch processes exactly one market to simplify ΔEₜ admissibility
+        // One market per batch invariant for simplified ΔEₜ admissibility
         uint64 batchId = uint64(settlementTimestamp / BATCH_SECONDS);
         uint256 existingMarket = _batchIdToMarketId[batchId];
-        if (existingMarket != 0) {
-            revert CE.BatchAlreadyHasMarket(batchId, existingMarket);
-        }
+        require(existingMarket == 0, SE.BatchAlreadyHasMarket(batchId, existingMarket));
 
         marketId = ++nextMarketId;
         
@@ -135,14 +131,14 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         tree.init(numBins);
         tree.seedWithFactors(baseFactors);
 
-        // Phase 6: Store initial root sum for P&L calculation
+        // Store initial root sum for P&L calculation
         market.initialRootSum = rootSum;
 
         emit MarketCreated(marketId);
     }
 
     // ============================================================
-    // Phase 8: WP v2 Settlement State Machine
+    // Settlement State Machine
     // ============================================================
     // Timeline:
     //   Trading:        t < Tset
@@ -153,27 +149,25 @@ contract MarketLifecycleModule is SignalsCoreStorage {
 
     /**
      * @notice Finalize primary settlement after PendingOps window ends
-     * @dev WP v2 Sec 7.4: Called after Tset + Δsettle + Δops
-     *      Uses the closest-sample candidate from SettlementOpen window
+     * @dev Called after Tset + Δsettle + Δops. Uses the closest-sample candidate 
+     *      from SettlementOpen window.
      * @param marketId Market to finalize
      */
     function finalizePrimarySettlement(uint256 marketId) external onlyDelegated {
         ISignalsCore.Market storage market = markets[marketId];
-        if (!_marketExists(marketId)) revert CE.MarketNotFound(marketId);
-        if (market.settled) revert CE.MarketAlreadySettled(marketId);
-        if (market.failed) revert CE.MarketAlreadyFailed(marketId);
+        require(_marketExists(marketId), SE.MarketNotFound(marketId));
+        require(!market.settled, SE.MarketAlreadySettled(marketId));
+        require(!market.failed, SE.MarketAlreadyFailed(marketId));
 
         SettlementOracleState storage state = settlementOracleState[marketId];
-        if (state.candidatePriceTimestamp == 0) revert CE.SettlementOracleCandidateMissing();
+        require(state.candidatePriceTimestamp != 0, SE.SettlementOracleCandidateMissing());
 
         uint64 tSet = market.settlementTimestamp;
         uint64 nowTs = uint64(block.timestamp);
         
-        // WP v2: Can only finalize after PendingOps ends (Tset + Δsettle + Δops)
+        // Can only finalize after PendingOps ends (Tset + Δsettle + Δops)
         uint64 opsEnd = tSet + settlementSubmitWindow + pendingOpsWindow;
-        if (nowTs < opsEnd) {
-            revert CE.PendingOpsNotStarted();
-        }
+        require(nowTs >= opsEnd, SE.PendingOpsNotStarted());
 
         int256 settlementTick = _toSettlementTick(market, state.candidateValue);
 
@@ -191,11 +185,11 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         state.candidateValue = 0;
         state.candidatePriceTimestamp = 0;
 
-        // Phase 6: Calculate P&L with payout reserve
+        // Calculate P&L with payout reserve
         uint64 batchId = _getBatchIdForMarket(marketId);
         (int256 lt, uint256 ftot, uint256 payoutReserve) = _calculateMarketPnlWithPayout(marketId, settlementTick);
         
-        // Store payout reserve in escrow (WP v2 Sec 3.3)
+        // Store payout reserve in escrow
         _payoutReserve[marketId] = payoutReserve;
         _payoutReserveRemaining[marketId] = payoutReserve;
         
@@ -210,7 +204,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
 
     /**
      * @notice Mark a market's settlement as failed (operations only during PendingOps)
-     * @dev WP v2 Sec 7.5: Operations can mark failed during PendingOps
+     * @dev Operations can mark failed during PendingOps:
      *      - Can be called even if candidate exists (divergence scenario)
      *      - Callable during: [Tset + Δsettle, Tset + Δsettle + Δops)
      *      - After PendingOps, if no markSettlementFailed → finalize via finalizePrimarySettlement
@@ -218,14 +212,14 @@ contract MarketLifecycleModule is SignalsCoreStorage {
      */
     function markSettlementFailed(uint256 marketId) external onlyDelegated {
         ISignalsCore.Market storage market = markets[marketId];
-        if (!_marketExists(marketId)) revert CE.MarketNotFound(marketId);
-        if (market.settled) revert CE.MarketAlreadySettled(marketId);
-        if (market.failed) revert CE.MarketAlreadyFailed(marketId);
+        require(_marketExists(marketId), SE.MarketNotFound(marketId));
+        require(!market.settled, SE.MarketAlreadySettled(marketId));
+        require(!market.failed, SE.MarketAlreadyFailed(marketId));
 
         uint64 tSet = market.settlementTimestamp;
         uint64 nowTs = uint64(block.timestamp);
         
-        // WP v2: markFailed during PendingOps [Tset + Δsettle, Tset + Δsettle + Δops)
+        // markFailed during PendingOps [Tset + Δsettle, Tset + Δsettle + Δops)
         uint64 opsStart = tSet + settlementSubmitWindow;
         uint64 opsEnd = opsStart + pendingOpsWindow;
         
@@ -233,15 +227,11 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         SettlementOracleState storage state = settlementOracleState[marketId];
         bool hasCandidate = state.candidatePriceTimestamp != 0;
         
-        if (nowTs < opsStart) {
-            // Before PendingOps - not allowed
-            revert CE.PendingOpsNotStarted();
-        }
+        // Before PendingOps - not allowed
+        require(nowTs >= opsStart, SE.PendingOpsNotStarted());
         
-        if (nowTs >= opsEnd && hasCandidate) {
-            // After PendingOps with candidate: should use settleMarket instead
-            revert CE.SettlementOracleCandidateMissing();
-        }
+        // After PendingOps with candidate: should use settleMarket instead
+        require(nowTs < opsEnd || !hasCandidate, SE.SettlementOracleCandidateMissing());
         
         // Clear any candidate (WP v2: divergence case discards candidate)
         state.candidateValue = 0;
@@ -255,9 +245,9 @@ contract MarketLifecycleModule is SignalsCoreStorage {
 
     /**
      * @notice Finalize secondary settlement for a failed market
-     * @dev WP v2 Sec 7.5: Operations provides settlement value for failed markets
-     *      Can only be called on a market marked as failed
-     *      Settlement value comes from pre-announced secondary rule (off-chain)
+     * @dev Operations provides settlement value for failed markets.
+     *      Can only be called on a market marked as failed.
+     *      Settlement value comes from pre-announced secondary rule (off-chain).
      * @param marketId Market to settle
      * @param settlementValue The settlement value (ops-determined)
      */
@@ -266,9 +256,9 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         int256 settlementValue
     ) external onlyDelegated {
         ISignalsCore.Market storage market = markets[marketId];
-        if (!_marketExists(marketId)) revert CE.MarketNotFound(marketId);
-        if (market.settled) revert CE.MarketAlreadySettled(marketId);
-        if (!market.failed) revert CE.MarketNotFailed(marketId);
+        require(_marketExists(marketId), SE.MarketNotFound(marketId));
+        require(!market.settled, SE.MarketAlreadySettled(marketId));
+        require(market.failed, SE.MarketNotFailed(marketId));
 
         int256 settlementTick = _toSettlementTick(market, settlementValue);
 
@@ -281,11 +271,11 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         market.snapshotChunkCursor = 0;
         market.snapshotChunksDone = (market.openPositionCount == 0);
 
-        // Phase 6: Calculate P&L with payout reserve (same as primary settlement)
+        // Calculate P&L with payout reserve
         uint64 batchId = _getBatchIdForMarket(marketId);
         (int256 lt, uint256 ftot, uint256 payoutReserve) = _calculateMarketPnlWithPayout(marketId, settlementTick);
         
-        // Store payout reserve in escrow (WP v2 Sec 3.3)
+        // Store payout reserve in escrow
         _payoutReserve[marketId] = payoutReserve;
         _payoutReserveRemaining[marketId] = payoutReserve;
         
@@ -300,9 +290,9 @@ contract MarketLifecycleModule is SignalsCoreStorage {
 
     function reopenMarket(uint256 marketId) external onlyDelegated {
         ISignalsCore.Market storage market = markets[marketId];
-        if (!_marketExists(marketId)) revert CE.MarketNotFound(marketId);
+        require(_marketExists(marketId), SE.MarketNotFound(marketId));
         // Can reopen either settled or failed markets
-        if (!market.settled && !market.failed) revert CE.MarketNotSettled(marketId);
+        require(market.settled || market.failed, SE.MarketNotSettled(marketId));
 
         market.settled = false;
         market.failed = false;
@@ -320,8 +310,8 @@ contract MarketLifecycleModule is SignalsCoreStorage {
 
     function setMarketActive(uint256 marketId, bool isActive) external onlyDelegated {
         ISignalsCore.Market storage market = markets[marketId];
-        if (!_marketExists(marketId)) revert CE.MarketNotFound(marketId);
-        if (isActive && market.settled) revert CE.MarketAlreadySettled(marketId);
+        require(_marketExists(marketId), SE.MarketNotFound(marketId));
+        require(!isActive || !market.settled, SE.MarketAlreadySettled(marketId));
 
         market.isActive = isActive;
         emit MarketActivationUpdated(marketId, isActive);
@@ -334,8 +324,8 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         uint64 settlementTimestamp
     ) external onlyDelegated {
         ISignalsCore.Market storage market = markets[marketId];
-        if (!_marketExists(marketId)) revert CE.MarketNotFound(marketId);
-        if (market.settled) revert CE.MarketAlreadySettled(marketId);
+        require(_marketExists(marketId), SE.MarketNotFound(marketId));
+        require(!market.settled, SE.MarketAlreadySettled(marketId));
         _validateTimeRange(startTimestamp, endTimestamp, settlementTimestamp);
 
         market.startTimestamp = startTimestamp;
@@ -346,11 +336,11 @@ contract MarketLifecycleModule is SignalsCoreStorage {
     }
 
     function requestSettlementChunks(uint256 marketId, uint32 maxChunksPerTx) external onlyDelegated returns (uint32 emitted) {
-        if (maxChunksPerTx == 0) revert CE.ZeroLimit();
+        require(maxChunksPerTx != 0, SE.ZeroLimit());
         ISignalsCore.Market storage market = markets[marketId];
-        if (!_marketExists(marketId)) revert CE.MarketNotFound(marketId);
-        if (!market.settled) revert CE.MarketNotSettled(marketId);
-        if (market.snapshotChunksDone) revert CE.SnapshotAlreadyCompleted();
+        require(_marketExists(marketId), SE.MarketNotFound(marketId));
+        require(market.settled, SE.MarketNotSettled(marketId));
+        require(!market.snapshotChunksDone, SE.SnapshotAlreadyCompleted());
 
         uint32 totalChunks = _calculateTotalChunks(market.openPositionCount);
         uint32 cursor = market.snapshotChunkCursor;
@@ -381,16 +371,14 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         uint64 endTimestamp,
         uint64 settlementTimestamp
     ) internal pure {
-        if (tickSpacing <= 0) revert CE.InvalidMarketParameters(minTick, maxTick, tickSpacing);
-        if (minTick >= maxTick) revert CE.InvalidMarketParameters(minTick, maxTick, tickSpacing);
-        if ((maxTick - minTick) % tickSpacing != 0) revert CE.InvalidMarketParameters(minTick, maxTick, tickSpacing);
+        require(tickSpacing > 0, SE.InvalidMarketParameters(minTick, maxTick, tickSpacing));
+        require(minTick < maxTick, SE.InvalidMarketParameters(minTick, maxTick, tickSpacing));
+        require((maxTick - minTick) % tickSpacing == 0, SE.InvalidMarketParameters(minTick, maxTick, tickSpacing));
         _validateTimeRange(startTimestamp, endTimestamp, settlementTimestamp);
     }
 
     function _validateTimeRange(uint64 startTimestamp, uint64 endTimestamp, uint64 settlementTimestamp) internal pure {
-        if (startTimestamp >= endTimestamp || endTimestamp > settlementTimestamp) {
-            revert CE.InvalidTimeRange(startTimestamp, endTimestamp, settlementTimestamp);
-        }
+        require(startTimestamp < endTimestamp && endTimestamp <= settlementTimestamp, SE.InvalidTimeRange(startTimestamp, endTimestamp, settlementTimestamp));
     }
 
     function _marketExists(uint256 marketId) internal view returns (bool) {
@@ -437,7 +425,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
     }
 
     // ============================================================
-    // Phase 6: P&L Recording
+    // P&L Recording
     // ============================================================
 
     /**
@@ -455,18 +443,16 @@ contract MarketLifecycleModule is SignalsCoreStorage {
 
     /**
      * @notice Calculate market P&L from CLMSR tree state
-     * @dev Phase 6: Calculates P&L using whitepaper formula:
-     *      L_t = C(q_end) - C(q_start) = α * (ln(Z_end) - ln(Z_start))
-     * 
+     * @dev L_t = C(q_end) - C(q_start) = α * (ln(Z_end) - ln(Z_start))
      *      Where:
      *      - Z_start = initialRootSum (stored at market creation)
      *      - Z_end = current tree root sum
      *      - α = liquidityParameter
-     * 
+     *
      *      P&L interpretation:
      *      - Positive: maker loss (Z_end > Z_start, traders net profitable)
      *      - Negative: maker profit (Z_end < Z_start, traders net losing)
-     * 
+     *
      * @param marketId Market identifier
      * @return lt Maker P&L (signed: positive = loss, negative = profit)
      * @return ftot Gross fees collected during trading
@@ -482,8 +468,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         uint256 zEnd = tree.getRangeSum(0, market.numBins - 1);
         
         // P&L = α * (ln(Z_end) - ln(Z_start))
-        // Per whitepaper Sec 3.5: L_t = C(q_end) - C(q_start)
-        // where C(q) = α * ln(Z(q))
+        // L_t = C(q_end) - C(q_start), where C(q) = α * ln(Z(q))
         // L_t > 0: cost increased → maker profit (traders net bought)
         // L_t < 0: cost decreased → maker loss (traders net sold)
         uint256 lnZEnd = zEnd.wLn();
@@ -502,10 +487,9 @@ contract MarketLifecycleModule is SignalsCoreStorage {
 
     /**
      * @notice Calculate market P&L with payout reserve deduction
-     * @dev Phase 6: Whitepaper v2 formula:
-     *      Payout_t := Q_{t,τ_t} (settlement tick exposure)
+     * @dev Payout_t := Q_{t,τ_t} (settlement tick exposure)
      *      L_t := ΔC_t - Payout_t (maker P&L net of payout)
-     * 
+     *
      * @param marketId Market identifier
      * @param settlementTick The settlement tick τ_t
      * @return lt Maker P&L after payout deduction
@@ -525,8 +509,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         // Get current root sum (Z_end)
         uint256 zEnd = tree.getRangeSum(0, market.numBins - 1);
         
-        // ΔC_t = α * (ln(Z_end) - ln(Z_start))
-        // Per whitepaper Sec 3.5: ΔC_t = C(q_end) - C(q_start)
+        // ΔC_t = α * (ln(Z_end) - ln(Z_start)) = C(q_end) - C(q_start)
         int256 deltaC;
         uint256 lnZEnd = zEnd.wLn();
         uint256 lnZStart = zStart.wLn();
@@ -557,13 +540,10 @@ contract MarketLifecycleModule is SignalsCoreStorage {
 
     /**
      * @notice Record P&L and ΔEₜ to daily batch
-     * @dev Phase 7: Multi-market prior admissibility check (WP v2 Sec 4.1)
-     *      When multiple markets settle in the same batch, their ΔEₜ values are summed.
+     * @dev When multiple markets settle in the same batch, their ΔEₜ values are summed.
      *      The batch's total ΔEₜ acts as the grant cap in FeeWaterfallLib.
-     *      This function performs an early check: if batchDeltaEt > backstopNav,
-     *      it's impossible for the batch to process successfully (grant would exceed cap).
-     *      Note: backstopNav may change between settle and batch processing, so this is
-     *      an early warning, not a guarantee. Final enforcement is in FeeWaterfallLib.
+     *      Performs early check: if batchDeltaEt > backstopNav, batch will fail.
+     *      Note: backstopNav may change between settle and batch processing.
      * @param batchId Batch identifier
      * @param lt P&L to add
      * @param ftot Fees to add
@@ -571,32 +551,23 @@ contract MarketLifecycleModule is SignalsCoreStorage {
      */
     function _recordPnlToBatch(uint64 batchId, int256 lt, uint256 ftot, uint256 deltaEt) internal {
         DailyPnlSnapshot storage snap = _dailyPnl[batchId];
-        if (snap.processed) revert CE.BatchAlreadyProcessed(batchId);
+        require(!snap.processed, SE.BatchAlreadyProcessed(batchId));
         snap.Lt += lt;
         snap.Ftot += ftot;
         snap.DeltaEtSum += deltaEt;
         
-        // Phase 7: Early check for multi-market batch admissibility
-        // If total ΔEₜ exceeds backstopNav, batch will fail when processed
-        // Revert early to provide faster feedback to operators
-        if (snap.DeltaEtSum > capitalStack.backstopNav) {
-            revert CE.BatchDeltaEtExceedsBackstop(snap.DeltaEtSum, capitalStack.backstopNav);
-        }
+        // Early check: if total ΔEₜ exceeds backstopNav, batch will fail
+        require(snap.DeltaEtSum <= capitalStack.backstopNav, SE.BatchDeltaEtExceedsBackstop(snap.DeltaEtSum, capitalStack.backstopNav));
     }
 
     // ============================================================
-    // Phase 7: α Safety Enforcement
-    // ============================================================
-
-    // ============================================================
-    // Phase 7: ΔEₜ Calculation
-    // NOTE: Phase 8 moved α/prior enforcement to RiskModule gate
+    // ΔEₜ Calculation
+    // Note: α/prior enforcement is in RiskModule gate
     // ============================================================
 
     /**
      * @notice Calculate ΔEₜ (tail budget) from prior factors
-     * @dev Per WP v2 Sec 4.1:
-     *      E_ent(q₀,t) = C(q₀,t) - min_j q₀,t,j
+     * @dev E_ent(q₀,t) = C(q₀,t) - min_j q₀,t,j
      *      where q_b = α * ln(factor_b), C(q) = α * ln(rootSum)
      *      
      *      For general prior:

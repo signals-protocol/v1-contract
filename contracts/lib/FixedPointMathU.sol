@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {UD60x18, ud, unwrap, exp, ln} from "@prb/math/src/UD60x18.sol";
+import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
 
 /// @notice Fixed-point math utilities (WAD = 1e18) with 512-bit safe arithmetic.
 /// @dev Uses OpenZeppelin Math.mulDiv for overflow-safe multiplication/division.
@@ -13,10 +14,6 @@ library FixedPointMathU {
     uint256 internal constant SCALE_DIFF = 1e12; // 6-dec → 18-dec
     uint256 internal constant HALF_SCALE = SCALE_DIFF / 2;
 
-    error FP_DivisionByZero();
-    error FP_InvalidInput();
-    error FP_Overflow();
-
     // ============================================================
     // Decimal Conversion (6-dec ↔ 18-dec)
     // ============================================================
@@ -25,8 +22,8 @@ library FixedPointMathU {
     /// @notice Overflow-safe: explicitly checks before multiplication
     function toWad(uint256 x) internal pure returns (uint256) {
         // Explicit overflow check to prevent wrap-around
-        if (x > type(uint256).max / SCALE_DIFF) revert FP_Overflow();
-            return x * SCALE_DIFF;
+        if (x > type(uint256).max / SCALE_DIFF) revert SE.FP_Overflow();
+        return x * SCALE_DIFF;
     }
 
     /// @dev 18-decimal → 6-decimal (truncates/floor)
@@ -74,7 +71,6 @@ library FixedPointMathU {
     /// @notice WAD multiply with ceil (round up)
     /// @dev result = ceil(x * y / WAD)
     ///      Uses mulDiv + mulmod to check for remainder
-    ///      Per whitepaper: ceil semantics required for Nfloor calculation
     function wMulUp(uint256 x, uint256 y) internal pure returns (uint256) {
         uint256 result = Math.mulDiv(x, y, WAD);
         // Check if there's a remainder (x*y % WAD != 0)
@@ -108,7 +104,7 @@ library FixedPointMathU {
     /// @dev result = floor(x * WAD / y)
     ///      Uses 512-bit intermediate to prevent overflow
     function wDiv(uint256 x, uint256 y) internal pure returns (uint256) {
-        if (y == 0) revert FP_DivisionByZero();
+        if (y == 0) revert SE.FP_DivisionByZero();
         return Math.mulDiv(x, WAD, y);
     }
 
@@ -116,7 +112,7 @@ library FixedPointMathU {
     /// @dev result = ceil(x * WAD / y)
     ///      Uses mulDiv + mulmod to check for remainder
     function wDivUp(uint256 x, uint256 y) internal pure returns (uint256) {
-        if (y == 0) revert FP_DivisionByZero();
+        if (y == 0) revert SE.FP_DivisionByZero();
         uint256 result = Math.mulDiv(x, WAD, y);
         // Check if there's a remainder (x*WAD % y != 0)
         if (mulmod(x, WAD, y) > 0) {
@@ -131,7 +127,7 @@ library FixedPointMathU {
     /// @dev result = round(x * WAD / y)
     ///      Uses mulDiv + mulmod to check remainder against y/2
     function wDivNearest(uint256 x, uint256 y) internal pure returns (uint256) {
-        if (y == 0) revert FP_DivisionByZero();
+        if (y == 0) revert SE.FP_DivisionByZero();
         uint256 result = Math.mulDiv(x, WAD, y);
         uint256 remainder = mulmod(x, WAD, y);
         // Round up if remainder >= y/2
@@ -156,7 +152,7 @@ library FixedPointMathU {
     /// @param xWad Input in WAD (must be <= MAX_EXP_INPUT_WAD ≈ 133.084)
     function wExp(uint256 xWad) internal pure returns (uint256) {
         if (xWad == 0) return WAD;
-        if (xWad > MAX_EXP_INPUT_WAD) revert FP_Overflow();
+        if (xWad > MAX_EXP_INPUT_WAD) revert SE.FP_Overflow();
         return unwrap(exp(ud(xWad)));
     }
 
@@ -164,7 +160,7 @@ library FixedPointMathU {
     /// @dev Wraps PRBMath UD60x18.ln() for production-grade numerical stability
     /// @param xWad Input value in WAD (MUST be >= WAD = 1e18)
     function wLn(uint256 xWad) internal pure returns (uint256) {
-        if (xWad < WAD) revert FP_InvalidInput();
+        if (xWad < WAD) revert SE.FP_InvalidInput();
         if (xWad == WAD) return 0;
         return unwrap(ln(ud(xWad)));
     }
@@ -174,9 +170,8 @@ library FixedPointMathU {
     // ============================================================
 
     /// @notice Calculate ln(n) with safe (upward) rounding for α calculation
-    /// @dev Returns ln(n) in WAD, rounded UP (+1 wei) to ensure α_base is conservative
-    ///      Per whitepaper v2: α_base = λE/ln(n) must never exceed the safety bound
-    ///      Using PRBMath for precision, +1 wei for conservative upper bound
+    /// @dev Returns ln(n) in WAD, rounded UP (+1 wei) to ensure α_base is conservative.
+    ///      α_base = λE/ln(n) must never exceed the safety bound.
     /// @param n Number of bins (integer, not WAD)
     /// @return lnN ln(n) in WAD, rounded up for safety
     function lnWadUp(uint256 n) internal pure returns (uint256 lnN) {

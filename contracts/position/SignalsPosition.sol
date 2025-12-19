@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "../errors/CLMSRErrors.sol";
+import "../errors/SignalsErrors.sol";
 import "../interfaces/ISignalsPosition.sol";
 import "./SignalsPositionStorage.sol";
 
@@ -15,6 +15,7 @@ contract SignalsPosition is
     ERC721Upgradeable,
     OwnableUpgradeable,
     UUPSUpgradeable,
+    SignalsErrors,
     SignalsPositionStorage
 {
     event PositionMinted(
@@ -31,7 +32,7 @@ contract SignalsPosition is
     event PositionUpdated(uint256 indexed positionId, uint128 oldQuantity, uint128 newQuantity);
 
     modifier onlyCore() {
-        if (msg.sender != core) revert CE.UnauthorizedCaller(msg.sender);
+        if (msg.sender != core) revert SignalsErrors.UnauthorizedCaller(msg.sender);
         _;
     }
 
@@ -41,7 +42,7 @@ contract SignalsPosition is
     }
 
     function initialize(address _core) external initializer {
-        if (_core == address(0)) revert CE.ZeroAddress();
+        if (_core == address(0)) revert SignalsErrors.ZeroAddress();
         __ERC721_init("Signals Position", "SIGP");
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
@@ -50,7 +51,7 @@ contract SignalsPosition is
     }
 
     function setCore(address _core) external onlyOwner {
-        if (_core == address(0)) revert CE.ZeroAddress();
+        if (_core == address(0)) revert SignalsErrors.ZeroAddress();
         core = _core;
     }
 
@@ -63,8 +64,8 @@ contract SignalsPosition is
         int256 upperTick,
         uint128 quantity
     ) external onlyCore returns (uint256 positionId) {
-        if (to == address(0)) revert CE.ZeroAddress();
-        if (quantity == 0) revert CE.InvalidQuantity(quantity);
+        if (to == address(0)) revert SignalsErrors.ZeroAddress();
+        if (quantity == 0) revert SignalsErrors.InvalidQuantity(quantity);
 
         positionId = _nextId++;
 
@@ -83,7 +84,7 @@ contract SignalsPosition is
     }
 
     function burn(uint256 positionId) external onlyCore {
-        if (!_exists(positionId)) revert CE.PositionNotFound(positionId);
+        if (!_exists(positionId)) revert SignalsErrors.PositionNotFound(positionId);
         address owner = ownerOf(positionId);
         uint256 marketId = _positions[positionId].marketId;
 
@@ -95,8 +96,8 @@ contract SignalsPosition is
     }
 
     function updateQuantity(uint256 positionId, uint128 newQuantity) external onlyCore {
-        if (!_exists(positionId)) revert CE.PositionNotFound(positionId);
-        if (newQuantity == 0) revert CE.InvalidQuantity(newQuantity);
+        if (!_exists(positionId)) revert SignalsErrors.PositionNotFound(positionId);
+        if (newQuantity == 0) revert SignalsErrors.InvalidQuantity(newQuantity);
         uint128 oldQty = _positions[positionId].quantity;
         _positions[positionId].quantity = newQuantity;
         emit PositionUpdated(positionId, oldQty, newQuantity);
@@ -105,7 +106,7 @@ contract SignalsPosition is
     // --- Views ---
 
     function getPosition(uint256 positionId) external view returns (ISignalsPosition.Position memory position) {
-        if (!_exists(positionId)) revert CE.PositionNotFound(positionId);
+        if (!_exists(positionId)) revert SignalsErrors.PositionNotFound(positionId);
         return _positions[positionId];
     }
 

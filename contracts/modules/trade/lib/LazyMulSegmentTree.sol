@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import {FixedPointMathU} from "../../../lib/FixedPointMathU.sol";
-import {CE} from "../../../errors/CLMSRErrors.sol";
+import {SignalsErrors as SE} from "../../../errors/SignalsErrors.sol";
 
 /// @notice Lazy multiplication segment tree used by CLMSR math (ported from v0).
 library LazyMulSegmentTree {
@@ -28,9 +28,9 @@ library LazyMulSegmentTree {
     }
 
     function init(Tree storage tree, uint32 treeSize) external {
-        if (treeSize == 0) revert CE.TreeSizeZero();
-        if (tree.size != 0) revert CE.TreeAlreadyInitialized();
-        if (treeSize > type(uint32).max / 2) revert CE.TreeSizeTooLarge();
+        require(treeSize != 0, SE.TreeSizeZero());
+        require(tree.size == 0, SE.TreeAlreadyInitialized());
+        require(treeSize <= type(uint32).max / 2, SE.TreeSizeTooLarge());
 
         tree.size = treeSize;
         tree.nextIndex = 0;
@@ -38,38 +38,38 @@ library LazyMulSegmentTree {
     }
 
     function applyRangeFactor(Tree storage tree, uint32 lo, uint32 hi, uint256 factor) external {
-        if (tree.size == 0) revert CE.TreeNotInitialized();
-        if (lo > hi) revert CE.InvalidRange(lo, hi);
-        if (hi >= tree.size) revert CE.IndexOutOfBounds(hi, tree.size);
-        if (factor < MIN_FACTOR || factor > MAX_FACTOR) revert CE.InvalidFactor(factor);
+        require(tree.size != 0, SE.TreeNotInitialized());
+        require(lo <= hi, SE.InvalidRange(lo, hi));
+        require(hi < tree.size, SE.IndexOutOfBounds(hi, tree.size));
+        require(factor >= MIN_FACTOR && factor <= MAX_FACTOR, SE.InvalidFactor(factor));
 
         _applyFactorRecursive(tree, tree.root, 0, tree.size - 1, lo, hi, factor);
     }
 
     function getRangeSum(Tree storage tree, uint32 lo, uint32 hi) external view returns (uint256 sum) {
-        if (tree.size == 0) revert CE.TreeNotInitialized();
-        if (lo > hi) revert CE.InvalidRange(lo, hi);
-        if (hi >= tree.size) revert CE.IndexOutOfBounds(hi, tree.size);
+        require(tree.size != 0, SE.TreeNotInitialized());
+        require(lo <= hi, SE.InvalidRange(lo, hi));
+        require(hi < tree.size, SE.IndexOutOfBounds(hi, tree.size));
 
         return _sumRangeWithAccFactor(tree, tree.root, 0, tree.size - 1, lo, hi, ONE_WAD);
     }
 
     function propagateLazy(Tree storage tree, uint32 lo, uint32 hi) external returns (uint256 sum) {
-        if (tree.size == 0) revert CE.TreeNotInitialized();
-        if (lo > hi) revert CE.InvalidRange(lo, hi);
-        if (hi >= tree.size) revert CE.IndexOutOfBounds(hi, tree.size);
+        require(tree.size != 0, SE.TreeNotInitialized());
+        require(lo <= hi, SE.InvalidRange(lo, hi));
+        require(hi < tree.size, SE.IndexOutOfBounds(hi, tree.size));
         sum = _queryRecursive(tree, tree.root, 0, tree.size - 1, lo, hi);
         return sum;
     }
 
     function seedWithFactors(Tree storage tree, uint256[] memory factors) internal {
-        if (tree.size == 0) revert CE.TreeNotInitialized();
-        if (factors.length != tree.size) revert CE.ArrayLengthMismatch();
+        require(tree.size != 0, SE.TreeNotInitialized());
+        require(factors.length == tree.size, SE.ArrayLengthMismatch());
 
         tree.nextIndex = 0;
         tree.root = 0;
 
-        (uint32 rootIndex, uint256 total) = _buildTreeFromArray(tree, 0, tree.size - 1, factors);
+        (uint32 rootIndex, ) = _buildTreeFromArray(tree, 0, tree.size - 1, factors);
         tree.root = rootIndex;
     }
 
@@ -118,7 +118,7 @@ library LazyMulSegmentTree {
 
         uint256 priorPending = uint256(node.pendingFactor);
         uint256 newPendingFactor = _combineFactors(priorPending, factor);
-        if (newPendingFactor > type(uint192).max) revert CE.LazyFactorOverflow();
+        require(newPendingFactor <= type(uint192).max, SE.LazyFactorOverflow());
         node.pendingFactor = uint192(newPendingFactor);
     }
 
@@ -161,7 +161,7 @@ library LazyMulSegmentTree {
         uint256 remaining = surplus - rightSum;
         tree.nodes[right].sum = 0;
         uint256 leftSum = tree.nodes[left].sum;
-        if (remaining > leftSum) revert CE.MathMulOverflow();
+        require(remaining <= leftSum, SE.MathMulOverflow());
         tree.nodes[left].sum = leftSum - remaining;
     }
 
@@ -211,7 +211,7 @@ library LazyMulSegmentTree {
                 _pushPendingFactor(tree, nodeIndex, l, r);
                 node.pendingFactor = uint192(ONE_WAD);
             } else {
-                if (newPendingFactor > type(uint192).max) revert CE.LazyFactorOverflow();
+                require(newPendingFactor <= type(uint192).max, SE.LazyFactorOverflow());
                 node.pendingFactor = uint192(newPendingFactor);
             }
 

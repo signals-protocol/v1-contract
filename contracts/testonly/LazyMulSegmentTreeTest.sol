@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import {LazyMulSegmentTree} from "../modules/trade/lib/LazyMulSegmentTree.sol";
 import {FixedPointMathU} from "../lib/FixedPointMathU.sol";
+import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
 
 /// @notice Test harness for LazyMulSegmentTree library.
 /// @dev Exposes all tree operations for unit testing.
@@ -51,7 +52,7 @@ contract LazyMulSegmentTreeTest {
 
     /// @notice Initialize and seed in one call.
     function initAndSeed(uint256[] calldata factors) external {
-        if (factors.length == 0) revert("EMPTY_FACTORS");
+        if (factors.length == 0) revert SE.EmptyFactors();
         tree.size = 0;
         tree.root = 0;
         tree.nextIndex = 0;

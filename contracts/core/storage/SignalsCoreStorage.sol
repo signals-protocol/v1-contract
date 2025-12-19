@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../../interfaces/ISignalsCore.sol";
@@ -8,11 +8,10 @@ import "../../modules/trade/lib/LazyMulSegmentTree.sol";
 
 abstract contract SignalsCoreStorage {
     /// @dev Batch/day granularity for daily accounting. Used to derive batchId as day-key.
-    ///      Note: This is a mechanism-layer constant (whitepaper "day t" cycle).
     uint64 internal constant BATCH_SECONDS = 86_400;
 
     // ============================================================
-    // Phase 8: Settlement Timeline Configuration (WP v2 Sec 7)
+    // Settlement Timeline Configuration
     // ============================================================
     // Timeline: Trading → SettlementOpen → PendingOps → Finalized
     // 
@@ -74,7 +73,7 @@ abstract contract SignalsCoreStorage {
     address public defaultFeePolicy;
 
     // ============================================================
-    // LP Vault State (Phase 4)
+    // LP Vault State
     // ============================================================
     
     /// @notice LP Vault accounting state
@@ -93,7 +92,7 @@ abstract contract SignalsCoreStorage {
     uint256 public minSeedAmount;
 
     // ============================================================
-    // Phase 5: Fee Waterfall & Capital Stack
+    // Fee Waterfall & Capital Stack
     // ============================================================
 
     /// @notice Capital stack configuration (Backstop + Treasury)
@@ -114,7 +113,6 @@ abstract contract SignalsCoreStorage {
     }
 
     /// @notice Daily P&L snapshot for batch processing
-    /// @dev Fields match whitepaper Appendix A naming for easy verification
     struct DailyPnlSnapshot {
         // Input values
         int256 Lt;               // CLMSR P&L (signed)
@@ -143,20 +141,20 @@ abstract contract SignalsCoreStorage {
         bool processed;          // Whether this batch has been processed
     }
 
-    /// @notice Unified capital stack state (Phase 5)
+    /// @notice Unified capital stack state
     CapitalStackState internal capitalStack;
 
-    /// @notice Fee waterfall configuration (Phase 5)
+    /// @notice Fee waterfall configuration
     FeeWaterfallConfig internal feeWaterfallConfig;
 
     /// @notice Daily P&L snapshots by batch ID
     mapping(uint64 => DailyPnlSnapshot) internal _dailyPnl;
 
     // ============================================================
-    // Phase 6: Request ID-based Queue (Placeholder)
+    // Request ID-based Queue
     // ============================================================
 
-    /// @notice Request status enum for ID-based queue (Phase 6)
+    /// @notice Request status enum for ID-based queue
     enum RequestStatus {
         Pending,
         Processed,
@@ -164,7 +162,7 @@ abstract contract SignalsCoreStorage {
         Cancelled
     }
 
-    /// @notice Deposit request with ID (Phase 6)
+    /// @notice Deposit request with ID
     struct DepositRequest {
         uint64 id;
         address owner;
@@ -173,7 +171,7 @@ abstract contract SignalsCoreStorage {
         RequestStatus status;
     }
 
-    /// @notice Withdraw request with ID (Phase 6)
+    /// @notice Withdraw request with ID
     struct WithdrawRequest {
         uint64 id;
         address owner;
@@ -182,7 +180,7 @@ abstract contract SignalsCoreStorage {
         RequestStatus status;
     }
 
-    /// @notice Batch aggregation result (Phase 6)
+    /// @notice Batch aggregation result
     struct BatchAggregation {
         uint256 totalDepositAssets;   // Sum of all eligible deposit amounts
         uint256 totalWithdrawShares;  // Sum of all eligible withdraw shares
@@ -197,7 +195,7 @@ abstract contract SignalsCoreStorage {
     }
 
     // ============================================================
-    // Phase 6: Request ID-based Queue Storage (Active)
+    // Request ID-based Queue Storage
     // ============================================================
 
     /// @notice Request ID → DepositRequest mapping
@@ -227,7 +225,7 @@ abstract contract SignalsCoreStorage {
     uint64 public withdrawalLagBatches;
 
     // ============================================================
-    // Phase 6: Exposure Ledger & Payout Reserve
+    // Exposure Ledger & Payout Reserve
     // ============================================================
 
     /// @notice DEPRECATED: Old tick-keyed exposure ledger
@@ -253,7 +251,7 @@ abstract contract SignalsCoreStorage {
     mapping(uint256 => uint256) internal _payoutReserveRemaining;
 
     // ============================================================
-    // Phase 6: Free Balance Accounting (Escrow Safety)
+    // Free Balance Accounting (Escrow Safety)
     // ============================================================
 
     /// @notice Total pending deposits in 6-decimal token units
@@ -273,17 +271,17 @@ abstract contract SignalsCoreStorage {
     uint256 internal _totalPendingWithdrawals6;
 
     // ============================================================
-    // Phase 7: Risk Configuration
+    // Risk Configuration
     // ============================================================
 
-    /// @notice Risk parameters for α Safety Bounds (WP v2 Sec 4.3-4.5)
+    /// @notice Risk parameters for α Safety Bounds
     struct RiskConfig {
         uint256 lambda;      // λ: Safety parameter (WAD), e.g., 0.3e18 = 30% max drawdown
         uint256 kDrawdown;   // k: Drawdown sensitivity factor (WAD), typically 1.0e18
         bool enforceAlpha;   // Whether to enforce α bounds at market config time (create/reopen)
     }
 
-    /// @notice Risk configuration (Phase 7)
+    /// @notice Risk configuration
     RiskConfig internal riskConfig;
 
     /// @notice Batch ID → Market ID mapping (WP v2: one market per batch)

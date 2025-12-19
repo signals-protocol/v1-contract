@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import "../core/SignalsCore.sol";
 import "../modules/trade/lib/LazyMulSegmentTree.sol";
@@ -46,7 +46,7 @@ contract SignalsCoreHarness is SignalsCore {
     }
 
     // ============================================================
-    // Phase 6: Exposure Ledger test helpers (Fenwick-based)
+    // Exposure Ledger test helpers (Fenwick-based)
     // ============================================================
 
     /**
@@ -104,7 +104,7 @@ contract SignalsCoreHarness is SignalsCore {
         );
     }
 
-    /// @notice Set exposure at a specific tick (Diff-based, Phase 6 testing)
+    /// @notice Set exposure at a specific tick (Diff-based)
     function harnessSetExposureAtTick(
         uint256 marketId,
         int256 tick,
@@ -127,7 +127,7 @@ contract SignalsCoreHarness is SignalsCore {
         }
     }
 
-    /// @notice Set payout reserve for a market (Phase 6 testing)
+    /// @notice Set payout reserve for a market (testing)
     function harnessSetPayoutReserve(
         uint256 marketId,
         uint256 amount
@@ -158,7 +158,7 @@ contract SignalsCoreHarness is SignalsCore {
     }
 
     // ============================================================
-    // Phase 7: LP Vault state helpers for testing
+    // LP Vault state helpers for testing
     // ============================================================
 
     /// @notice Set LP vault state directly for testing α safety with drawdown
@@ -188,7 +188,7 @@ contract SignalsCoreHarness is SignalsCore {
     }
 
     // ============================================================
-    // Phase 7: Backward-compatible createMarket for tests
+    // Backward-compatible createMarket for tests
     // ============================================================
 
     /// @notice Create market with uniform prior (backward compatible for tests)
@@ -210,7 +210,7 @@ contract SignalsCoreHarness is SignalsCore {
             factors[i] = 1e18;
         }
         
-        // Phase 8: Risk gate FIRST - RiskModule calculates deltaEt from factors
+        // Risk gate first - RiskModule calculates deltaEt from factors
         _riskGate(abi.encodeCall(
             IRiskModule.gateCreateMarket,
             (liquidityParameter, numBins, factors)
