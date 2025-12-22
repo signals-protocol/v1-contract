@@ -14,15 +14,12 @@ import "./trade/lib/ExposureDiffLib.sol";
 import "./trade/lib/TickBinLib.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-interface IOwnableLite {
-    function owner() external view returns (address);
-}
-
-/// @notice Delegate-only trade module (skeleton)
+/// @notice Delegate-only trade module
 contract TradeModule is SignalsCoreStorage {
     address private immutable self;
     
     uint256 internal constant WAD = 1e18;
+    uint256 internal constant MAX_CHUNKS_PER_TX = 100;
 
     // Events mirrored from v0 for parity
     event PositionOpened(
@@ -65,6 +62,13 @@ contract TradeModule is SignalsCoreStorage {
         address feePolicy
     );
 
+    event RangeFactorApplied(
+        uint256 indexed marketId,
+        int256 indexed lo,
+        int256 indexed hi,
+        uint256 factor
+    );
+
     using SignalsDistributionMath for LazyMulSegmentTree.Tree;
     using SignalsClmsrMath for uint256;
     using LazyMulSegmentTree for LazyMulSegmentTree.Tree;
@@ -81,6 +85,8 @@ contract TradeModule is SignalsCoreStorage {
     }
 
     // --- External stubs ---
+    /// @notice Open a new position (execute-first model for exact cost calculation)
+    /// @dev Applies factor first, then computes exact cost from actual sum change
     function openPosition(
         uint256 marketId,
         int256 lowerTick,
@@ -93,7 +99,14 @@ contract TradeModule is SignalsCoreStorage {
         address feePolicy = market.feePolicy != address(0) ? market.feePolicy : defaultFeePolicy;
 
         uint256 qtyWad = uint256(quantity).toWad();
-        uint256 costWad = _calculateTradeCost(marketId, lowerTick, upperTick, qtyWad);
+        
+        // Execute-first: apply factor and get actual sum change
+        (uint256 sumBefore, uint256 sumAfter) = _applyFactorChunked(marketId, lowerTick, upperTick, qtyWad, true);
+        
+        // Compute exact cost from actual sum change (no view/execute mismatch)
+        uint256 costWad = SignalsDistributionMath.computeBuyCostFromSumChange(
+            market.liquidityParameter, sumBefore, sumAfter
+        );
         uint256 cost6 = _roundDebit(costWad);
 
         uint256 fee6 = _quoteFeeWithPolicy(feePolicy, true, msg.sender, marketId, lowerTick, upperTick, quantity, cost6);
@@ -101,9 +114,9 @@ contract TradeModule is SignalsCoreStorage {
         uint256 totalCost = cost6 + fee6;
         require(totalCost <= maxCost, SE.CostExceedsMaximum(totalCost, maxCost));
 
+        // Payment after state change (atomic transaction ensures rollback on failure)
         _pullPayment(msg.sender, totalCost);
 
-        _applyFactor(marketId, lowerTick, upperTick, qtyWad, true);
         market.accumulatedFees += fee6.toWad();
         _addExposure(marketId, lowerTick, upperTick, quantity);
 
@@ -115,6 +128,7 @@ contract TradeModule is SignalsCoreStorage {
         emit TradeFeeCharged(msg.sender, marketId, positionId, true, cost6, fee6, feePolicy);
     }
 
+    /// @notice Increase an existing position (execute-first model for exact cost calculation)
     function increasePosition(
         uint256 positionId,
         uint128 quantity,
@@ -128,7 +142,16 @@ contract TradeModule is SignalsCoreStorage {
         address feePolicy = market.feePolicy != address(0) ? market.feePolicy : defaultFeePolicy;
 
         uint256 qtyWad = uint256(quantity).toWad();
-        uint256 costWad = _calculateTradeCost(position.marketId, position.lowerTick, position.upperTick, qtyWad);
+        
+        // Execute-first: apply factor and get actual sum change
+        (uint256 sumBefore, uint256 sumAfter) = _applyFactorChunked(
+            position.marketId, position.lowerTick, position.upperTick, qtyWad, true
+        );
+        
+        // Compute exact cost from actual sum change
+        uint256 costWad = SignalsDistributionMath.computeBuyCostFromSumChange(
+            market.liquidityParameter, sumBefore, sumAfter
+        );
         uint256 cost6 = _roundDebit(costWad);
 
         uint256 fee6 = _quoteFeeWithPolicy(feePolicy, true, msg.sender, position.marketId, position.lowerTick, position.upperTick, quantity, cost6);
@@ -138,7 +161,6 @@ contract TradeModule is SignalsCoreStorage {
 
         _pullPayment(msg.sender, totalCost);
 
-        _applyFactor(position.marketId, position.lowerTick, position.upperTick, qtyWad, true);
         market.accumulatedFees += fee6.toWad();
         _addExposure(position.marketId, position.lowerTick, position.upperTick, quantity);
 
@@ -321,6 +343,7 @@ contract TradeModule is SignalsCoreStorage {
         proceedsWad = tree.calculateSellProceeds(market.liquidityParameter, loBin, hiBin, quantityWad);
     }
 
+    /// @notice Internal decrease position logic (execute-first model for exact proceeds calculation)
     function _decreasePositionInternal(
         ISignalsPosition.Position memory position,
         uint256 positionId,
@@ -335,7 +358,16 @@ contract TradeModule is SignalsCoreStorage {
         address feePolicy = market.feePolicy != address(0) ? market.feePolicy : defaultFeePolicy;
 
         uint256 qtyWad = uint256(quantity).toWad();
-        uint256 proceedsWad = _calculateSellProceeds(position.marketId, position.lowerTick, position.upperTick, qtyWad);
+        
+        // Execute-first: apply factor and get actual sum change
+        (uint256 sumBefore, uint256 sumAfter) = _applyFactorChunked(
+            position.marketId, position.lowerTick, position.upperTick, qtyWad, false
+        );
+        
+        // Compute exact proceeds from actual sum change
+        uint256 proceedsWad = SignalsDistributionMath.computeSellProceedsFromSumChange(
+            market.liquidityParameter, sumBefore, sumAfter
+        );
         baseProceeds = _roundCredit(proceedsWad);
 
         uint256 fee6 = _quoteFeeWithPolicy(
@@ -352,7 +384,6 @@ contract TradeModule is SignalsCoreStorage {
         uint256 netProceeds = baseProceeds - fee6;
         require(netProceeds >= minProceeds, SE.ProceedsBelowMinimum(netProceeds, minProceeds));
 
-        _applyFactor(position.marketId, position.lowerTick, position.upperTick, qtyWad, false);
         market.accumulatedFees += fee6.toWad();
         _removeExposure(position.marketId, position.lowerTick, position.upperTick, quantity);
 
@@ -381,45 +412,6 @@ contract TradeModule is SignalsCoreStorage {
         return wadAmount.fromWad();
     }
 
-    function _resolveFeeRecipient() internal view returns (address) {
-        if (feeRecipient != address(0)) return feeRecipient;
-        return IOwnableLite(address(this)).owner();
-    }
-
-    function _resolveFeePolicy(ISignalsCore.Market memory market) internal view returns (address) {
-        return market.feePolicy != address(0) ? market.feePolicy : defaultFeePolicy;
-    }
-
-    function _quoteFee(
-        bool isBuy,
-        address trader,
-        uint256 marketId,
-        int256 lowerTick,
-        int256 upperTick,
-        uint128 quantity,
-        uint256 baseAmount
-    ) internal view returns (uint256 fee6) {
-        ISignalsCore.Market memory market = markets[marketId];
-        address policyAddress = _resolveFeePolicy(market);
-        if (policyAddress == address(0)) return 0;
-        IFeePolicy.QuoteParams memory params = IFeePolicy.QuoteParams({
-            trader: trader,
-            marketId: marketId,
-            lowerTick: lowerTick,
-            upperTick: upperTick,
-            quantity: quantity,
-            baseAmount: baseAmount,
-            isBuy: isBuy,
-            context: bytes32(0)
-        });
-        fee6 = IFeePolicy(policyAddress).quoteFee(params);
-        require(fee6 <= baseAmount, SE.FeeExceedsBase(fee6, baseAmount));
-    }
-
-    /**
-     * @notice Quote fee using pre-resolved policy address (gas optimized)
-     * @dev Avoids redundant Market memory copy for policy resolution
-     */
     function _quoteFeeWithPolicy(
         address policyAddress,
         bool isBuy,
@@ -479,24 +471,59 @@ contract TradeModule is SignalsCoreStorage {
 
     // --- Tree update helper ---
 
-    function _applyFactor(
+    /// @dev Apply factor with chunking support for large orders
+    /// @notice Uses execute-first model: applies factor and returns sum before/after for exact cost calculation
+    /// @param marketId Market identifier
+    /// @param lowerTick Lower tick of range
+    /// @param upperTick Upper tick of range
+    /// @param qtyWad Quantity in WAD
+    /// @param isBuy True for buy (factor > 1), false for sell (factor < 1)
+    /// @return sumBefore Total sum before any factor application
+    /// @return sumAfter Total sum after all factor applications
+    function _applyFactorChunked(
         uint256 marketId,
         int256 lowerTick,
         int256 upperTick,
         uint256 qtyWad,
         bool isBuy
-    ) internal {
+    ) internal returns (uint256 sumBefore, uint256 sumAfter) {
         ISignalsCore.Market storage market = markets[marketId];
+        LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
+        
         (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBins(
             market.minTick, market.maxTick, market.tickSpacing, market.numBins,
             lowerTick, upperTick
         );
-        uint256 factor = SignalsClmsrMath._safeExp(qtyWad, market.liquidityParameter);
-        if (!isBuy) {
-            factor = WAD.wDivUp(factor);
+        
+        uint256 alpha = market.liquidityParameter;
+        uint256 maxSafeQty = SignalsDistributionMath.maxSafeChunkQuantity(alpha);
+        
+        sumBefore = tree.totalSum();
+        
+        // Apply factor in chunks if quantity exceeds safe limit
+        uint256 remaining = qtyWad;
+        uint256 chunkCount;
+        
+        while (remaining > 0 && chunkCount < MAX_CHUNKS_PER_TX) {
+            uint256 chunkQty = remaining > maxSafeQty ? maxSafeQty : remaining;
+            
+            uint256 factor = SignalsClmsrMath._safeExp(chunkQty, alpha);
+            if (!isBuy) {
+                factor = WAD.wDivUp(factor);
+            }
+            
+            tree.applyRangeFactor(loBin, hiBin, factor);
+            emit RangeFactorApplied(marketId, lowerTick, upperTick, factor);
+            
+            remaining -= chunkQty;
+            chunkCount++;
         }
-        marketTrees[marketId].applyRangeFactor(loBin, hiBin, factor);
+        
+        require(remaining == 0, SE.ResidualQuantity(remaining));
+        
+        sumAfter = tree.totalSum();
     }
+
 
     function _calculateClaimAmount(
         ISignalsPosition.Position memory position,

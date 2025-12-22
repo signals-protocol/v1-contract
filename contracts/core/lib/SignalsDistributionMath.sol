@@ -15,11 +15,69 @@ library SignalsDistributionMath {
     uint256 internal constant MAX_CHUNKS_PER_TX = 100;
     uint256 internal constant OVERFLOW_GUARD_MULTIPLIER = 50e18; // 50 * WAD
 
-    /// @notice Maximum safe quantity per chunk to keep exp input within bounds.
+    /// @notice ln(MAX_FACTOR) = ln(100) ≈ 4.605170... in WAD
+    /// @dev Used to cap chunk quantity so that exp(q/α) ≤ MAX_FACTOR.
+    ///      Slightly conservative (4.6e18) to avoid boundary issues.
+    uint256 internal constant LN_MAX_FACTOR_WAD = 4_605_170_185_988_091_368; // ln(100) * 1e18
+
+    // ============================================================
+    // Execute-First Cost/Proceeds Calculation (from actual sum change)
+    // ============================================================
+
+    /// @notice Compute buy cost from actual sum change (post-update)
+    /// @dev Use this for execute-first model: apply factor first, then compute exact cost
+    /// @param alpha Liquidity parameter
+    /// @param sumBefore Total sum before factor application
+    /// @param sumAfter Total sum after factor application
+    /// @return costWad Exact cost in WAD
+    function computeBuyCostFromSumChange(
+        uint256 alpha,
+        uint256 sumBefore,
+        uint256 sumAfter
+    ) internal pure returns (uint256 costWad) {
+        if (sumAfter <= sumBefore) return 0;
+        uint256 ratio = sumAfter.wDivUp(sumBefore);
+        return alpha.wMul(ratio.wLn());
+    }
+
+    /// @notice Compute sell proceeds from actual sum change (post-update)
+    /// @dev Use this for execute-first model: apply factor first, then compute exact proceeds
+    ///      Uses floor division for ratio to ensure proceeds never exceed theoretical value (safety)
+    /// @param alpha Liquidity parameter
+    /// @param sumBefore Total sum before factor application
+    /// @param sumAfter Total sum after factor application
+    /// @return proceedsWad Exact proceeds in WAD
+    function computeSellProceedsFromSumChange(
+        uint256 alpha,
+        uint256 sumBefore,
+        uint256 sumAfter
+    ) internal pure returns (uint256 proceedsWad) {
+        if (sumAfter >= sumBefore) return 0;
+        // Floor division ensures we never overpay (credit safety)
+        uint256 ratio = sumBefore.wDiv(sumAfter);
+        return alpha.wMul(ratio.wLn());
+    }
+
+    /// @notice Maximum safe quantity per chunk for tree factor bounds AND exp input bounds.
+    /// @dev Returns min(α * MAX_EXP_INPUT, α * ln(MAX_FACTOR)).
+    ///      The tree enforces factor ≤ MAX_FACTOR, so exp(q/α) ≤ MAX_FACTOR ⟹ q ≤ α * ln(MAX_FACTOR).
+    ///      This is typically the binding constraint (ln(100) ≈ 4.6 << MAX_EXP_INPUT ≈ 135).
+    function maxSafeChunkQuantity(uint256 alpha) internal pure returns (uint256) {
+        if (alpha == 0) return 0;
+        // Tree factor limit: exp(q/α) ≤ MAX_FACTOR ⟹ q ≤ α * ln(MAX_FACTOR)
+        uint256 treeLimit = alpha.wMul(LN_MAX_FACTOR_WAD);
+        // Exp computation limit: q/α ≤ MAX_EXP_INPUT
+        uint256 expLimit = alpha.wMul(FixedPointMathU.MAX_EXP_INPUT_WAD);
+        // Return the more restrictive limit
+        return treeLimit < expLimit ? treeLimit : expLimit;
+    }
+
+    /// @notice Private helper for internal use (identical logic)
     function _maxSafeChunkQuantity(uint256 alpha) private pure returns (uint256) {
-        uint256 raw = alpha.wMul(FixedPointMathU.MAX_EXP_INPUT_WAD);
-        if (raw == 0) return 0;
-        return raw;
+        if (alpha == 0) return 0;
+        uint256 treeLimit = alpha.wMul(LN_MAX_FACTOR_WAD);
+        uint256 expLimit = alpha.wMul(FixedPointMathU.MAX_EXP_INPUT_WAD);
+        return treeLimit < expLimit ? treeLimit : expLimit;
     }
 
     function calculateTradeCost(
