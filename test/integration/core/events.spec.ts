@@ -136,9 +136,10 @@ describe("Events & Position Lifecycle", () => {
   // Position Events from SignalsPosition
   // ============================================================
   describe("SignalsPosition Events", () => {
-    it("emits PositionMinted on openPosition", async () => {
+    it("emits PositionMinted on openPosition with correct args", async () => {
       const { core, position, user, marketId } = await loadFixture(deployEventFixture);
 
+      const nextId = await position.nextId();
       const tx = await core.connect(user).openPosition(
         marketId,
         2,
@@ -147,10 +148,11 @@ describe("Events & Position Lifecycle", () => {
         ethers.parseUnits("100", USDC_DECIMALS)
       );
 
-      await expect(tx).to.emit(position, "PositionMinted");
+      await expect(tx).to.emit(position, "PositionMinted")
+        .withArgs(nextId, user.address, marketId, 2, 5, MEDIUM_QUANTITY);
     });
 
-    it("emits PositionUpdated on increasePosition", async () => {
+    it("emits PositionUpdated on increasePosition with correct args", async () => {
       const { core, position, user, marketId } = await loadFixture(deployEventFixture);
 
       await core.connect(user).openPosition(
@@ -163,6 +165,7 @@ describe("Events & Position Lifecycle", () => {
 
       const positions = await position.getPositionsByOwner(user.address);
       const positionId = positions[0];
+      const posBefore = await position.getPosition(positionId);
 
       const tx = await core.connect(user).increasePosition(
         positionId,
@@ -170,10 +173,11 @@ describe("Events & Position Lifecycle", () => {
         ethers.parseUnits("50", USDC_DECIMALS)
       );
 
-      await expect(tx).to.emit(position, "PositionUpdated");
+      await expect(tx).to.emit(position, "PositionUpdated")
+        .withArgs(positionId, posBefore.quantity, posBefore.quantity + BigInt(SMALL_QUANTITY));
     });
 
-    it("emits PositionUpdated on decreasePosition", async () => {
+    it("emits PositionUpdated on decreasePosition with correct args", async () => {
       const { core, position, user, marketId } = await loadFixture(deployEventFixture);
 
       await core.connect(user).openPosition(
@@ -186,6 +190,7 @@ describe("Events & Position Lifecycle", () => {
 
       const positions = await position.getPositionsByOwner(user.address);
       const positionId = positions[0];
+      const posBefore = await position.getPosition(positionId);
 
       const tx = await core.connect(user).decreasePosition(
         positionId,
@@ -193,10 +198,11 @@ describe("Events & Position Lifecycle", () => {
         0
       );
 
-      await expect(tx).to.emit(position, "PositionUpdated");
+      await expect(tx).to.emit(position, "PositionUpdated")
+        .withArgs(positionId, posBefore.quantity, posBefore.quantity - BigInt(SMALL_QUANTITY));
     });
 
-    it("emits PositionBurned on closePosition", async () => {
+    it("emits PositionBurned on closePosition with correct args", async () => {
       const { core, position, user, marketId } = await loadFixture(deployEventFixture);
 
       await core.connect(user).openPosition(
@@ -212,7 +218,49 @@ describe("Events & Position Lifecycle", () => {
 
       const tx = await core.connect(user).closePosition(positionId, 0);
 
-      await expect(tx).to.emit(position, "PositionBurned");
+      await expect(tx).to.emit(position, "PositionBurned")
+        .withArgs(positionId, user.address);
+    });
+  });
+
+  // ============================================================
+  // TradeModule Events
+  // Note: TradeModule only emits PositionClosed, PositionSettled, PositionClaimed
+  // PositionOpened/Increased/Decreased events are defined but NOT emitted in current impl
+  // ============================================================
+  describe("TradeModule Events", () => {
+    it("emits PositionClosed with correct position and trader", async () => {
+      const { core, position, user, marketId } = await loadFixture(deployEventFixture);
+
+      const tradeModule = await ethers.getContractAt("TradeModule", core.target);
+
+      await core.connect(user).openPosition(
+        marketId,
+        2,
+        5,
+        MEDIUM_QUANTITY,
+        ethers.parseUnits("100", USDC_DECIMALS)
+      );
+
+      const positions = await position.getPositionsByOwner(user.address);
+      const positionId = positions[0];
+
+      const tx = await core.connect(user).closePosition(positionId, 0);
+      const receipt = await tx.wait();
+
+      // Find PositionClosed event
+      const iface = tradeModule.interface;
+      const positionClosedEvent = receipt?.logs
+        .map((log) => {
+          try { return iface.parseLog({ topics: log.topics as string[], data: log.data }); } 
+          catch { return null; }
+        })
+        .find((parsed) => parsed?.name === "PositionClosed");
+
+      expect(positionClosedEvent).to.not.be.null;
+      expect(positionClosedEvent?.args.positionId).to.equal(positionId);
+      expect(positionClosedEvent?.args.trader).to.equal(user.address);
+      expect(positionClosedEvent?.args.proceeds).to.be.gte(0);
     });
   });
 

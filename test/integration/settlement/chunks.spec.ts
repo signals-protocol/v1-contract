@@ -131,6 +131,24 @@ async function deploySystem() {
 }
 
 describe("Settlement chunks and claim totals", () => {
+  it("reverts requestSettlementChunks before market is settled", async () => {
+    const { core, lifecycleModule } = await deploySystem();
+
+    const now = BigInt(await time.latest());
+    const start = now - 10n;
+    const end = now + 100n;
+    const settleTs = end + 10n;
+    await core.createMarketUniform(
+      0, 4, 1, Number(start), Number(end), Number(settleTs),
+      4, WAD, ethers.ZeroAddress
+    );
+
+    // Market is active but not settled
+    await expect(
+      core.requestSettlementChunks(1, 10)
+    ).to.be.revertedWithCustomError(lifecycleModule, "MarketNotSettled");
+  });
+
   it("handles multiple users/positions across chunks and preserves payout totals", async () => {
     const { owner, u1, u2, u3, core, payment, lifecycleModule } =
       await deploySystem();

@@ -141,6 +141,23 @@ describe("Core View Getters", () => {
       const drawdown = await core.getVaultDrawdown();
       expect(drawdown).to.equal(ethers.parseEther("0.2"));
     });
+
+    it("getVaultDrawdown returns 0 when price >= pricePeak", async () => {
+      await core.harnessSetLpVault(
+        ethers.parseEther("1000"),
+        ethers.parseEther("500"),
+        ethers.parseEther("3"), // price > pricePeak
+        ethers.parseEther("2.5"),
+        true
+      );
+      const drawdown = await core.getVaultDrawdown();
+      expect(drawdown).to.equal(0);
+    });
+
+    it("isVaultSeeded returns false when not seeded", async () => {
+      await core.harnessSetLpVault(0, 0, 0, 0, false);
+      expect(await core.isVaultSeeded()).to.equal(false);
+    });
   });
 
   describe("Risk config getter", () => {
