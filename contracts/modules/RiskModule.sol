@@ -78,20 +78,6 @@ contract RiskModule is SignalsCoreStorage {
         deltaEt = alpha.wMul(priorConcentration);
     }
 
-    /**
-     * @notice Get current tail budget for batch processing
-     * @dev DEPRECATED: ΔEₜ is now calculated and stored per-market in createMarket().
-     *      Batch processing uses DailyPnlSnapshot.DeltaEtSum which accumulates
-     *      market.deltaEt at settlement time.
-     *      This function is kept for backward compatibility but always returns 0.
-     * @return deltaEt Always 0 (use market.deltaEt instead)
-     */
-    function getDeltaEt() external view onlyDelegated returns (uint256) {
-        // DEPRECATED: Per-market ΔEₜ is stored in Market.deltaEt
-        // and accumulated to DailyPnlSnapshot.DeltaEtSum at settlement
-        return 0;
-    }
-
     // ============================================================
     // α Safety Bounds
     // ============================================================

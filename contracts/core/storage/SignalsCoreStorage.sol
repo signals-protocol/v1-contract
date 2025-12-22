@@ -228,11 +228,6 @@ abstract contract SignalsCoreStorage {
     // Exposure Ledger & Payout Reserve
     // ============================================================
 
-    /// @notice DEPRECATED: Old tick-keyed exposure ledger
-    /// @dev Kept for storage slot stability - DO NOT USE
-    ///      Replaced by _exposureFenwick (bin-based Fenwick tree)
-    mapping(uint256 => mapping(int256 => uint256)) internal _exposureLedger;
-
     /// @notice Market ID → Diff array for exposure tracking (bin-based)
     /// @dev Exposure Ledger Q_t: tracks payout liability per settlement bin
     ///      Uses diff-array pattern:
