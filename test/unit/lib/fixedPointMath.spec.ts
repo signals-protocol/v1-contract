@@ -200,6 +200,24 @@ describe("FixedPointMathU", () => {
       approx(result, expected, LOOSE_TOLERANCE);
     });
 
+    it("reverts on exp(MAX_EXP_INPUT + 1) overflow", async () => {
+      const { test } = await loadFixture(deployFixture);
+      // MAX_EXP_INPUT_WAD = 133_084258667509499440 (≈133.084 WAD)
+      const MAX_EXP_INPUT_WAD = 133_084258667509499440n;
+      await expect(test.wExp(MAX_EXP_INPUT_WAD + 1n)).to.be.revertedWithCustomError(
+        test,
+        "FP_Overflow"
+      );
+    });
+
+    it("succeeds at MAX_EXP_INPUT boundary", async () => {
+      const { test } = await loadFixture(deployFixture);
+      const MAX_EXP_INPUT_WAD = 133_084258667509499440n;
+      // Should not revert
+      const result = await test.wExp(MAX_EXP_INPUT_WAD);
+      expect(result).to.be.gt(0n);
+    });
+
     // Note: exp(-x) not tested - v1 FixedPointMathU only supports unsigned inputs
   });
 

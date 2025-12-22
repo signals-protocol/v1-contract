@@ -271,5 +271,50 @@ describe("ClmsrMath", () => {
       expect(quantity).to.equal(0n);
     });
   });
+
+  // ============================================================
+  // Edge Cases: Chunking and Overflow
+  // ============================================================
+  describe("Edge Cases: Large trades and chunking", () => {
+    it("handles trade within maxSafeChunkQuantity without chunking", async () => {
+      const { harness } = await loadFixture(deployFixture);
+      
+      await harness.seed([WAD, WAD, WAD, WAD]);
+      
+      const alpha = WAD;
+      // maxSafeChunkQuantity = α * ln(100) ≈ 4.6 WAD
+      const safeQuantity = await harness.maxSafeChunkQuantity(alpha);
+      
+      // Trade at exactly safe limit should work
+      const cost = await harness.quoteBuy(alpha, 0, 1, safeQuantity);
+      expect(cost).to.be.gt(0n);
+    });
+
+    it("handles trade slightly above maxSafeChunkQuantity (triggers chunking)", async () => {
+      const { harness } = await loadFixture(deployFixture);
+      
+      await harness.seed([WAD, WAD, WAD, WAD]);
+      
+      const alpha = WAD;
+      const safeQuantity = await harness.maxSafeChunkQuantity(alpha);
+      
+      // Trade slightly above safe limit triggers chunking
+      const cost = await harness.quoteBuy(alpha, 0, 1, safeQuantity + WAD);
+      expect(cost).to.be.gt(0n);
+    });
+
+    it("very small alpha does not cause division issues", async () => {
+      const { harness } = await loadFixture(deployFixture);
+      
+      await harness.seed([WAD, WAD, WAD, WAD]);
+      
+      // Very small alpha: 0.001 WAD
+      const smallAlpha = WAD / 1000n;
+      const safeQty = await harness.maxSafeChunkQuantity(smallAlpha);
+      
+      // Safe quantity should scale with alpha
+      expect(safeQty).to.be.closeTo(LN_MAX_FACTOR / 1000n, LN_MAX_FACTOR / 10000n);
+    });
+  });
 });
 

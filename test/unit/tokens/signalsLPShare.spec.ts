@@ -112,14 +112,15 @@ describe("SignalsLPShare", () => {
         await paymentToken.getAddress()
       );
     });
+
+    it("sets owner to core address", async () => {
+      expect(await lpShare.owner()).to.equal(await core.getAddress());
+    });
   });
 
   describe("OnlyCore modifier", () => {
-    it("allows core to mint", async () => {
-      // Impersonate core by calling from core contract
-      // Since we can't directly call from core in tests, we test via integration
-      // This is a placeholder - real test would be in integration tests
-    });
+    // Note: Success cases for mint/burn require core impersonation,
+    // which is tested in module/vault/lpVaultModule.spec.ts
 
     it("reverts when non-core tries to mint", async () => {
       await expect(
@@ -205,12 +206,87 @@ describe("SignalsLPShare", () => {
   });
 
   describe("ERC20 functionality", () => {
-    it("allows transfers between users", async () => {
-      // We need to mint first through core
-      // Since we can't call core.mint directly, test standard ERC20 transfer
-      // This is a basic sanity check
+    it("starts with zero total supply", async () => {
       const totalSupply = await lpShare.totalSupply();
       expect(totalSupply).to.equal(0n);
+    });
+
+    it("returns 18 decimals", async () => {
+      expect(await lpShare.decimals()).to.equal(18);
+    });
+  });
+
+  describe("Edge cases", () => {
+    describe("price = 0 fallback", () => {
+      beforeEach(async () => {
+        // Set vault with price = 0 (not seeded)
+        await core.harnessSetLpVault(0n, 0n, 0n, 0n, false);
+      });
+
+      it("convertToShares returns 1:1 when price is 0", async () => {
+        const assets = ethers.parseEther("100");
+        const shares = await lpShare.convertToShares(assets);
+        expect(shares).to.equal(assets);
+      });
+
+      it("convertToAssets returns 1:1 when price is 0", async () => {
+        const shares = ethers.parseEther("100");
+        const assets = await lpShare.convertToAssets(shares);
+        expect(assets).to.equal(shares);
+      });
+
+      it("previewDeposit returns 1:1 when price is 0", async () => {
+        const assets = ethers.parseEther("100");
+        const shares = await lpShare.previewDeposit(assets);
+        expect(shares).to.equal(assets);
+      });
+
+      it("previewRedeem returns 1:1 when price is 0", async () => {
+        const shares = ethers.parseEther("100");
+        const assets = await lpShare.previewRedeem(shares);
+        expect(assets).to.equal(shares);
+      });
+    });
+
+    describe("zero input", () => {
+      beforeEach(async () => {
+        await core.harnessSetLpVault(
+          ethers.parseEther("1000"),
+          ethers.parseEther("500"),
+          ethers.parseEther("2"),
+          ethers.parseEther("2"),
+          true
+        );
+      });
+
+      it("convertToShares(0) returns 0", async () => {
+        expect(await lpShare.convertToShares(0n)).to.equal(0n);
+      });
+
+      it("convertToAssets(0) returns 0", async () => {
+        expect(await lpShare.convertToAssets(0n)).to.equal(0n);
+      });
+
+      it("previewDeposit(0) returns 0", async () => {
+        expect(await lpShare.previewDeposit(0n)).to.equal(0n);
+      });
+
+      it("previewRedeem(0) returns 0", async () => {
+        expect(await lpShare.previewRedeem(0n)).to.equal(0n);
+      });
+    });
+
+    describe("totalAssets fallback", () => {
+      it("returns vault NAV when available", async () => {
+        await core.harnessSetLpVault(
+          ethers.parseEther("1000"),
+          ethers.parseEther("500"),
+          ethers.parseEther("2"),
+          ethers.parseEther("2"),
+          true
+        );
+        expect(await lpShare.totalAssets()).to.equal(ethers.parseEther("1000"));
+      });
     });
   });
 });

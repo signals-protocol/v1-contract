@@ -80,6 +80,41 @@ describe("ExposureDiffLib", () => {
         harness.rangeAdd(0, NUM_BINS, 100, NUM_BINS)
       ).to.be.revertedWithCustomError(harness, "ExposureDiffBinOutOfBounds");
     });
+
+    it("handles zero delta (no-op)", async () => {
+      await harness.rangeAdd(2, 5, 0, NUM_BINS);
+      
+      // All bins should remain 0
+      expect(await harness.pointQuery(2)).to.equal(0);
+      expect(await harness.pointQuery(5)).to.equal(0);
+    });
+
+    it("handles full range (lo=0, hi=numBins-1)", async () => {
+      await harness.rangeAdd(0, NUM_BINS - 1, 100, NUM_BINS);
+      
+      // All bins should be 100
+      for (let i = 0; i < NUM_BINS; i++) {
+        expect(await harness.pointQuery(i)).to.equal(100);
+      }
+      
+      // diff[hi+1] is not written since hi+1 >= numBins
+      // This means the exposure extends to infinity, which is correct
+      // since there's no "closing" boundary
+    });
+
+    it("verifies diff array pattern for last bin (hi=numBins-1)", async () => {
+      // When hi = numBins - 1, diff[hi+1] should NOT be written
+      // because hi+1 >= numBins
+      await harness.rangeAdd(8, 9, 100, NUM_BINS);
+      
+      // Check diff values directly
+      expect(await harness.getDiff(8)).to.equal(100);
+      // diff[10] would be out of bounds, so it's not written
+      // diff[9] should be 0 (not -100) because hi+1 = 10 >= NUM_BINS
+      // This is handled by the pointQuery returning correct values
+      expect(await harness.pointQuery(8)).to.equal(100);
+      expect(await harness.pointQuery(9)).to.equal(100);
+    });
   });
 
   describe("subtraction (negative delta)", () => {

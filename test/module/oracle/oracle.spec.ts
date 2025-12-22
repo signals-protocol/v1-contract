@@ -496,4 +496,29 @@ describe("OracleModule", () => {
       );
     });
   });
+
+  describe("setRedstoneConfig", () => {
+    it("updates feedId and related parameters", async () => {
+      const { core } = await setup();
+      
+      const newFeedId = ethers.encodeBytes32String("NEW_FEED");
+      const newDecimals = 6n;
+      const newMaxDistance = 1200n;
+      const newFutureTolerance = 120n;
+      
+      await core.setRedstoneConfig(newFeedId, newDecimals, newMaxDistance, newFutureTolerance);
+      
+      // Verify by checking that the oracle module uses the new config
+      // Config is used internally, so we verify via behavior
+      const feedId = await core.redstoneFeedId();
+      const decimals = await core.redstoneFeedDecimals();
+      const maxDistance = await core.maxSampleDistance();
+      const futureTolerance = await core.futureTolerance();
+      
+      expect(feedId).to.equal(newFeedId);
+      expect(decimals).to.equal(newDecimals);
+      expect(maxDistance).to.equal(newMaxDistance);
+      expect(futureTolerance).to.equal(newFutureTolerance);
+    });
+  });
 });

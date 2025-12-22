@@ -357,6 +357,103 @@ describe("MarketLifecycleModule", () => {
     expect(reopened.snapshotChunksDone).to.equal(false);
   });
 
+  it("marks settlement failed during PendingOps window when no candidate", async () => {
+    const { core, lifecycle } = await setup();
+    const { end } = await createDefaultMarket(core);
+    const lifecycleEvents = lifecycle.attach(await core.getAddress());
+    const tSet = end;
+    const opsStart = tSet + 120n; // settlementSubmitWindow
+
+    // Move to PendingOps window (no candidate submitted)
+    await time.setNextBlockTimestamp(Number(opsStart + 1n));
+    
+    await expect(core.markSettlementFailed(1))
+      .to.emit(lifecycleEvents, "MarketFailed")
+      .withArgs(1, opsStart + 1n);
+
+    const market = await core.markets(1);
+    expect(market.failed).to.equal(true);
+    expect(market.isActive).to.equal(false);
+    expect(market.settled).to.equal(false);
+  });
+
+  it("rejects markSettlementFailed before PendingOps starts", async () => {
+    const { core, lifecycle } = await setup();
+    const { end } = await createDefaultMarket(core);
+    const tSet = end;
+
+    // Before PendingOps
+    await time.setNextBlockTimestamp(Number(tSet + 10n));
+    await expect(core.markSettlementFailed(1))
+      .to.be.revertedWithCustomError(lifecycle, "PendingOpsNotStarted");
+  });
+
+  it("rejects markSettlementFailed after PendingOps if candidate exists", async () => {
+    const { core, oracleModule } = await setup();
+    const { end } = await createDefaultMarket(core);
+    const tSet = end;
+    const opsEnd = tSet + 120n + 60n;
+
+    // Submit candidate
+    const candidateTs = tSet + 10n;
+    await time.setNextBlockTimestamp(Number(candidateTs + 1n));
+    const payload = buildRedstonePayload(HUMAN_PRICE, Number(candidateTs), authorisedWallets);
+    await submitWithPayload(core, (await ethers.getSigners())[0], 1, payload);
+
+    // After PendingOps with candidate - should use finalize instead
+    await time.setNextBlockTimestamp(Number(opsEnd + 1n));
+    await expect(core.markSettlementFailed(1))
+      .to.be.revertedWithCustomError(oracleModule, "SettlementOracleCandidateMissing");
+  });
+
+  it("finalizes secondary settlement for failed market", async () => {
+    const { core, lifecycle } = await setup();
+    const { end } = await createDefaultMarket(core);
+    const lifecycleEvents = lifecycle.attach(await core.getAddress());
+    const tSet = end;
+    const opsStart = tSet + 120n;
+
+    // Mark as failed first
+    await time.setNextBlockTimestamp(Number(opsStart + 1n));
+    await core.markSettlementFailed(1);
+
+    // Finalize secondary settlement with ops-provided value
+    const settlementValue = 2_000_000n; // 2.0 in 6 decimals
+    await expect(core.finalizeSecondarySettlement(1, settlementValue))
+      .to.emit(lifecycleEvents, "MarketSettledSecondary");
+
+    const market = await core.markets(1);
+    expect(market.settled).to.equal(true);
+    expect(market.failed).to.equal(true);
+    expect(market.settlementValue).to.equal(settlementValue);
+  });
+
+  it("rejects finalizeSecondarySettlement for non-failed market", async () => {
+    const { core, lifecycle } = await setup();
+    await createDefaultMarket(core);
+
+    await expect(core.finalizeSecondarySettlement(1, 1_000_000n))
+      .to.be.revertedWithCustomError(lifecycle, "MarketNotFailed");
+  });
+
+  it("rejects finalizeSecondarySettlement for already settled market", async () => {
+    const { core, lifecycle } = await setup();
+    const { end } = await createDefaultMarket(core);
+    const tSet = end;
+    const opsStart = tSet + 120n;
+
+    // Mark as failed
+    await time.setNextBlockTimestamp(Number(opsStart + 1n));
+    await core.markSettlementFailed(1);
+
+    // First secondary settlement
+    await core.finalizeSecondarySettlement(1, 2_000_000n);
+
+    // Second attempt should fail
+    await expect(core.finalizeSecondarySettlement(1, 1_000_000n))
+      .to.be.revertedWithCustomError(lifecycle, "MarketAlreadySettled");
+  });
+
   it("updates market timing and activation", async () => {
     const { core, lifecycle } = await setup();
     await createDefaultMarket(core);

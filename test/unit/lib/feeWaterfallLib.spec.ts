@@ -207,6 +207,50 @@ describe("FeeWaterfallLib", () => {
     });
   });
 
+  describe("Step 3: Backstop Coverage Target", () => {
+    it("Ffill = 0 when Btarget < Bgrant (no fill needed)", async () => {
+      // Bgrant is already above coverage target
+      // High rhoBS = 20%, with Bgrant already at 200, Ngrant needs to be < 1000 for no fill
+      const result = await calculate({
+        Lt: ethers.parseEther("50"), // small profit
+        Ftot: ethers.parseEther("10"),
+        Nprev: ethers.parseEther("500"),  // Ngrant ≈ 550
+        Bprev: ethers.parseEther("200"),   // Bgrant = 200
+        rhoBS: ethers.parseEther("0.2"),   // Btarget = 550 * 0.2 = 110
+        // dBneed = max(0, 110 - 200) = 0
+      });
+      expect(result.Ffill).to.equal(0n);
+    });
+
+    it("Ffill = Fpool when dBneed > Fpool (capped)", async () => {
+      // Large coverage deficit, small fee pool
+      const result = await calculate({
+        Lt: ethers.parseEther("100"), // profit
+        Ftot: ethers.parseEther("10"), // small fees
+        Nprev: ethers.parseEther("1000"),
+        Bprev: ethers.parseEther("50"),    // Low backstop
+        rhoBS: ethers.parseEther("0.3"),   // Btarget = 1100 * 0.3 = 330
+        // dBneed = max(0, 330 - 50) = 280 > Fpool = 10
+      });
+      // Ffill should be capped at Fpool
+      expect(result.Ffill).to.equal(result.Fpool);
+    });
+
+    it("Ffill = dBneed when dBneed < Fpool (full fill)", async () => {
+      // Small coverage deficit, large fee pool
+      const result = await calculate({
+        Lt: ethers.parseEther("100"), // profit
+        Ftot: ethers.parseEther("200"), // large fees
+        Nprev: ethers.parseEther("1000"),
+        Bprev: ethers.parseEther("200"),    // Bgrant = 200
+        rhoBS: ethers.parseEther("0.2"),    // Btarget = 1100 * 0.2 = 220
+        // dBneed = max(0, 220 - 200) = 20 < Fpool = 200
+      });
+      // Ffill should be exactly dBneed (20)
+      expect(result.Ffill).to.equal(ethers.parseEther("20"));
+    });
+  });
+
   describe("INV-FW6: Residual Split Conservation", () => {
     it("residual splits sum correctly", async () => {
       const Ftot = ethers.parseEther("100");
@@ -233,6 +277,72 @@ describe("FeeWaterfallLib", () => {
       // Fdust >= 0
       expect(result.Fdust).to.be.gte(0n);
       expect(result.Ft).to.be.gte(result.Floss);
+    });
+  });
+
+  describe("Step 4: Residual Split Calculation", () => {
+    it("verifies FcoreLP, FcoreBS, FcoreTR individual values", async () => {
+      // No loss, no fill needed → all Fpool goes to residual split
+      const result = await calculate({
+        Lt: 0n,
+        Ftot: ethers.parseEther("100"),
+        Nprev: ethers.parseEther("500"),  // Low NAV so Btarget < Bgrant
+        Bprev: ethers.parseEther("200"),
+        rhoBS: ethers.parseEther("0.2"),  // Btarget = 500 * 0.2 = 100 < Bgrant = 200
+        phiLP: ethers.parseEther("0.7"),
+        phiBS: ethers.parseEther("0.2"),
+        phiTR: ethers.parseEther("0.1"),
+      });
+
+      // Ffill = 0 (Btarget < Bgrant)
+      expect(result.Ffill).to.equal(0n);
+
+      // Fremain = Fpool = 100 WAD
+      // FcoreLP = floor(100 * 0.7) = 70 WAD
+      // FcoreBS = floor(100 * 0.2) = 20 WAD
+      // FcoreTR = floor(100 * 0.1) = 10 WAD
+      // Fdust = 100 - 70 - 20 - 10 = 0
+
+      // Ft = Floss + FcoreLP + Fdust = 0 + 70 + 0 = 70
+      expect(result.Ft).to.equal(ethers.parseEther("70"));
+
+      // Bnext = Bgrant + Ffill + FcoreBS = 200 + 0 + 20 = 220
+      expect(result.Bnext).to.equal(ethers.parseEther("220"));
+
+      // Tnext = Tprev + FcoreTR = 50 + 10 = 60
+      expect(result.Tnext).to.equal(ethers.parseEther("60"));
+    });
+
+    it("verifies split with non-zero Ffill", async () => {
+      const result = await calculate({
+        Lt: 0n,
+        Ftot: ethers.parseEther("100"),
+        Nprev: ethers.parseEther("1000"),
+        Bprev: ethers.parseEther("150"),   // Bgrant = 150
+        rhoBS: ethers.parseEther("0.2"),   // Btarget = 1000 * 0.2 = 200
+        // dBneed = 200 - 150 = 50
+        phiLP: ethers.parseEther("0.7"),
+        phiBS: ethers.parseEther("0.2"),
+        phiTR: ethers.parseEther("0.1"),
+      });
+
+      // Ffill = min(50, 100) = 50
+      expect(result.Ffill).to.equal(ethers.parseEther("50"));
+
+      // Fremain = 100 - 50 = 50
+      // FcoreLP = floor(50 * 0.7) = 35
+      // FcoreBS = floor(50 * 0.2) = 10
+      // FcoreTR = floor(50 * 0.1) = 5
+      // Fdust = 50 - 35 - 10 - 5 = 0
+
+      // Ft = 0 + 35 + 0 = 35
+      expect(result.Ft).to.equal(ethers.parseEther("35"));
+
+      // Bnext = 150 + 50 + 10 = 210
+      expect(result.Bnext).to.equal(ethers.parseEther("210"));
+
+      // Tnext = 50 + 5 = 55
+      expect(result.Tnext).to.equal(ethers.parseEther("55"));
     });
   });
 
@@ -330,6 +440,20 @@ describe("FeeWaterfallLib", () => {
           phiTR: ethers.parseEther("0.1"), // Sum = 0.9, not 1.0
         })
       ).to.be.revertedWithCustomError(harness, "InvalidPhiSum");
+    });
+
+    it("handles Nprev = 0 (Nfloor becomes 0)", async () => {
+      const result = await calculate({
+        Lt: ethers.parseEther("100"), // profit
+        Ftot: ethers.parseEther("50"),
+        Nprev: 0n,
+        Bprev: ethers.parseEther("200"),
+        Tprev: ethers.parseEther("50"),
+      });
+      // Nfloor = 0 when Nprev = 0
+      // No grant needed since Nraw = 0 + 100 + 0 = 100 > Nfloor = 0
+      expect(result.Gt).to.equal(0n);
+      expect(result.Nraw).to.equal(ethers.parseEther("100"));
     });
   });
 

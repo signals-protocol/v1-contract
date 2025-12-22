@@ -132,5 +132,9 @@ describe('RiskMath', () => {
       expect(ln100).to.be.lt(ethers.parseEther('4.606'));
     });
   });
+
+  // Note: calculateDrawdown and enforceAlphaLimit are internal library functions
+  // not directly exposed on RiskModule. They are tested via integration tests
+  // in test/integration/risk/alphaEnforcement.spec.ts
 });
 

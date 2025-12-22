@@ -469,6 +469,37 @@ describe("VaultAccountingLib", () => {
   });
 
   // ============================================================
+  // Price calculation
+  // ============================================================
+  describe("computePrice", () => {
+    it("returns nav/shares for normal case", async () => {
+      const nav = ethers.parseEther("1000");
+      const shares = ethers.parseEther("900");
+      
+      const price = await lib.computePrice(nav, shares);
+      
+      // P = 1000/900 ≈ 1.111e18
+      const expected = (nav * WAD) / shares;
+      expect(price).to.equal(expected);
+    });
+
+    it("returns 1e18 when shares = 0 (empty vault)", async () => {
+      const price = await lib.computePrice(ethers.parseEther("100"), 0n);
+      expect(price).to.equal(WAD);
+    });
+
+    it("returns 1e18 when both nav and shares are 0", async () => {
+      const price = await lib.computePrice(0n, 0n);
+      expect(price).to.equal(WAD);
+    });
+
+    it("handles nav = 0 with shares > 0 (price = 0)", async () => {
+      const price = await lib.computePrice(0n, ethers.parseEther("100"));
+      expect(price).to.equal(0n);
+    });
+  });
+
+  // ============================================================
   // Full batch processing
   // ============================================================
   describe("computePostBatchState", () => {

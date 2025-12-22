@@ -116,6 +116,37 @@ describe("TickBinLib", () => {
         harness.ticksToBins(MIN_TICK, MAX_TICK, TICK_SPACING, NUM_BINS, 10n, 55n)
       ).to.be.revertedWithCustomError(harness, "InvalidTickSpacing");
     });
+
+    it("reverts when upperTick > maxTick + tickSpacing", async () => {
+      // maxTick = 90, tickSpacing = 10, so max upperTick = 100
+      // Trying upperTick = 110 should fail
+      await expect(
+        harness.ticksToBins(MIN_TICK, MAX_TICK, TICK_SPACING, NUM_BINS, 0n, 110n)
+      ).to.be.revertedWithCustomError(harness, "InvalidTick");
+    });
+
+    it("reverts when hiBin >= numBins (via ticksToBins)", async () => {
+      // Create a case where conversion results in hiBin >= numBins
+      // With minTick=0, maxTick=90, spacing=10, numBins=10
+      // upperTick=100 should give hiBin = (100-0)/10 - 1 = 9, which is valid
+      // But if numBins=5, then hiBin=9 >= 5 would fail
+      await expect(
+        harness.ticksToBins(MIN_TICK, MAX_TICK, TICK_SPACING, 5, 0n, 100n)
+      ).to.be.revertedWithCustomError(harness, "RangeBinsOutOfBounds");
+    });
+  });
+
+  describe("edge cases", () => {
+    it("handles tickSpacing = 1", async () => {
+      // spacing=1 means every tick is valid
+      const [lo, hi] = await harness.ticksToBins(0n, 9n, 1n, 10, 0n, 10n);
+      expect(lo).to.equal(0);
+      expect(hi).to.equal(9);
+    });
+
+    it("handles single bin market (numBins = 1)", async () => {
+      expect(await harness.tickToBin(0n, 10n, 1, 0n)).to.equal(0);
+    });
   });
 });
 
