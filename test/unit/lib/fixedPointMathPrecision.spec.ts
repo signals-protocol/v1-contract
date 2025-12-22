@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-import { WAD } from "../helpers/constants";
+import { WAD } from "../../helpers/constants";
 
 /**
  * Fixed-Point Math Precision Tests

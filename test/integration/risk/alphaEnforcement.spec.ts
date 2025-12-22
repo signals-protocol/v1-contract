@@ -7,7 +7,7 @@ import {
   MockSignalsPosition,
   MarketLifecycleModule,
   RiskModule,
-} from "../../typechain-types";
+} from "../../../typechain-types";
 
 /**
  * α Safety Bound Enforcement Integration Test
