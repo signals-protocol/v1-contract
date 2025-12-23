@@ -478,9 +478,10 @@ describe("LP Vault Scenarios", () => {
       await proxy.harnessRecordPnl(day2, 0n, 0n, ethers.parseEther("500"));
       await advancePastBatchEnd(day2);
 
-      await expect(
-        proxy.processDailyBatch(day2)
-      ).to.be.revertedWithCustomError(module, "WithdrawalWouldBrickVault");
+      await expect(proxy.processDailyBatch(day2)).to.be.revertedWithCustomError(
+        module,
+        "WithdrawalWouldBrickVault"
+      );
     });
   });
 
@@ -510,15 +511,24 @@ describe("LP Vault Scenarios", () => {
 
       // LP NAV increase = Ftot * phiLP = 1000 * 0.8 = 800
       const navIncrease = navAfter - navBefore;
-      expect(navIncrease).to.be.closeTo(ethers.parseEther("800"), ethers.parseEther("10"));
+      expect(navIncrease).to.be.closeTo(
+        ethers.parseEther("800"),
+        ethers.parseEther("10")
+      );
 
       // Backstop increase = Ftot * phiBS = 1000 * 0.1 = 100
       const bsIncrease = backstopAfter - backstopBefore;
-      expect(bsIncrease).to.be.closeTo(ethers.parseEther("100"), ethers.parseEther("10"));
+      expect(bsIncrease).to.be.closeTo(
+        ethers.parseEther("100"),
+        ethers.parseEther("10")
+      );
 
       // Treasury increase = Ftot * phiTR = 1000 * 0.1 = 100
       const trIncrease = treasuryAfter - treasuryBefore;
-      expect(trIncrease).to.be.closeTo(ethers.parseEther("100"), ethers.parseEther("10"));
+      expect(trIncrease).to.be.closeTo(
+        ethers.parseEther("100"),
+        ethers.parseEther("10")
+      );
     });
   });
 });

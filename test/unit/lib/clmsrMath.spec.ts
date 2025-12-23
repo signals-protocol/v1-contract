@@ -273,6 +273,36 @@ describe("ClmsrMath", () => {
   });
 
   // ============================================================
+  // Error Path Coverage
+  // ============================================================
+  describe("Error paths", () => {
+    it("quoteBuy reverts with TreeNotInitialized when tree not seeded", async () => {
+      const { harness } = await loadFixture(deployFixture);
+      
+      // Tree not seeded - totalSum = 0
+      await expect(
+        harness.quoteBuy(WAD, 0, 1, WAD)
+      ).to.be.revertedWithCustomError(harness, "TreeNotInitialized");
+    });
+
+    it("quoteSell reverts with TreeNotInitialized when tree not seeded", async () => {
+      const { harness } = await loadFixture(deployFixture);
+      
+      await expect(
+        harness.quoteSell(WAD, 0, 1, WAD)
+      ).to.be.revertedWithCustomError(harness, "TreeNotInitialized");
+    });
+
+    it("quantityFromCost reverts with TreeNotInitialized when tree not seeded", async () => {
+      const { harness } = await loadFixture(deployFixture);
+      
+      await expect(
+        harness.quantityFromCost(WAD, 0, 1, WAD)
+      ).to.be.revertedWithCustomError(harness, "TreeNotInitialized");
+    });
+  });
+
+  // ============================================================
   // Edge Cases: Chunking and Overflow
   // ============================================================
   describe("Edge Cases: Large trades and chunking", () => {
