@@ -25,7 +25,7 @@ describe("E2E: vault lifecycle", () => {
     const endTimestamp = settlementTimestamp - 100n;
 
     const baseFactors = Array(10).fill(ethers.parseEther("1"));
-    const tx = await core.createMarket(
+    const marketId = await core.createMarket.staticCall(
       0,
       100,
       10,
@@ -37,9 +37,18 @@ describe("E2E: vault lifecycle", () => {
       ethers.ZeroAddress,
       baseFactors
     );
-    const receipt = await tx.wait();
-    const event = receipt?.logs.find((log: any) => log.fragment?.name === "MarketCreated");
-    const marketId = event?.args?.marketId ?? 1n;
+    await core.createMarket(
+      0,
+      100,
+      10,
+      startTimestamp,
+      endTimestamp,
+      settlementTimestamp,
+      10,
+      ethers.parseEther("100"),
+      ethers.ZeroAddress,
+      baseFactors
+    );
 
     const opsStart = settlementTimestamp + BigInt(submitWindow) + 1n;
     await time.setNextBlockTimestamp(Number(opsStart));

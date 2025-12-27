@@ -2,8 +2,40 @@ import hre from "hardhat";
 import { loadEnvironment, normalizeEnvironment } from "../utils/environment";
 import type { Environment } from "../types/environment";
 
+type SettlementMode = "secondary" | "primary";
+type TimingMode = "auto" | "manual" | "skip";
+
+interface CloseMarketConfig {
+  marketId: number;
+  mode: SettlementMode;
+  settlement: {
+    valueUsd: string;
+    tick: string;
+  };
+  timing: {
+    mode: TimingMode;
+    auto: {
+      daysBack: number;
+      durationSec: number;
+      endOffsetSec: number;
+    };
+    manual: {
+      startTimestamp: number;
+      endTimestamp: number;
+      settlementTimestamp: number;
+    };
+  };
+  chunks: {
+    maxPerTx: number;
+    maxCalls: number;
+  };
+  batch: {
+    run: boolean;
+  };
+}
+
 // === Editable config (top-level) ============================================
-const CONFIG = {
+const CONFIG: CloseMarketConfig = {
   marketId: 1,
   mode: "secondary", // "secondary" | "primary"
   settlement: {
@@ -30,7 +62,7 @@ const CONFIG = {
   batch: {
     run: true,
   },
-} as const;
+};
 
 // === Helpers ================================================================
 const USD_DECIMALS = 6;

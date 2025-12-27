@@ -2,8 +2,64 @@ import hre from "hardhat";
 import { loadEnvironment, normalizeEnvironment, updateConfig } from "../utils/environment";
 import type { Environment } from "../types/environment";
 
+type LiquidityMode = "auto" | "manual";
+type BaseFactorsMode = "uniform" | "custom";
+
+interface CreateMarketConfig {
+  skipStaticCall: boolean;
+  feePolicyAddress: string;
+  vault: {
+    minSeedAmountUsd: string;
+    seedAmountUsd: string;
+    withdrawalLagBatches: number;
+  };
+  risk: {
+    lambda: string;
+    kDrawdown: string;
+    enforceAlpha: boolean;
+  };
+  feeWaterfall: {
+    rhoBS: string;
+    phiLP: string;
+    phiBS: string;
+    phiTR: string;
+  };
+  capitalStack: {
+    backstopNavUsd: string;
+    treasuryNavUsd: string;
+  };
+  settlement: {
+    submitWindowSec: number;
+    pendingOpsWindowSec: number;
+    claimDelaySec: number;
+  };
+  redstone: {
+    feedId: string;
+    feedDecimals: number;
+    maxSampleDistanceSec: number;
+    futureToleranceSec: number;
+  };
+  market: {
+    minTick: number;
+    maxTick: number;
+    tickSpacing: number;
+    startDelaySec: number;
+    durationSec: number;
+    settlementDelaySec: number;
+    liquidity: {
+      mode: LiquidityMode;
+      safetyFactor: string;
+      manualAlphaWad: string;
+    };
+    baseFactors: {
+      mode: BaseFactorsMode;
+      customWad: string[];
+    };
+  };
+}
+
 // === Editable config (top-level) ============================================
-const CONFIG = {
+const CONFIG: CreateMarketConfig = {
   skipStaticCall: true,
   feePolicyAddress: "", // leave empty to use env FeePolicy100bps
   vault: {
@@ -54,7 +110,7 @@ const CONFIG = {
       customWad: [] as string[], // only used if mode=custom
     },
   },
-} as const;
+};
 
 // === Helpers ================================================================
 const USD_DECIMALS = 6;

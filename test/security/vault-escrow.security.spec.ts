@@ -135,7 +135,7 @@ describe("Vault Escrow Security", () => {
     const maxTick = tickSpacing * BigInt(numBins);
     const baseFactors = Array(numBins).fill(WAD);
 
-    const tx = await core.createMarket(
+    const marketId = await core.createMarket.staticCall(
       minTick,
       maxTick,
       tickSpacing,
@@ -147,9 +147,19 @@ describe("Vault Escrow Security", () => {
       ethers.ZeroAddress,
       baseFactors
     );
-    const receipt = await tx.wait();
-    const event = receipt?.logs.find((l: any) => l.fragment?.name === "MarketCreated");
-    return event?.args?.marketId ?? 1n;
+    await core.createMarket(
+      minTick,
+      maxTick,
+      tickSpacing,
+      startTime,
+      endTime,
+      settlementTimestamp,
+      numBins,
+      WAD,
+      ethers.ZeroAddress,
+      baseFactors
+    );
+    return marketId;
   }
 
   // ============================================================

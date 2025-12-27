@@ -3,7 +3,7 @@ import path from "path";
 import { execSync } from "child_process";
 import type { Environment, EnvironmentFile } from "../types/environment";
 
-export interface ReleaseMeta {
+export interface ReleaseMeta extends Record<string, unknown> {
   release?: string;
   gitCommit?: string;
   changes?: string[];

@@ -60,7 +60,7 @@ describe("E2E: UUPS upgrades", () => {
       ["function upgradeToAndCall(address newImplementation, bytes data) external payable"],
       coreAddress
     );
-    await coreUpgrader.connect(owner).upgradeToAndCall(coreV2Impl.target, "0x");
+    await (coreUpgrader as any).connect(owner).upgradeToAndCall(coreV2Impl.target, "0x");
     const coreV2 = await ethers.getContractAt("SignalsCoreV2", coreAddress);
     expect(await coreV2.version()).to.equal("v2");
 
@@ -69,7 +69,7 @@ describe("E2E: UUPS upgrades", () => {
       ["function upgradeToAndCall(address newImplementation, bytes data) external payable"],
       positionAddress
     );
-    await positionUpgrader.connect(owner).upgradeToAndCall(positionV2Impl.target, "0x");
+    await (positionUpgrader as any).connect(owner).upgradeToAndCall(positionV2Impl.target, "0x");
     const positionV2 = await ethers.getContractAt("SignalsPositionV2", positionAddress);
     expect(await positionV2.version()).to.equal("v2");
 
