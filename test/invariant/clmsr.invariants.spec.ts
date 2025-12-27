@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import {
-  MockPaymentToken,
+  SignalsUSDToken,
   MockFeePolicy,
   TradeModuleProxy,
   SignalsPosition,
@@ -31,7 +31,7 @@ interface DeployedSystem {
   owner: HardhatEthersSigner;
   user: HardhatEthersSigner;
   user2: HardhatEthersSigner;
-  payment: MockPaymentToken;
+  payment: SignalsUSDToken;
   position: SignalsPosition;
   core: TradeModuleProxy;
   feePolicy: MockFeePolicy;
@@ -46,7 +46,7 @@ describe("CLMSR Invariants", () => {
     const [owner, user, user2] = await ethers.getSigners();
 
     const payment = await (
-      await ethers.getContractFactory("MockPaymentToken")
+      await ethers.getContractFactory("SignalsUSDToken")
     ).deploy();
 
     const positionImplFactory = await ethers.getContractFactory(

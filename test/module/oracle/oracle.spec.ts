@@ -20,7 +20,7 @@ describe("OracleModule", () => {
   async function setup() {
     const [owner, other] = await ethers.getSigners();
     const payment = await (
-      await ethers.getContractFactory("MockPaymentToken")
+      await ethers.getContractFactory("SignalsUSDToken")
     ).deploy();
     const position = await (
       await ethers.getContractFactory("MockSignalsPosition")

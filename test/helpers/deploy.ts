@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import {
-  MockPaymentToken,
+  SignalsUSDToken,
   MockFeePolicy,
   TradeModuleProxy,
   TradeModule,
@@ -17,7 +17,7 @@ import { WAD, USDC_DECIMALS } from "./constants";
 export interface TradeModuleSystem {
   owner: HardhatEthersSigner;
   users: HardhatEthersSigner[];
-  payment: MockPaymentToken;
+  payment: SignalsUSDToken;
   position: SignalsPosition;
   feePolicy: MockFeePolicy;
   tradeModule: TradeModule;
@@ -75,10 +75,10 @@ export async function deployTradeModuleSystem(
   const owner = signers[0];
   const users = signers.slice(1, 1 + (opts.userCount ?? 5));
 
-  // Deploy MockPaymentToken
+  // Deploy SignalsUSDToken
   const payment = (await (
-    await ethers.getContractFactory("MockPaymentToken")
-  ).deploy()) as MockPaymentToken;
+    await ethers.getContractFactory("SignalsUSDToken")
+  ).deploy()) as SignalsUSDToken;
 
   // Deploy MockFeePolicy
   const feePolicy = (await (
@@ -286,7 +286,7 @@ export async function deployTradeModuleTestEnv() {
   const [owner, user] = await ethers.getSigners();
 
   const payment = await (
-    await ethers.getContractFactory("MockPaymentToken")
+    await ethers.getContractFactory("SignalsUSDToken")
   ).deploy();
 
   const positionImplFactory = await ethers.getContractFactory("SignalsPosition");

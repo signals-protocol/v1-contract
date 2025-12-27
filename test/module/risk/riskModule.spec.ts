@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import {
   SignalsCoreHarness,
-  MockPaymentToken,
+  SignalsUSDToken,
   MockSignalsPosition,
   RiskModule,
 } from "../../../typechain-types";
@@ -34,7 +34,7 @@ const K_DD = ethers.parseEther("1"); // Drawdown sensitivity factor
 describe("RiskModule", () => {
   let core: SignalsCoreHarness;
   let riskModule: RiskModule;
-  let payment: MockPaymentToken;
+  let payment: SignalsUSDToken;
   let position: MockSignalsPosition;
   let owner: Awaited<ReturnType<typeof ethers.getSigners>>[0];
 
@@ -43,7 +43,7 @@ describe("RiskModule", () => {
     owner = _owner;
 
     payment = await (
-      await ethers.getContractFactory("MockPaymentToken")
+      await ethers.getContractFactory("SignalsUSDToken")
     ).deploy();
     position = await (
       await ethers.getContractFactory("MockSignalsPosition")

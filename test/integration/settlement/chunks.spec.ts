@@ -33,7 +33,7 @@ async function deploySystem() {
   const [owner, u1, u2, u3] = await ethers.getSigners();
 
   const payment = await (
-    await ethers.getContractFactory("MockPaymentToken")
+    await ethers.getContractFactory("SignalsUSDToken")
   ).deploy();
   await (await ethers.getContractFactory("MockFeePolicy")).deploy(0); // feePolicy not used directly
 

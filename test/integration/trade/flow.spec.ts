@@ -2,7 +2,7 @@ import { ethers } from "hardhat";
 import { expect } from "chai";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import {
-  MockPaymentToken,
+  SignalsUSDToken,
   MockFeePolicy,
   TradeModuleProxy,
   TradeModule,
@@ -15,7 +15,7 @@ import { WAD } from "../../helpers/constants";
 interface DeployedSystem {
   owner: HardhatEthersSigner;
   user: HardhatEthersSigner;
-  payment: MockPaymentToken;
+  payment: SignalsUSDToken;
   position: SignalsPosition;
   core: TradeModuleProxy;
   feePolicy: MockFeePolicy;
@@ -29,7 +29,7 @@ describe("TradeModule flow (minimal parity)", () => {
     const [owner, user] = await ethers.getSigners();
 
     const payment = await (
-      await ethers.getContractFactory("MockPaymentToken")
+      await ethers.getContractFactory("SignalsUSDToken")
     ).deploy();
     const positionImplFactory = await ethers.getContractFactory(
       "SignalsPosition"
@@ -113,7 +113,7 @@ describe("TradeModule flow (minimal parity)", () => {
     return {
       owner,
       user,
-      payment: payment as MockPaymentToken,
+      payment: payment as SignalsUSDToken,
       position: position as SignalsPosition,
       core: core as TradeModuleProxy,
       feePolicy: feePolicy as MockFeePolicy,

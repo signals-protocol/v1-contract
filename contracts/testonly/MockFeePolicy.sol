@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "../interfaces/IFeePolicy.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 /// @notice Mock fee policy returning a fixed basis-point fee over baseAmount.
 contract MockFeePolicy is IFeePolicy {
@@ -19,7 +20,13 @@ contract MockFeePolicy is IFeePolicy {
         return "MockFeePolicy";
     }
 
-    function descriptor() external pure returns (string memory) {
-        return "{\"policy\":\"mock-bps\"}";
+    function descriptor() external view returns (string memory) {
+        return string(
+            abi.encodePacked(
+                '{"policy":"percentage","params":{"bps":"',
+                Strings.toString(bps),
+                '","name":"MockFeePolicy"},"name":"MockFeePolicy"}'
+            )
+        );
     }
 }

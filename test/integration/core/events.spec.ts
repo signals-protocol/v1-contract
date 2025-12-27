@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import {
-  MockPaymentToken,
+  SignalsUSDToken,
   MockFeePolicy,
   TradeModuleProxy,
   SignalsPosition,
@@ -22,15 +22,15 @@ import { WAD, USDC_DECIMALS, SMALL_QUANTITY, MEDIUM_QUANTITY } from "../../helpe
  * - PositionUpdated (on increase/decrease)
  * - PositionBurned (on close)
  * 
- * TradeModule defines additional events (PositionClosed, PositionSettled, PositionClaimed)
- * but PositionOpened/Increased/Decreased are not currently emitted from TradeModule.
+ * TradeModule emits trade lifecycle events (open/increase/decrease/close + claim/settle),
+ * while SignalsPosition emits tokenization events (mint/update/burn).
  */
 
 interface DeployedSystem {
   owner: HardhatEthersSigner;
   user: HardhatEthersSigner;
   user2: HardhatEthersSigner;
-  payment: MockPaymentToken;
+  payment: SignalsUSDToken;
   position: SignalsPosition;
   core: TradeModuleProxy;
   feePolicy: MockFeePolicy;
@@ -45,7 +45,7 @@ describe("Events & Position Lifecycle", () => {
     const [owner, user, user2] = await ethers.getSigners();
 
     const payment = await (
-      await ethers.getContractFactory("MockPaymentToken")
+      await ethers.getContractFactory("SignalsUSDToken")
     ).deploy();
 
     const positionImplFactory = await ethers.getContractFactory("SignalsPosition");
@@ -225,8 +225,7 @@ describe("Events & Position Lifecycle", () => {
 
   // ============================================================
   // TradeModule Events
-  // Note: TradeModule only emits PositionClosed, PositionSettled, PositionClaimed
-  // PositionOpened/Increased/Decreased events are defined but NOT emitted in current impl
+  // Note: TradeModule emits trade lifecycle events; SignalsPosition emits mint/update/burn
   // ============================================================
   describe("TradeModule Events", () => {
     it("emits PositionClosed with correct position and trader", async () => {

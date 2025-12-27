@@ -64,7 +64,7 @@ describe("MarketLifecycleModule", () => {
   async function setup() {
     const [owner] = await ethers.getSigners();
     const payment = await (
-      await ethers.getContractFactory("MockPaymentToken")
+      await ethers.getContractFactory("SignalsUSDToken")
     ).deploy();
     const position = await (
       await ethers.getContractFactory("MockSignalsPosition")

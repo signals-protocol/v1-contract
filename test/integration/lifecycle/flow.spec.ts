@@ -35,7 +35,7 @@ describe("Lifecycle + Trade integration", () => {
   async function setup() {
     const [owner, user] = await ethers.getSigners();
     const payment = await (
-      await ethers.getContractFactory("MockPaymentToken")
+      await ethers.getContractFactory("SignalsUSDToken")
     ).deploy();
     const positionImplFactory = await ethers.getContractFactory(
       "SignalsPosition"

@@ -20,7 +20,7 @@ describe("Core Security", () => {
 
     // Deploy with owner who gets initial supply
     const payment = await (
-      await ethers.getContractFactory("MockPaymentToken")
+      await ethers.getContractFactory("SignalsUSDToken")
     ).deploy();
 
     // Transfer from deployer to users

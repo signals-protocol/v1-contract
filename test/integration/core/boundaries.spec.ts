@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import {
-  MockPaymentToken,
+  SignalsUSDToken,
   MockFeePolicy,
   TradeModuleProxy,
   SignalsPosition,
@@ -29,7 +29,7 @@ import {
 interface DeployedSystem {
   owner: HardhatEthersSigner;
   user: HardhatEthersSigner;
-  payment: MockPaymentToken;
+  payment: SignalsUSDToken;
   position: SignalsPosition;
   core: TradeModuleProxy;
   feePolicy: MockFeePolicy;
@@ -45,7 +45,7 @@ describe("Boundaries", () => {
     const [owner, user] = await ethers.getSigners();
 
     const payment = await (
-      await ethers.getContractFactory("MockPaymentToken")
+      await ethers.getContractFactory("SignalsUSDToken")
     ).deploy();
 
     const positionImplFactory = await ethers.getContractFactory(
@@ -336,7 +336,7 @@ describe("Boundaries", () => {
       const [owner, user] = await ethers.getSigners();
 
       const payment = await (
-        await ethers.getContractFactory("MockPaymentToken")
+        await ethers.getContractFactory("SignalsUSDToken")
       ).deploy();
 
       const positionImplFactory = await ethers.getContractFactory(

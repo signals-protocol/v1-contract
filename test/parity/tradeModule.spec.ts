@@ -2,7 +2,7 @@ import { ethers } from "hardhat";
 import { expect } from "chai";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import {
-  MockPaymentToken,
+  SignalsUSDToken,
   MockFeePolicy,
   TradeModuleProxy,
   TradeModule,
@@ -16,7 +16,7 @@ interface DeployedSystem {
   owner: HardhatEthersSigner;
   userA: HardhatEthersSigner;
   userB: HardhatEthersSigner;
-  payment: MockPaymentToken;
+  payment: SignalsUSDToken;
   position: SignalsPosition;
   core: TradeModuleProxy;
   feePolicy: MockFeePolicy;
@@ -30,7 +30,7 @@ async function deploySystem(
   const [owner, userA, userB] = await ethers.getSigners();
 
   const payment = await (
-    await ethers.getContractFactory("MockPaymentToken")
+    await ethers.getContractFactory("SignalsUSDToken")
   ).deploy();
   const feePolicy = await (
     await ethers.getContractFactory("MockFeePolicy")

@@ -15,7 +15,7 @@ describe("Market Security", () => {
     const [owner, user1] = await ethers.getSigners();
 
     const payment = await (
-      await ethers.getContractFactory("MockPaymentToken")
+      await ethers.getContractFactory("SignalsUSDToken")
     ).deploy();
     const fundAmount = ethers.parseUnits("1000000", USDC_DECIMALS);
     await payment.transfer(user1.address, fundAmount);
