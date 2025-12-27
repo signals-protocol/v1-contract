@@ -2,5 +2,6 @@
   "network": "citrea-prod",
   "version": 1,
   "contracts": {},
+  "config": {},
   "history": []
 }

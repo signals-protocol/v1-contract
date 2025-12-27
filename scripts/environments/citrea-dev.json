@@ -1,6 +1,66 @@
 {
   "network": "citrea-dev",
-  "version": 1,
-  "contracts": {},
-  "history": []
+  "version": 5,
+  "contracts": {
+    "SignalsCoreProxy": "0x3FC6641f9fBa716c3ced5b99C3Ce8B60E4EfB979",
+    "SignalsCoreImplementation": "0x3D140A218cEB46dEd6C62d598d3A52e2F266cDF2",
+    "SignalsPositionProxy": "0x94fD26eeC30e5cC1c980D169Eeee3cdB56B35Fbd",
+    "SignalsPositionImplementation": "0x0d507C75B0618a4Eb7CC65552a810e594d8f38fE",
+    "TradeModule": "0xc3B0e21D6106C387AaD09F2378cF154cac428cb5",
+    "MarketLifecycleModule": "0x2Daa8450A843Cf6d3BC6e8B0adDb7e527bEF05b7",
+    "OracleModule": "0x66F48cc383213A235C5a33d771EFadB0d7beeBBB",
+    "FeePolicy": "0x00fD056B83B07ad7909CC91Da7880422dE16d010",
+    "SignalsUSDToken": "0x4c79a346E8A9BE9373932daC73244A833e02c41B",
+    "LazyMulSegmentTree": "0x36C80deC1fa8367E0768965404C03dEEA4Fe1C7b",
+    "RiskModule": "0xE07F6F6f335D79Bb399179955dE4fCfC921FC3CC",
+    "LPVaultModule": "0x12Ce8088D0E41D8BbC8517cFFEfa6D03D66eF854",
+    "SignalsLPShare": "0xff79c94b31565186cA7920e9d28DBF7e81368c12",
+    "FeePolicyNull": "0xc5cE00a26aE286db0b863A91b29A99AA60ce63fA",
+    "FeePolicy10bps": "0x9AA3eCF1C1BafFBCa433C01aD692cE57b2730F6C",
+    "FeePolicy50bps": "0xECd5576eB930163Bb60ACA6f6DBb52A042659649",
+    "FeePolicy100bps": "0xe8B9f41450c03889E7189EF2FCF4c521993F42f0",
+    "FeePolicy200bps": "0x7ecaDB4CA9E3B441666820D3E2363bA6B0e76203"
+  },
+  "config": {
+    "settlementSubmitWindow": "600",
+    "settlementFinalizeDeadline": "900",
+    "defaultFeeBps": 0,
+    "owners": {
+      "core": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
+      "position": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD"
+    },
+    "pendingOpsWindow": "600",
+    "redstoneFeedId": "BTC",
+    "redstoneFeedDecimals": 8,
+    "redstoneMaxSampleDistance": "600",
+    "redstoneFutureTolerance": "60",
+    "lpShareTokenName": "Signals LP",
+    "lpShareTokenSymbol": "SIGLP"
+  },
+  "history": [
+    {
+      "action": "deploy",
+      "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
+      "version": 2,
+      "timestamp": 1766650401
+    },
+    {
+      "action": "deploy",
+      "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
+      "version": 3,
+      "timestamp": 1766652509
+    },
+    {
+      "action": "deploy-fee-policies",
+      "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
+      "version": 4,
+      "timestamp": 1766659287
+    },
+    {
+      "action": "deploy",
+      "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
+      "version": 5,
+      "timestamp": 1766823397
+    }
+  ]
 }

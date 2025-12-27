@@ -1,5 +1,6 @@
 import hre from "hardhat";
-import { appendHistory, loadEnvironment, updateContracts } from "../utils/environment";
+import { loadEnvironment, recordDeployment, updateContracts } from "../utils/environment";
+import { buildReleaseMetaFromEnv, writeReleaseSnapshot } from "../utils/release";
 import type { Environment } from "../types/environment";
 
 export async function upgradeAction(env: Environment) {
@@ -15,7 +16,10 @@ export async function upgradeAction(env: Environment) {
   }
 
   const coreFactory = await ethers.getContractFactory("SignalsCore");
-  const upgradedCore = await upgrades.upgradeProxy(coreProxyAddr, coreFactory, { kind: "uups" });
+  const upgradedCore = await upgrades.upgradeProxy(coreProxyAddr, coreFactory, {
+    kind: "uups",
+    unsafeAllow: ["delegatecall"],
+  });
   await upgradedCore.waitForDeployment();
   const newCoreImpl = await upgrades.erc1967.getImplementationAddress(await upgradedCore.getAddress());
 
@@ -29,12 +33,13 @@ export async function upgradeAction(env: Environment) {
     SignalsPositionImplementation: newPositionImpl,
   });
 
-  appendHistory(env, {
-    version: envData.version + 1,
+  const releaseMeta = buildReleaseMetaFromEnv();
+  const { data: updatedEnv, record } = recordDeployment(env, {
     action: "upgrade",
     deployer: deployer.address,
-    timestamp: Math.floor(Date.now() / 1000),
+    meta: releaseMeta,
   });
+  writeReleaseSnapshot(env, updatedEnv, releaseMeta);
 
-  console.log("[upgrade] completed");
+  console.log(`[upgrade] completed (version=${record.version})`);
 }

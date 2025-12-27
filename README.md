@@ -93,6 +93,10 @@ yarn test
 yarn test test/unit/FeeWaterfallLib.spec.ts
 ```
 
+## Operations
+
+See `OPERATIONS.md` for deployment, upgrades, and release runbooks.
+
 ## Core Concepts
 
 ### Markets

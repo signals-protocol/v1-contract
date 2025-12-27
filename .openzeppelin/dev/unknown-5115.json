@@ -1,0 +1,2628 @@
+{
+  "manifestVersion": "3.2",
+  "proxies": [
+    {
+      "address": "0xBbBC30f92ABCdb5977f99176d875332eBbC69d93",
+      "txHash": "0x4cd25805a5195d6b97417175fc2b19ad99ec3090e66340bd09fb3dbd5d20519c",
+      "kind": "uups"
+    },
+    {
+      "address": "0x7d0241a487e46F49a1EcE39b8aBFe0A42fF1D8E0",
+      "txHash": "0x0735082c84b82e6fcd8d19c93a2fbf361c3cc940fdea3a06231d997c918ea69a",
+      "kind": "uups"
+    },
+    {
+      "address": "0xFc6007011b09a16D8efC3a6606862AcD8830D6F4",
+      "txHash": "0xb0b91a385237da54477cad389957cc06542a39dadf377add2f1a8be528757822",
+      "kind": "uups"
+    },
+    {
+      "address": "0x6d21016D65cB0E64CF1799E6CC130a59aA8a2945",
+      "txHash": "0x321bf01b01fb1dab7177097196d39ecacda16c98e4c610dfea0f31244e9e492f",
+      "kind": "uups"
+    },
+    {
+      "address": "0x20d1B19fC0a2E154A86a06339f1AA0e21dB831cD",
+      "txHash": "0x15a480f47489e7ef16114b624bdf1979034230cc57ead07906bfc7d1d7c89c0c",
+      "kind": "uups"
+    },
+    {
+      "address": "0x0796e34d2e538d151fBc4f160f2cc8791D80C890",
+      "txHash": "0x56834c36e43d76370309eaeb8c0b705d250525d6713df075b7bdf5eb8343109c",
+      "kind": "uups"
+    },
+    {
+      "address": "0xD5bfC19892Eb9c347eA00861804E73a5786D567A",
+      "txHash": "0x35a0683667676432ab20fdd8267505ad10487805d351522cdc33287779076540",
+      "kind": "uups"
+    },
+    {
+      "address": "0xb0234B34d3398116453c38354933be9fa738d783",
+      "txHash": "0x342a4a1131fe8e0ea17ad7e25c47b4322a650ba2083a43ed1566677eeca13c16",
+      "kind": "uups"
+    },
+    {
+      "address": "0x94fD26eeC30e5cC1c980D169Eeee3cdB56B35Fbd",
+      "txHash": "0x2ee5ac71eb1fe58fb7811d9a70f2c3e1192d93e182e61ea3f4ec563020c2957c",
+      "kind": "uups"
+    },
+    {
+      "address": "0x3FC6641f9fBa716c3ced5b99C3Ce8B60E4EfB979",
+      "txHash": "0x4a404493f5ada7ac605a147c9cc368a80801b5b172d9ec5cabef753ee7885c12",
+      "kind": "uups"
+    }
+  ],
+  "impls": {
+    "7bb2fbb565e5829a564aae59de08a66b3e82e2e8cc68fa3935dcee6cced54839": {
+      "address": "0x0d507C75B0618a4Eb7CC65552a810e594d8f38fE",
+      "txHash": "0xa68316e9da11d8cda304d6e9d3205f4b8243556d5884d9e549b18a051e11931c",
+      "layout": {
+        "solcVersion": "0.8.28",
+        "storage": [
+          {
+            "label": "core",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_address",
+            "contract": "SignalsPositionStorage",
+            "src": "contracts/position/SignalsPositionStorage.sol:7"
+          },
+          {
+            "label": "_nextId",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_uint256",
+            "contract": "SignalsPositionStorage",
+            "src": "contracts/position/SignalsPositionStorage.sol:8"
+          },
+          {
+            "label": "_positions",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_mapping(t_uint256,t_struct(Position)18911_storage)",
+            "contract": "SignalsPositionStorage",
+            "src": "contracts/position/SignalsPositionStorage.sol:9"
+          },
+          {
+            "label": "_marketTokenList",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_mapping(t_uint256,t_array(t_uint256)dyn_storage)",
+            "contract": "SignalsPositionStorage",
+            "src": "contracts/position/SignalsPositionStorage.sol:10"
+          },
+          {
+            "label": "_positionMarketIndex",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "SignalsPositionStorage",
+            "src": "contracts/position/SignalsPositionStorage.sol:11"
+          },
+          {
+            "label": "_ownerTokenList",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_mapping(t_address,t_array(t_uint256)dyn_storage)",
+            "contract": "SignalsPositionStorage",
+            "src": "contracts/position/SignalsPositionStorage.sol:12"
+          },
+          {
+            "label": "_positionOwnerIndex",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "SignalsPositionStorage",
+            "src": "contracts/position/SignalsPositionStorage.sol:13"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_array(t_uint256)48_storage",
+            "contract": "SignalsPositionStorage",
+            "src": "contracts/position/SignalsPositionStorage.sol:16"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_mapping(t_address,t_bool))": {
+            "label": "mapping(address => mapping(address => bool))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_address)": {
+            "label": "mapping(uint256 => address)",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(ERC721Storage)279_storage": {
+            "label": "struct ERC721Upgradeable.ERC721Storage",
+            "members": [
+              {
+                "label": "_name",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_symbol",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "_owners",
+                "type": "t_mapping(t_uint256,t_address)",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "_balances",
+                "type": "t_mapping(t_address,t_uint256)",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "_tokenApprovals",
+                "type": "t_mapping(t_uint256,t_address)",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "_operatorApprovals",
+                "type": "t_mapping(t_address,t_mapping(t_address,t_bool))",
+                "offset": 0,
+                "slot": "5"
+              }
+            ],
+            "numberOfBytes": "192"
+          },
+          "t_struct(InitializableStorage)86_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(OwnableStorage)14_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_array(t_uint256)48_storage": {
+            "label": "uint256[48]",
+            "numberOfBytes": "1536"
+          },
+          "t_array(t_uint256)dyn_storage": {
+            "label": "uint256[]",
+            "numberOfBytes": "32"
+          },
+          "t_int256": {
+            "label": "int256",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_array(t_uint256)dyn_storage)": {
+            "label": "mapping(address => uint256[])",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_array(t_uint256)dyn_storage)": {
+            "label": "mapping(uint256 => uint256[])",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Position)18911_storage)": {
+            "label": "mapping(uint256 => struct ISignalsPosition.Position)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_uint256)": {
+            "label": "mapping(uint256 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Position)18911_storage": {
+            "label": "struct ISignalsPosition.Position",
+            "members": [
+              {
+                "label": "marketId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "lowerTick",
+                "type": "t_int256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "upperTick",
+                "type": "t_int256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "quantity",
+                "type": "t_uint128",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "createdAt",
+                "type": "t_uint64",
+                "offset": 16,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_uint128": {
+            "label": "uint128",
+            "numberOfBytes": "16"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.ERC721": [
+            {
+              "contract": "ERC721Upgradeable",
+              "label": "_name",
+              "type": "t_string_storage",
+              "src": "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol:27",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "ERC721Upgradeable",
+              "label": "_symbol",
+              "type": "t_string_storage",
+              "src": "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol:30",
+              "offset": 0,
+              "slot": "1"
+            },
+            {
+              "contract": "ERC721Upgradeable",
+              "label": "_owners",
+              "type": "t_mapping(t_uint256,t_address)",
+              "src": "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol:32",
+              "offset": 0,
+              "slot": "2"
+            },
+            {
+              "contract": "ERC721Upgradeable",
+              "label": "_balances",
+              "type": "t_mapping(t_address,t_uint256)",
+              "src": "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol:34",
+              "offset": 0,
+              "slot": "3"
+            },
+            {
+              "contract": "ERC721Upgradeable",
+              "label": "_tokenApprovals",
+              "type": "t_mapping(t_uint256,t_address)",
+              "src": "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol:36",
+              "offset": 0,
+              "slot": "4"
+            },
+            {
+              "contract": "ERC721Upgradeable",
+              "label": "_operatorApprovals",
+              "type": "t_mapping(t_address,t_mapping(t_address,t_bool))",
+              "src": "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol:38",
+              "offset": 0,
+              "slot": "5"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "787f1af1dd7d6fc5ef4b2416c36be058c7cd55084baf42cdf74559a68a220e53": {
+      "address": "0x7ff4025A02dc976500d127132F42649cF969C261",
+      "txHash": "0x2bcad7714448aa584e7b9bbc8ea00c2ac8b0099fa2660ae546d1323363bf1b26",
+      "layout": {
+        "solcVersion": "0.8.28",
+        "storage": [
+          {
+            "label": "settlementSubmitWindow",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint64",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:28"
+          },
+          {
+            "label": "claimDelaySeconds",
+            "offset": 8,
+            "slot": "0",
+            "type": "t_uint64",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:32"
+          },
+          {
+            "label": "pendingOpsWindow",
+            "offset": 16,
+            "slot": "0",
+            "type": "t_uint64",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:36"
+          },
+          {
+            "label": "maxSampleDistance",
+            "offset": 24,
+            "slot": "0",
+            "type": "t_uint64",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:40"
+          },
+          {
+            "label": "futureTolerance",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_uint64",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:44"
+          },
+          {
+            "label": "redstoneFeedId",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_bytes32",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:47"
+          },
+          {
+            "label": "redstoneFeedDecimals",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_uint8",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:50"
+          },
+          {
+            "label": "paymentToken",
+            "offset": 1,
+            "slot": "3",
+            "type": "t_contract(IERC20)2649",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:52"
+          },
+          {
+            "label": "positionContract",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_contract(ISignalsPosition)19013",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:53"
+          },
+          {
+            "label": "lpShareToken",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_address",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:56"
+          },
+          {
+            "label": "markets",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_mapping(t_uint256,t_struct(Market)18669_storage)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:58"
+          },
+          {
+            "label": "marketTrees",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_mapping(t_uint256,t_struct(Tree)19529_storage)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:59"
+          },
+          {
+            "label": "nextMarketId",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_uint256",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:60"
+          },
+          {
+            "label": "settlementOracleState",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_mapping(t_uint256,t_struct(SettlementOracleState)17830_storage)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:67"
+          },
+          {
+            "label": "settlementOracleSigner",
+            "offset": 0,
+            "slot": "10",
+            "type": "t_address",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:68"
+          },
+          {
+            "label": "positionSettledEmitted",
+            "offset": 0,
+            "slot": "11",
+            "type": "t_mapping(t_uint256,t_bool)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:70"
+          },
+          {
+            "label": "feeRecipient",
+            "offset": 0,
+            "slot": "12",
+            "type": "t_address",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:72"
+          },
+          {
+            "label": "defaultFeePolicy",
+            "offset": 0,
+            "slot": "13",
+            "type": "t_address",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:73"
+          },
+          {
+            "label": "lpVault",
+            "offset": 0,
+            "slot": "14",
+            "type": "t_struct(VaultState)17859_storage",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:89"
+          },
+          {
+            "label": "minSeedAmount",
+            "offset": 0,
+            "slot": "19",
+            "type": "t_uint256",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:92"
+          },
+          {
+            "label": "capitalStack",
+            "offset": 0,
+            "slot": "20",
+            "type": "t_struct(CapitalStackState)17871_storage",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:145"
+          },
+          {
+            "label": "feeWaterfallConfig",
+            "offset": 0,
+            "slot": "22",
+            "type": "t_struct(FeeWaterfallConfig)17883_storage",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:148"
+          },
+          {
+            "label": "_dailyPnl",
+            "offset": 0,
+            "slot": "27",
+            "type": "t_mapping(t_uint64,t_struct(DailyPnlSnapshot)17917_storage)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:151"
+          },
+          {
+            "label": "_depositRequests",
+            "offset": 0,
+            "slot": "28",
+            "type": "t_mapping(t_uint64,t_struct(DepositRequest)17950_storage)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:202"
+          },
+          {
+            "label": "_withdrawRequests",
+            "offset": 0,
+            "slot": "29",
+            "type": "t_mapping(t_uint64,t_struct(WithdrawRequest)17963_storage)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:205"
+          },
+          {
+            "label": "_batchAggregations",
+            "offset": 0,
+            "slot": "30",
+            "type": "t_mapping(t_uint64,t_struct(BatchAggregation)17973_storage)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:208"
+          },
+          {
+            "label": "_pendingBatchTotals",
+            "offset": 0,
+            "slot": "31",
+            "type": "t_mapping(t_uint64,t_struct(PendingBatchTotal)17979_storage)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:212"
+          },
+          {
+            "label": "nextDepositRequestId",
+            "offset": 0,
+            "slot": "32",
+            "type": "t_uint64",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:217"
+          },
+          {
+            "label": "nextWithdrawRequestId",
+            "offset": 8,
+            "slot": "32",
+            "type": "t_uint64",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:220"
+          },
+          {
+            "label": "currentBatchId",
+            "offset": 16,
+            "slot": "32",
+            "type": "t_uint64",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:223"
+          },
+          {
+            "label": "withdrawalLagBatches",
+            "offset": 24,
+            "slot": "32",
+            "type": "t_uint64",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:227"
+          },
+          {
+            "label": "_exposureFenwick",
+            "offset": 0,
+            "slot": "33",
+            "type": "t_mapping(t_uint256,t_mapping(t_uint32,t_int256))",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:238"
+          },
+          {
+            "label": "_payoutReserve",
+            "offset": 0,
+            "slot": "34",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:243"
+          },
+          {
+            "label": "_payoutReserveRemaining",
+            "offset": 0,
+            "slot": "35",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:246"
+          },
+          {
+            "label": "_totalPendingDeposits6",
+            "offset": 0,
+            "slot": "36",
+            "type": "t_uint256",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:257"
+          },
+          {
+            "label": "_totalPayoutReserve6",
+            "offset": 0,
+            "slot": "37",
+            "type": "t_uint256",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:262"
+          },
+          {
+            "label": "_totalPendingWithdrawals6",
+            "offset": 0,
+            "slot": "38",
+            "type": "t_uint256",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:268"
+          },
+          {
+            "label": "riskConfig",
+            "offset": 0,
+            "slot": "39",
+            "type": "t_struct(RiskConfig)18049_storage",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:282"
+          },
+          {
+            "label": "_batchIdToMarketId",
+            "offset": 0,
+            "slot": "42",
+            "type": "t_mapping(t_uint64,t_uint256)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:285"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "43",
+            "type": "t_array(t_uint256)13_storage",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:290"
+          },
+          {
+            "label": "tradeModule",
+            "offset": 0,
+            "slot": "56",
+            "type": "t_address",
+            "contract": "SignalsCore",
+            "src": "contracts/core/SignalsCore.sol:31"
+          },
+          {
+            "label": "lifecycleModule",
+            "offset": 0,
+            "slot": "57",
+            "type": "t_address",
+            "contract": "SignalsCore",
+            "src": "contracts/core/SignalsCore.sol:32"
+          },
+          {
+            "label": "riskModule",
+            "offset": 0,
+            "slot": "58",
+            "type": "t_address",
+            "contract": "SignalsCore",
+            "src": "contracts/core/SignalsCore.sol:33"
+          },
+          {
+            "label": "vaultModule",
+            "offset": 0,
+            "slot": "59",
+            "type": "t_address",
+            "contract": "SignalsCore",
+            "src": "contracts/core/SignalsCore.sol:34"
+          },
+          {
+            "label": "oracleModule",
+            "offset": 0,
+            "slot": "60",
+            "type": "t_address",
+            "contract": "SignalsCore",
+            "src": "contracts/core/SignalsCore.sol:35"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)86_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(OwnableStorage)14_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(PausableStorage)632_storage": {
+            "label": "struct PausableUpgradeable.PausableStorage",
+            "members": [
+              {
+                "label": "_paused",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(ReentrancyGuardStorage)708_storage": {
+            "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
+            "members": [
+              {
+                "label": "_status",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_array(t_uint256)13_storage": {
+            "label": "uint256[13]",
+            "numberOfBytes": "416"
+          },
+          "t_array(t_uint256)dyn_storage": {
+            "label": "uint256[]",
+            "numberOfBytes": "32"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_contract(IERC20)2649": {
+            "label": "contract IERC20",
+            "numberOfBytes": "20"
+          },
+          "t_contract(ISignalsPosition)19013": {
+            "label": "contract ISignalsPosition",
+            "numberOfBytes": "20"
+          },
+          "t_enum(RequestStatus)17937": {
+            "label": "enum SignalsCoreStorage.RequestStatus",
+            "members": [
+              "Pending",
+              "Processed",
+              "Claimed",
+              "Cancelled"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_int256": {
+            "label": "int256",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_bool)": {
+            "label": "mapping(uint256 => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_mapping(t_uint32,t_int256))": {
+            "label": "mapping(uint256 => mapping(uint32 => int256))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Market)18669_storage)": {
+            "label": "mapping(uint256 => struct ISignalsCore.Market)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(SettlementOracleState)17830_storage)": {
+            "label": "mapping(uint256 => struct SignalsCoreStorage.SettlementOracleState)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Tree)19529_storage)": {
+            "label": "mapping(uint256 => struct LazyMulSegmentTree.Tree)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_uint256)": {
+            "label": "mapping(uint256 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint32,t_int256)": {
+            "label": "mapping(uint32 => int256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint64,t_struct(BatchAggregation)17973_storage)": {
+            "label": "mapping(uint64 => struct SignalsCoreStorage.BatchAggregation)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint64,t_struct(DailyPnlSnapshot)17917_storage)": {
+            "label": "mapping(uint64 => struct SignalsCoreStorage.DailyPnlSnapshot)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint64,t_struct(DepositRequest)17950_storage)": {
+            "label": "mapping(uint64 => struct SignalsCoreStorage.DepositRequest)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint64,t_struct(PendingBatchTotal)17979_storage)": {
+            "label": "mapping(uint64 => struct SignalsCoreStorage.PendingBatchTotal)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint64,t_struct(WithdrawRequest)17963_storage)": {
+            "label": "mapping(uint64 => struct SignalsCoreStorage.WithdrawRequest)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint64,t_uint256)": {
+            "label": "mapping(uint64 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(BatchAggregation)17973_storage": {
+            "label": "struct SignalsCoreStorage.BatchAggregation",
+            "members": [
+              {
+                "label": "totalDepositAssets",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "totalWithdrawShares",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "batchPrice",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "processed",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_struct(CapitalStackState)17871_storage": {
+            "label": "struct SignalsCoreStorage.CapitalStackState",
+            "members": [
+              {
+                "label": "backstopNav",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "treasuryNav",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(DailyPnlSnapshot)17917_storage": {
+            "label": "struct SignalsCoreStorage.DailyPnlSnapshot",
+            "members": [
+              {
+                "label": "Lt",
+                "type": "t_int256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "Ftot",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "DeltaEtSum",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "Floss",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "Fpool",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "Nraw",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "Gt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "Ffill",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "FLP",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "FBS",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "9"
+              },
+              {
+                "label": "FTR",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "10"
+              },
+              {
+                "label": "Fdust",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "11"
+              },
+              {
+                "label": "Ft",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "12"
+              },
+              {
+                "label": "Npre",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "13"
+              },
+              {
+                "label": "Pe",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "14"
+              },
+              {
+                "label": "processed",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "15"
+              }
+            ],
+            "numberOfBytes": "512"
+          },
+          "t_struct(DepositRequest)17950_storage": {
+            "label": "struct SignalsCoreStorage.DepositRequest",
+            "members": [
+              {
+                "label": "id",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "owner",
+                "type": "t_address",
+                "offset": 8,
+                "slot": "0"
+              },
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "eligibleBatchId",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "status",
+                "type": "t_enum(RequestStatus)17937",
+                "offset": 8,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_struct(FeeWaterfallConfig)17883_storage": {
+            "label": "struct SignalsCoreStorage.FeeWaterfallConfig",
+            "members": [
+              {
+                "label": "pdd",
+                "type": "t_int256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "rhoBS",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "phiLP",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "phiBS",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "phiTR",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              }
+            ],
+            "numberOfBytes": "160"
+          },
+          "t_struct(Market)18669_storage": {
+            "label": "struct ISignalsCore.Market",
+            "members": [
+              {
+                "label": "isActive",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "settled",
+                "type": "t_bool",
+                "offset": 1,
+                "slot": "0"
+              },
+              {
+                "label": "snapshotChunksDone",
+                "type": "t_bool",
+                "offset": 2,
+                "slot": "0"
+              },
+              {
+                "label": "failed",
+                "type": "t_bool",
+                "offset": 3,
+                "slot": "0"
+              },
+              {
+                "label": "numBins",
+                "type": "t_uint32",
+                "offset": 4,
+                "slot": "0"
+              },
+              {
+                "label": "openPositionCount",
+                "type": "t_uint32",
+                "offset": 8,
+                "slot": "0"
+              },
+              {
+                "label": "snapshotChunkCursor",
+                "type": "t_uint32",
+                "offset": 12,
+                "slot": "0"
+              },
+              {
+                "label": "startTimestamp",
+                "type": "t_uint64",
+                "offset": 16,
+                "slot": "0"
+              },
+              {
+                "label": "endTimestamp",
+                "type": "t_uint64",
+                "offset": 24,
+                "slot": "0"
+              },
+              {
+                "label": "settlementTimestamp",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "settlementFinalizedAt",
+                "type": "t_uint64",
+                "offset": 8,
+                "slot": "1"
+              },
+              {
+                "label": "minTick",
+                "type": "t_int256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "maxTick",
+                "type": "t_int256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "tickSpacing",
+                "type": "t_int256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "settlementTick",
+                "type": "t_int256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "settlementValue",
+                "type": "t_int256",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "liquidityParameter",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "feePolicy",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "initialRootSum",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "9"
+              },
+              {
+                "label": "accumulatedFees",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "10"
+              },
+              {
+                "label": "minFactor",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "11"
+              },
+              {
+                "label": "deltaEt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "12"
+              }
+            ],
+            "numberOfBytes": "416"
+          },
+          "t_struct(PendingBatchTotal)17979_storage": {
+            "label": "struct SignalsCoreStorage.PendingBatchTotal",
+            "members": [
+              {
+                "label": "deposits",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "withdraws",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(RiskConfig)18049_storage": {
+            "label": "struct SignalsCoreStorage.RiskConfig",
+            "members": [
+              {
+                "label": "lambda",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "kDrawdown",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "enforceAlpha",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_struct(SettlementOracleState)17830_storage": {
+            "label": "struct SignalsCoreStorage.SettlementOracleState",
+            "members": [
+              {
+                "label": "candidateValue",
+                "type": "t_int256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "candidatePriceTimestamp",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(Tree)19529_storage": {
+            "label": "struct LazyMulSegmentTree.Tree",
+            "members": [
+              {
+                "label": "sum",
+                "type": "t_array(t_uint256)dyn_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "lazy",
+                "type": "t_array(t_uint256)dyn_storage",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "size",
+                "type": "t_uint32",
+                "offset": 0,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_struct(VaultState)17859_storage": {
+            "label": "struct SignalsCoreStorage.VaultState",
+            "members": [
+              {
+                "label": "nav",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "shares",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "price",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "pricePeak",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "lastBatchTimestamp",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "isSeeded",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "4"
+              }
+            ],
+            "numberOfBytes": "160"
+          },
+          "t_struct(WithdrawRequest)17963_storage": {
+            "label": "struct SignalsCoreStorage.WithdrawRequest",
+            "members": [
+              {
+                "label": "id",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "owner",
+                "type": "t_address",
+                "offset": 8,
+                "slot": "0"
+              },
+              {
+                "label": "shares",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "eligibleBatchId",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "status",
+                "type": "t_enum(RequestStatus)17937",
+                "offset": 8,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_uint32": {
+            "label": "uint32",
+            "numberOfBytes": "4"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.ReentrancyGuard": [
+            {
+              "contract": "ReentrancyGuardUpgradeable",
+              "label": "_status",
+              "type": "t_uint256",
+              "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:43",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Pausable": [
+            {
+              "contract": "PausableUpgradeable",
+              "label": "_paused",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:21",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "fd2b4f8847879c2d2e5e655437f56a30c2739d851bff0252c6dad4281f076c50": {
+      "address": "0x3D140A218cEB46dEd6C62d598d3A52e2F266cDF2",
+      "txHash": "0xa71eb624b4d06f8dd7228c64ced2c2da860cb911674ad1ac9db8d50c6a168a47",
+      "layout": {
+        "solcVersion": "0.8.28",
+        "storage": [
+          {
+            "label": "settlementSubmitWindow",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint64",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:28"
+          },
+          {
+            "label": "claimDelaySeconds",
+            "offset": 8,
+            "slot": "0",
+            "type": "t_uint64",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:32"
+          },
+          {
+            "label": "pendingOpsWindow",
+            "offset": 16,
+            "slot": "0",
+            "type": "t_uint64",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:36"
+          },
+          {
+            "label": "maxSampleDistance",
+            "offset": 24,
+            "slot": "0",
+            "type": "t_uint64",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:40"
+          },
+          {
+            "label": "futureTolerance",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_uint64",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:44"
+          },
+          {
+            "label": "redstoneFeedId",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_bytes32",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:47"
+          },
+          {
+            "label": "redstoneFeedDecimals",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_uint8",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:50"
+          },
+          {
+            "label": "paymentToken",
+            "offset": 1,
+            "slot": "3",
+            "type": "t_contract(IERC20)3597",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:52"
+          },
+          {
+            "label": "positionContract",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_contract(ISignalsPosition)26760",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:53"
+          },
+          {
+            "label": "lpShareToken",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_address",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:56"
+          },
+          {
+            "label": "markets",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_mapping(t_uint256,t_struct(Market)26336_storage)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:58"
+          },
+          {
+            "label": "marketTrees",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_mapping(t_uint256,t_struct(Tree)29115_storage)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:59"
+          },
+          {
+            "label": "nextMarketId",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_uint256",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:60"
+          },
+          {
+            "label": "settlementOracleState",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_mapping(t_uint256,t_struct(SettlementOracleState)22701_storage)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:67"
+          },
+          {
+            "label": "settlementOracleSigner",
+            "offset": 0,
+            "slot": "10",
+            "type": "t_address",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:68"
+          },
+          {
+            "label": "positionSettledEmitted",
+            "offset": 0,
+            "slot": "11",
+            "type": "t_mapping(t_uint256,t_bool)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:70"
+          },
+          {
+            "label": "feeRecipient",
+            "offset": 0,
+            "slot": "12",
+            "type": "t_address",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:72"
+          },
+          {
+            "label": "defaultFeePolicy",
+            "offset": 0,
+            "slot": "13",
+            "type": "t_address",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:73"
+          },
+          {
+            "label": "lpVault",
+            "offset": 0,
+            "slot": "14",
+            "type": "t_struct(VaultState)22730_storage",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:89"
+          },
+          {
+            "label": "minSeedAmount",
+            "offset": 0,
+            "slot": "19",
+            "type": "t_uint256",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:92"
+          },
+          {
+            "label": "capitalStack",
+            "offset": 0,
+            "slot": "20",
+            "type": "t_struct(CapitalStackState)22742_storage",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:145"
+          },
+          {
+            "label": "feeWaterfallConfig",
+            "offset": 0,
+            "slot": "22",
+            "type": "t_struct(FeeWaterfallConfig)22754_storage",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:148"
+          },
+          {
+            "label": "_dailyPnl",
+            "offset": 0,
+            "slot": "27",
+            "type": "t_mapping(t_uint64,t_struct(DailyPnlSnapshot)22788_storage)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:151"
+          },
+          {
+            "label": "_depositRequests",
+            "offset": 0,
+            "slot": "28",
+            "type": "t_mapping(t_uint64,t_struct(DepositRequest)22821_storage)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:202"
+          },
+          {
+            "label": "_withdrawRequests",
+            "offset": 0,
+            "slot": "29",
+            "type": "t_mapping(t_uint64,t_struct(WithdrawRequest)22834_storage)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:205"
+          },
+          {
+            "label": "_batchAggregations",
+            "offset": 0,
+            "slot": "30",
+            "type": "t_mapping(t_uint64,t_struct(BatchAggregation)22844_storage)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:208"
+          },
+          {
+            "label": "_pendingBatchTotals",
+            "offset": 0,
+            "slot": "31",
+            "type": "t_mapping(t_uint64,t_struct(PendingBatchTotal)22850_storage)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:212"
+          },
+          {
+            "label": "nextDepositRequestId",
+            "offset": 0,
+            "slot": "32",
+            "type": "t_uint64",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:217"
+          },
+          {
+            "label": "nextWithdrawRequestId",
+            "offset": 8,
+            "slot": "32",
+            "type": "t_uint64",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:220"
+          },
+          {
+            "label": "currentBatchId",
+            "offset": 16,
+            "slot": "32",
+            "type": "t_uint64",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:223"
+          },
+          {
+            "label": "withdrawalLagBatches",
+            "offset": 24,
+            "slot": "32",
+            "type": "t_uint64",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:227"
+          },
+          {
+            "label": "_exposureFenwick",
+            "offset": 0,
+            "slot": "33",
+            "type": "t_mapping(t_uint256,t_mapping(t_uint32,t_int256))",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:238"
+          },
+          {
+            "label": "_payoutReserve",
+            "offset": 0,
+            "slot": "34",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:243"
+          },
+          {
+            "label": "_payoutReserveRemaining",
+            "offset": 0,
+            "slot": "35",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:246"
+          },
+          {
+            "label": "_totalPendingDeposits6",
+            "offset": 0,
+            "slot": "36",
+            "type": "t_uint256",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:257"
+          },
+          {
+            "label": "_totalPayoutReserve6",
+            "offset": 0,
+            "slot": "37",
+            "type": "t_uint256",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:262"
+          },
+          {
+            "label": "_totalPendingWithdrawals6",
+            "offset": 0,
+            "slot": "38",
+            "type": "t_uint256",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:268"
+          },
+          {
+            "label": "riskConfig",
+            "offset": 0,
+            "slot": "39",
+            "type": "t_struct(RiskConfig)22920_storage",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:282"
+          },
+          {
+            "label": "_batchMarketState",
+            "offset": 0,
+            "slot": "42",
+            "type": "t_mapping(t_uint64,t_struct(BatchMarketState)22930_storage)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:289"
+          },
+          {
+            "label": "_marketBatchResolved",
+            "offset": 0,
+            "slot": "43",
+            "type": "t_mapping(t_uint256,t_bool)",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:292"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "44",
+            "type": "t_array(t_uint256)13_storage",
+            "contract": "SignalsCoreStorage",
+            "src": "contracts/core/SignalsCoreStorage.sol:297"
+          },
+          {
+            "label": "tradeModule",
+            "offset": 0,
+            "slot": "57",
+            "type": "t_address",
+            "contract": "SignalsCore",
+            "src": "contracts/core/SignalsCore.sol:31"
+          },
+          {
+            "label": "lifecycleModule",
+            "offset": 0,
+            "slot": "58",
+            "type": "t_address",
+            "contract": "SignalsCore",
+            "src": "contracts/core/SignalsCore.sol:32"
+          },
+          {
+            "label": "riskModule",
+            "offset": 0,
+            "slot": "59",
+            "type": "t_address",
+            "contract": "SignalsCore",
+            "src": "contracts/core/SignalsCore.sol:33"
+          },
+          {
+            "label": "vaultModule",
+            "offset": 0,
+            "slot": "60",
+            "type": "t_address",
+            "contract": "SignalsCore",
+            "src": "contracts/core/SignalsCore.sol:34"
+          },
+          {
+            "label": "oracleModule",
+            "offset": 0,
+            "slot": "61",
+            "type": "t_address",
+            "contract": "SignalsCore",
+            "src": "contracts/core/SignalsCore.sol:35"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)86_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(OwnableStorage)14_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(PausableStorage)632_storage": {
+            "label": "struct PausableUpgradeable.PausableStorage",
+            "members": [
+              {
+                "label": "_paused",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(ReentrancyGuardStorage)708_storage": {
+            "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
+            "members": [
+              {
+                "label": "_status",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_array(t_uint256)13_storage": {
+            "label": "uint256[13]",
+            "numberOfBytes": "416"
+          },
+          "t_array(t_uint256)dyn_storage": {
+            "label": "uint256[]",
+            "numberOfBytes": "32"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_contract(IERC20)3597": {
+            "label": "contract IERC20",
+            "numberOfBytes": "20"
+          },
+          "t_contract(ISignalsPosition)26760": {
+            "label": "contract ISignalsPosition",
+            "numberOfBytes": "20"
+          },
+          "t_enum(RequestStatus)22808": {
+            "label": "enum SignalsCoreStorage.RequestStatus",
+            "members": [
+              "Pending",
+              "Processed",
+              "Claimed",
+              "Cancelled"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_int256": {
+            "label": "int256",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_bool)": {
+            "label": "mapping(uint256 => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_mapping(t_uint32,t_int256))": {
+            "label": "mapping(uint256 => mapping(uint32 => int256))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Market)26336_storage)": {
+            "label": "mapping(uint256 => struct ISignalsCore.Market)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(SettlementOracleState)22701_storage)": {
+            "label": "mapping(uint256 => struct SignalsCoreStorage.SettlementOracleState)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Tree)29115_storage)": {
+            "label": "mapping(uint256 => struct LazyMulSegmentTree.Tree)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_uint256)": {
+            "label": "mapping(uint256 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint32,t_int256)": {
+            "label": "mapping(uint32 => int256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint64,t_struct(BatchAggregation)22844_storage)": {
+            "label": "mapping(uint64 => struct SignalsCoreStorage.BatchAggregation)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint64,t_struct(BatchMarketState)22930_storage)": {
+            "label": "mapping(uint64 => struct SignalsCoreStorage.BatchMarketState)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint64,t_struct(DailyPnlSnapshot)22788_storage)": {
+            "label": "mapping(uint64 => struct SignalsCoreStorage.DailyPnlSnapshot)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint64,t_struct(DepositRequest)22821_storage)": {
+            "label": "mapping(uint64 => struct SignalsCoreStorage.DepositRequest)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint64,t_struct(PendingBatchTotal)22850_storage)": {
+            "label": "mapping(uint64 => struct SignalsCoreStorage.PendingBatchTotal)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint64,t_struct(WithdrawRequest)22834_storage)": {
+            "label": "mapping(uint64 => struct SignalsCoreStorage.WithdrawRequest)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(BatchAggregation)22844_storage": {
+            "label": "struct SignalsCoreStorage.BatchAggregation",
+            "members": [
+              {
+                "label": "totalDepositAssets",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "totalWithdrawShares",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "batchPrice",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "processed",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_struct(BatchMarketState)22930_storage": {
+            "label": "struct SignalsCoreStorage.BatchMarketState",
+            "members": [
+              {
+                "label": "total",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "resolved",
+                "type": "t_uint64",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(CapitalStackState)22742_storage": {
+            "label": "struct SignalsCoreStorage.CapitalStackState",
+            "members": [
+              {
+                "label": "backstopNav",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "treasuryNav",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(DailyPnlSnapshot)22788_storage": {
+            "label": "struct SignalsCoreStorage.DailyPnlSnapshot",
+            "members": [
+              {
+                "label": "Lt",
+                "type": "t_int256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "Ftot",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "DeltaEtSum",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "Floss",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "Fpool",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "Nraw",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "Gt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "Ffill",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "FLP",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "FBS",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "9"
+              },
+              {
+                "label": "FTR",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "10"
+              },
+              {
+                "label": "Fdust",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "11"
+              },
+              {
+                "label": "Ft",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "12"
+              },
+              {
+                "label": "Npre",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "13"
+              },
+              {
+                "label": "Pe",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "14"
+              },
+              {
+                "label": "processed",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "15"
+              }
+            ],
+            "numberOfBytes": "512"
+          },
+          "t_struct(DepositRequest)22821_storage": {
+            "label": "struct SignalsCoreStorage.DepositRequest",
+            "members": [
+              {
+                "label": "id",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "owner",
+                "type": "t_address",
+                "offset": 8,
+                "slot": "0"
+              },
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "eligibleBatchId",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "status",
+                "type": "t_enum(RequestStatus)22808",
+                "offset": 8,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_struct(FeeWaterfallConfig)22754_storage": {
+            "label": "struct SignalsCoreStorage.FeeWaterfallConfig",
+            "members": [
+              {
+                "label": "pdd",
+                "type": "t_int256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "rhoBS",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "phiLP",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "phiBS",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "phiTR",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              }
+            ],
+            "numberOfBytes": "160"
+          },
+          "t_struct(Market)26336_storage": {
+            "label": "struct ISignalsCore.Market",
+            "members": [
+              {
+                "label": "isActive",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "settled",
+                "type": "t_bool",
+                "offset": 1,
+                "slot": "0"
+              },
+              {
+                "label": "snapshotChunksDone",
+                "type": "t_bool",
+                "offset": 2,
+                "slot": "0"
+              },
+              {
+                "label": "failed",
+                "type": "t_bool",
+                "offset": 3,
+                "slot": "0"
+              },
+              {
+                "label": "numBins",
+                "type": "t_uint32",
+                "offset": 4,
+                "slot": "0"
+              },
+              {
+                "label": "openPositionCount",
+                "type": "t_uint32",
+                "offset": 8,
+                "slot": "0"
+              },
+              {
+                "label": "snapshotChunkCursor",
+                "type": "t_uint32",
+                "offset": 12,
+                "slot": "0"
+              },
+              {
+                "label": "startTimestamp",
+                "type": "t_uint64",
+                "offset": 16,
+                "slot": "0"
+              },
+              {
+                "label": "endTimestamp",
+                "type": "t_uint64",
+                "offset": 24,
+                "slot": "0"
+              },
+              {
+                "label": "settlementTimestamp",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "settlementFinalizedAt",
+                "type": "t_uint64",
+                "offset": 8,
+                "slot": "1"
+              },
+              {
+                "label": "minTick",
+                "type": "t_int256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "maxTick",
+                "type": "t_int256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "tickSpacing",
+                "type": "t_int256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "settlementTick",
+                "type": "t_int256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "settlementValue",
+                "type": "t_int256",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "liquidityParameter",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "feePolicy",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "initialRootSum",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "9"
+              },
+              {
+                "label": "accumulatedFees",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "10"
+              },
+              {
+                "label": "minFactor",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "11"
+              },
+              {
+                "label": "deltaEt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "12"
+              }
+            ],
+            "numberOfBytes": "416"
+          },
+          "t_struct(PendingBatchTotal)22850_storage": {
+            "label": "struct SignalsCoreStorage.PendingBatchTotal",
+            "members": [
+              {
+                "label": "deposits",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "withdraws",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(RiskConfig)22920_storage": {
+            "label": "struct SignalsCoreStorage.RiskConfig",
+            "members": [
+              {
+                "label": "lambda",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "kDrawdown",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "enforceAlpha",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_struct(SettlementOracleState)22701_storage": {
+            "label": "struct SignalsCoreStorage.SettlementOracleState",
+            "members": [
+              {
+                "label": "candidateValue",
+                "type": "t_int256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "candidatePriceTimestamp",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_struct(Tree)29115_storage": {
+            "label": "struct LazyMulSegmentTree.Tree",
+            "members": [
+              {
+                "label": "sum",
+                "type": "t_array(t_uint256)dyn_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "lazy",
+                "type": "t_array(t_uint256)dyn_storage",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "size",
+                "type": "t_uint32",
+                "offset": 0,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_struct(VaultState)22730_storage": {
+            "label": "struct SignalsCoreStorage.VaultState",
+            "members": [
+              {
+                "label": "nav",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "shares",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "price",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "pricePeak",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "lastBatchTimestamp",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "isSeeded",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "4"
+              }
+            ],
+            "numberOfBytes": "160"
+          },
+          "t_struct(WithdrawRequest)22834_storage": {
+            "label": "struct SignalsCoreStorage.WithdrawRequest",
+            "members": [
+              {
+                "label": "id",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "owner",
+                "type": "t_address",
+                "offset": 8,
+                "slot": "0"
+              },
+              {
+                "label": "shares",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "eligibleBatchId",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "status",
+                "type": "t_enum(RequestStatus)22808",
+                "offset": 8,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_uint32": {
+            "label": "uint32",
+            "numberOfBytes": "4"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.ReentrancyGuard": [
+            {
+              "contract": "ReentrancyGuardUpgradeable",
+              "label": "_status",
+              "type": "t_uint256",
+              "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:43",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Pausable": [
+            {
+              "contract": "PausableUpgradeable",
+              "label": "_paused",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol:21",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

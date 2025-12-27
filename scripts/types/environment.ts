@@ -12,10 +12,28 @@ export interface EnvironmentContracts {
   [name: string]: string;
 }
 
+export interface EnvironmentConfig {
+  settlementSubmitWindow?: string;
+  settlementFinalizeDeadline?: string;
+  pendingOpsWindow?: string;
+  defaultFeeBps?: number;
+  redstoneFeedId?: string;
+  redstoneFeedDecimals?: number;
+  redstoneMaxSampleDistance?: string;
+  redstoneFutureTolerance?: string;
+  lpShareTokenName?: string;
+  lpShareTokenSymbol?: string;
+  owners?: {
+    core?: string;
+    position?: string;
+  };
+}
+
 export interface EnvironmentFile {
   network: Environment;
   version: number;
   contracts: EnvironmentContracts;
+  config?: EnvironmentConfig;
   history: DeploymentRecord[];
 }
 
