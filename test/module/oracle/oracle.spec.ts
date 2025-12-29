@@ -77,18 +77,19 @@ describe("OracleModule", () => {
     await core.setRedstoneConfig(feedId, FEED_DECIMALS, maxSampleDistance, futureTolerance);
     
     // Configure settlement timeline (submitWindow, opsWindow, claimDelay)
-    await core.setSettlementTimeline(120, 300, 60);
+    await core.setSettlementTimeline(120, 300, 420);
 
     const now = BigInt(await time.latest());
     const WAD = ethers.parseEther("1");
     const market: ISignalsCore.MarketStruct = {
-      isActive: true,
+      isSeeded: true,
       settled: false,
       snapshotChunksDone: false,
       failed: false,
       numBins: 4,
       openPositionCount: 0,
       snapshotChunkCursor: 0,
+      seedCursor: 4,
       startTimestamp: now - 100n,
       endTimestamp: now + 200n,
       settlementTimestamp: now + 300n,
@@ -100,6 +101,7 @@ describe("OracleModule", () => {
       settlementValue: 0,
       liquidityParameter: WAD,
       feePolicy: ethers.ZeroAddress,
+      seedData: ethers.ZeroAddress,
       initialRootSum: 4n * WAD,
       accumulatedFees: 0n,
       minFactor: WAD,
@@ -387,7 +389,7 @@ describe("OracleModule", () => {
       expect(retTSet).to.equal(tSet);
       expect(settleEnd).to.equal(tSet + submitWindow);
       expect(opsEnd).to.equal(tSet + submitWindow + opsWindow);
-      expect(claimOpen).to.equal(0); // Not finalized yet
+      expect(claimOpen).to.equal(tSet + submitWindow + opsWindow);
     });
   });
 
@@ -413,7 +415,6 @@ describe("OracleModule", () => {
 
       const m = await core.markets(1);
       expect(m.failed).to.equal(true);
-      expect(m.isActive).to.equal(false);
     });
 
     it("reverts finalizeSecondarySettlement on non-failed market", async () => {

@@ -295,13 +295,10 @@ contract SignalsCore is
 
     // --- Lifecycle / oracle ---
 
-    /// @notice Create a new market with prior-based factors
+    /// @notice Create a new market with prior-based factors stored in SeedData
     /// @dev Core-first Risk Gate pattern:
     ///      1. Core calls RiskModule.gateCreateMarket FIRST (α limit + prior admissibility)
     ///      2. Core delegates to MarketLifecycleModule (state machine, storage)
-    ///      baseFactors define the opening prior q₀,t:
-    ///      - Uniform prior: all factors = 1 WAD → ΔEₜ = 0
-    ///      - Concentrated prior: factors vary → ΔEₜ > 0
     function createMarket(
         int256 minTick,
         int256 maxTick,
@@ -312,17 +309,17 @@ contract SignalsCore is
         uint32 numBins,
         uint256 liquidityParameter,
         address feePolicy,
-        uint256[] calldata baseFactors
-    ) external override onlyOwner whenNotPaused returns (uint256 marketId) {
-        // Risk gate first: RiskModule calculates deltaEt from baseFactors and validates α bounds
+        address seedData
+    ) public override onlyOwner whenNotPaused returns (uint256 marketId) {
+        // Risk gate first: validate α bounds and prior admissibility
         _riskGate(abi.encodeCall(
             IRiskModule.gateCreateMarket,
-            (liquidityParameter, numBins, baseFactors)
+            (liquidityParameter, numBins, seedData)
         ));
 
         // Then delegate to lifecycle module (state machine only, risk already validated)
         bytes memory ret = _delegate(lifecycleModule, abi.encodeWithSignature(
-            "createMarket(int256,int256,int256,uint64,uint64,uint64,uint32,uint256,address,uint256[])",
+            "createMarket(int256,int256,int256,uint64,uint64,uint64,uint32,uint256,address,address)",
             minTick,
             maxTick,
             tickSpacing,
@@ -332,7 +329,7 @@ contract SignalsCore is
             numBins,
             liquidityParameter,
             feePolicy,
-            baseFactors
+            seedData
         ));
         if (ret.length > 0) marketId = abi.decode(ret, (uint256));
     }
@@ -368,8 +365,8 @@ contract SignalsCore is
         _delegate(lifecycleModule, abi.encodeWithSignature("reopenMarket(uint256)", marketId));
     }
 
-    function setMarketActive(uint256 marketId, bool isActive) external override onlyOwner whenNotPaused {
-        _delegate(lifecycleModule, abi.encodeWithSignature("setMarketActive(uint256,bool)", marketId, isActive));
+    function seedNextChunks(uint256 marketId, uint32 count) public override onlyOwner whenNotPaused {
+        _delegate(lifecycleModule, abi.encodeWithSignature("seedNextChunks(uint256,uint32)", marketId, count));
     }
 
     function updateMarketTiming(
@@ -417,12 +414,15 @@ contract SignalsCore is
     /// @notice Set settlement timeline parameters (WP v2 state machine)
     /// @param _sampleWindow Δsettle: SettlementOpen duration for sample submission
     /// @param _opsWindow Δops: PendingOps duration
-    /// @param _claimDelay Δclaim: Delay before claims open after finalization
+    /// @param _claimDelay Δclaim: Delay before claims open after Tset
     function setSettlementTimeline(
         uint64 _sampleWindow,
         uint64 _opsWindow,
         uint64 _claimDelay
     ) external onlyOwner whenNotPaused {
+        if (_claimDelay != _sampleWindow + _opsWindow) {
+            revert SignalsErrors.InvalidSettlementTimeline(_claimDelay, _sampleWindow, _opsWindow);
+        }
         settlementSubmitWindow = _sampleWindow;
         pendingOpsWindow = _opsWindow;
         claimDelaySeconds = _claimDelay;

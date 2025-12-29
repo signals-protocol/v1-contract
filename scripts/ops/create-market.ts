@@ -46,6 +46,7 @@ interface CreateMarketConfig {
     startDelaySec: number;
     durationSec: number;
     settlementDelaySec: number;
+    seedChunkSize: number;
     liquidity: {
       mode: LiquidityMode;
       safetyFactor: string;
@@ -84,7 +85,7 @@ const CONFIG: CreateMarketConfig = {
   },
   settlement: {
     submitWindowSec: 600,
-    pendingOpsWindowSec: 600,
+    pendingOpsWindowSec: 300,
     claimDelaySec: 900,
   },
   redstone: {
@@ -100,6 +101,7 @@ const CONFIG: CreateMarketConfig = {
     startDelaySec: 7 * 24 * 3600,
     durationSec: 24 * 3600,
     settlementDelaySec: 0,
+    seedChunkSize: 50,
     liquidity: {
       mode: "manual", // "auto" | "manual"
       safetyFactor: "0.8", // applies only for auto
@@ -361,6 +363,16 @@ async function main() {
     `[create-market] numBins=${numBins} alphaWad=${alphaWad.toString()} batchId=${targetBatchId}`
   );
 
+  const packedFactors = hre.ethers.solidityPacked(
+    Array(baseFactors.length).fill("uint256"),
+    baseFactors
+  );
+  const seedData = await (await hre.ethers.getContractFactory("SeedData")).deploy(
+    packedFactors
+  );
+  await seedData.waitForDeployment();
+  const seedDataAddress = seedData.target;
+
   const beforeMarketId = await core.nextMarketId();
   let marketId = beforeMarketId + 1n;
   if (!CONFIG.skipStaticCall) {
@@ -375,7 +387,7 @@ async function main() {
         numBins,
         alphaWad,
         feePolicyAddress,
-        baseFactors
+        seedDataAddress
       );
     } catch (err) {
       await decodeRevert(err);
@@ -394,7 +406,7 @@ async function main() {
     numBins,
     alphaWad,
     feePolicyAddress,
-    baseFactors,
+    seedDataAddress,
     overrides
   );
   if (overrides.gasLimit) {
@@ -406,6 +418,16 @@ async function main() {
 
   console.log(`[create-market] marketId=${marketId.toString()}`);
   console.log(`[create-market] start=${startTimestamp} end=${endTimestamp} settlement=${settlementTimestamp}`);
+
+  const seedChunkSize = Math.max(1, CONFIG.market.seedChunkSize);
+  let remaining = numBins;
+  while (remaining > 0) {
+    const count = remaining > seedChunkSize ? seedChunkSize : remaining;
+    console.log(`[create-market] seeding chunk count=${count} remaining=${remaining}`);
+    const seedTx = await core.seedNextChunks(marketId, count);
+    await seedTx.wait();
+    remaining -= count;
+  }
 }
 
 main().catch((err) => {

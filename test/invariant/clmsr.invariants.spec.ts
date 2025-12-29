@@ -96,13 +96,14 @@ describe("CLMSR Invariants", () => {
 
     const now = (await ethers.provider.getBlock("latest"))!.timestamp;
     const market: ISignalsCore.MarketStruct = {
-      isActive: true,
+      isSeeded: true,
       settled: false,
       snapshotChunksDone: false,
       failed: false,
       numBins: NUM_BINS,
       openPositionCount: 0,
       snapshotChunkCursor: 0,
+      seedCursor: NUM_BINS,
       startTimestamp: now - 10,
       endTimestamp: now + 100000,
       settlementTimestamp: now + 100100,
@@ -114,6 +115,7 @@ describe("CLMSR Invariants", () => {
       settlementValue: 0,
       liquidityParameter: WAD,
       feePolicy: ethers.ZeroAddress,
+      seedData: ethers.ZeroAddress,
       initialRootSum: BigInt(NUM_BINS) * WAD,
       accumulatedFees: 0n,
       minFactor: WAD, // uniform prior
@@ -575,13 +577,14 @@ describe("CLMSR Invariants", () => {
       // Create fresh market for path 2
       const now = (await ethers.provider.getBlock("latest"))!.timestamp;
       const market2: ISignalsCore.MarketStruct = {
-        isActive: true,
+        isSeeded: true,
         settled: false,
         snapshotChunksDone: false,
         failed: false,
         numBins: NUM_BINS,
         openPositionCount: 0,
         snapshotChunkCursor: 0,
+        seedCursor: NUM_BINS,
         startTimestamp: now - 10,
         endTimestamp: now + 100000,
         settlementTimestamp: now + 100100,
@@ -593,10 +596,11 @@ describe("CLMSR Invariants", () => {
         settlementValue: 0,
         liquidityParameter: WAD,
         feePolicy: ethers.ZeroAddress,
+        seedData: ethers.ZeroAddress,
         initialRootSum: BigInt(NUM_BINS) * WAD,
         accumulatedFees: 0n,
-      minFactor: WAD, // uniform prior
-      deltaEt: 0n, // Uniform prior: ΔEₜ = 0
+        minFactor: WAD, // uniform prior
+        deltaEt: 0n, // Uniform prior: ΔEₜ = 0
       };
       await core.setMarket(2, market2);
       await core.seedTree(2, Array(NUM_BINS).fill(WAD));

@@ -146,6 +146,14 @@ export async function safetyCheckAction(env: Environment) {
       throw new Error(`pendingOpsWindow mismatch: chain=${actual} env=${pendingOpsWindow}`);
     }
   }
+  if (submitWindow && pendingOpsWindow && finalizeDeadline) {
+    const expectedClaim = BigInt(submitWindow) + BigInt(pendingOpsWindow);
+    if (BigInt(finalizeDeadline) !== expectedClaim) {
+      throw new Error(
+        `claimDelaySeconds invariant mismatch: submit=${submitWindow} ops=${pendingOpsWindow} claim=${finalizeDeadline}`
+      );
+    }
+  }
 
   const redstoneFeedId = envData.config?.redstoneFeedId;
   if (redstoneFeedId) {

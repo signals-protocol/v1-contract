@@ -57,13 +57,14 @@ describe("TradeModule slippage and bounds", () => {
     // Get current market and update to settled state
     const now = (await ethers.provider.getBlock("latest"))!.timestamp;
     const settledMarket: ISignalsCore.MarketStruct = {
-      isActive: false,
+      isSeeded: true,
       settled: true,
       snapshotChunksDone: false,
       failed: false,
       numBins: 4,
       openPositionCount: 0,
       snapshotChunkCursor: 0,
+      seedCursor: 4,
       startTimestamp: now - 10,
       endTimestamp: now + 1_000,
       settlementTimestamp: now + 1_100,
@@ -75,6 +76,7 @@ describe("TradeModule slippage and bounds", () => {
       settlementValue: 0,
       liquidityParameter: WAD,
       feePolicy: ethers.ZeroAddress,
+      seedData: ethers.ZeroAddress,
       initialRootSum: 4n * WAD,
       accumulatedFees: 0n,
       minFactor: WAD, // uniform prior

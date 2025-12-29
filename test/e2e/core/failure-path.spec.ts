@@ -4,13 +4,13 @@ import { time } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { deployFullSystem } from "../../helpers/fullSystem";
 import { uniformFactors } from "../../helpers/constants";
 import { toSettlementValue } from "../../helpers/redstone";
+import { deploySeedData } from "../../helpers";
 
 describe("E2E: failure path", () => {
   it("marks failed, settles secondary, and claims", async () => {
     const { owner, users, core, payment, position } = await deployFullSystem({
       submitWindow: 5,
       opsWindow: 5,
-      claimDelay: 0,
     });
     const [trader] = users;
     const coreAddress = await core.getAddress();
@@ -28,6 +28,7 @@ describe("E2E: failure path", () => {
     const end = now + 50;
     const settlement = now + 60;
     const baseFactors = uniformFactors(4);
+    const seedData = await deploySeedData(baseFactors);
 
     const marketId = await core.createMarket.staticCall(
       0,
@@ -39,7 +40,7 @@ describe("E2E: failure path", () => {
       4,
       ethers.parseEther("1"),
       ethers.ZeroAddress,
-      baseFactors
+      await seedData.getAddress()
     );
     await core.createMarket(
       0,
@@ -51,8 +52,9 @@ describe("E2E: failure path", () => {
       4,
       ethers.parseEther("1"),
       ethers.ZeroAddress,
-      baseFactors
+      await seedData.getAddress()
     );
+    await core.seedNextChunks(marketId, 4);
 
     const quantity = 1_000n;
     const openCost = await core.calculateOpenCost.staticCall(marketId, 1, 3, quantity);
@@ -71,6 +73,7 @@ describe("E2E: failure path", () => {
     expect(market.failed).to.equal(true);
     expect(market.settled).to.equal(true);
 
+    await time.increaseTo(settlement + 10);
     const balanceBefore = await payment.balanceOf(trader.address);
     await core.connect(trader).claimPayout(positionId);
     const balanceAfter = await payment.balanceOf(trader.address);

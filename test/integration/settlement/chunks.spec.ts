@@ -84,12 +84,13 @@ async function deploySystem() {
     })
   ).deploy()) as SignalsCoreHarness;
   const submitWindow = 200;
-  const finalizeDeadline = 60;
+  const opsWindow = 60;
+  const claimDelay = submitWindow + opsWindow;
   const initCore = coreImpl.interface.encodeFunctionData("initialize", [
     payment.target,
     await position.getAddress(),
     submitWindow,
-    finalizeDeadline,
+    claimDelay,
   ]);
   const coreProxy = (await (
     await ethers.getContractFactory("TestERC1967Proxy")
@@ -109,6 +110,7 @@ async function deploySystem() {
   
   // Configure Redstone oracle params
   await core.setRedstoneConfig(FEED_ID, FEED_DECIMALS, MAX_SAMPLE_DISTANCE, FUTURE_TOLERANCE);
+  await core.setSettlementTimeline(submitWindow, opsWindow, claimDelay);
   await position.connect(owner).setCore(await core.getAddress());
 
   // Configure risk and fee waterfall for vault
@@ -225,8 +227,6 @@ describe("Settlement chunks and claim totals", () => {
       "SnapshotAlreadyCompleted"
     );
 
-    // wait claim gate
-    await time.increase(61);
 
     // top up core to ensure payouts (simulating fee pool)
     const coreAddr = await core.getAddress();
@@ -324,7 +324,6 @@ describe("Settlement chunks and claim totals", () => {
     await core.finalizePrimarySettlement(1);
 
     await core.requestSettlementChunks(1, 10);
-    await time.increase(61);
 
     const balBefore = await payment.balanceOf(u1.address);
     await core.connect(u1).claimPayout(1);
@@ -359,7 +358,6 @@ describe("Settlement chunks and claim totals", () => {
     await core.finalizePrimarySettlement(1);
 
     await core.requestSettlementChunks(1, 10);
-    await time.increase(61);
 
     const balBefore = await payment.balanceOf(u1.address);
     await core.connect(u1).claimPayout(1);
@@ -394,7 +392,6 @@ describe("Settlement chunks and claim totals", () => {
     await core.finalizePrimarySettlement(1);
 
     await core.requestSettlementChunks(1, 10);
-    await time.increase(61);
 
     const balBefore = await payment.balanceOf(u1.address);
     await core.connect(u1).claimPayout(1);
@@ -429,7 +426,6 @@ describe("Settlement chunks and claim totals", () => {
     await core.finalizePrimarySettlement(1);
 
     await core.requestSettlementChunks(1, 10);
-    await time.increase(61);
 
     const balBefore = await payment.balanceOf(u1.address);
     await core.connect(u1).claimPayout(1);

@@ -19,6 +19,7 @@ import {
   submitWithPayload,
 } from "../../helpers/redstone";
 import { advancePastBatchEnd, BATCH_SECONDS } from "../../helpers/constants";
+import { deploySeedData } from "../../helpers";
 const WAD = ethers.parseEther("1");
 
 // Redstone feed config (for setRedstoneConfig)
@@ -72,12 +73,13 @@ describe("VaultWithMarkets E2E", () => {
     ).deploy()) as SignalsCoreHarness;
 
     const submitWindow = 300;
-    const finalizeDeadline = 60;
+    const opsWindow = 60;
+    const claimDelay = submitWindow + opsWindow;
     const initData = coreImpl.interface.encodeFunctionData("initialize", [
       payment.target,
       position.target,
       submitWindow,
-      finalizeDeadline,
+      claimDelay,
     ]);
 
     const proxy = (await (
@@ -96,6 +98,7 @@ describe("VaultWithMarkets E2E", () => {
       vault.target,
       oracle.target
     );
+    await core.setSettlementTimeline(submitWindow, opsWindow, claimDelay);
     
     // Configure Redstone oracle params
     await core.setRedstoneConfig(FEED_ID, FEED_DECIMALS, MAX_SAMPLE_DISTANCE, FUTURE_TOLERANCE);
@@ -289,6 +292,7 @@ describe("VaultWithMarkets E2E", () => {
       const tSet = seedTime + 500n;
       const concentratedFactors = Array(10).fill(WAD);
       concentratedFactors[0] = 2n * WAD; // 2x weight on first bin
+      const seedData = await deploySeedData(concentratedFactors);
 
       await core.createMarket(
         0,
@@ -300,7 +304,7 @@ describe("VaultWithMarkets E2E", () => {
         10,
         ethers.parseEther("100"), // α = 100
         ethers.ZeroAddress,
-        concentratedFactors
+        await seedData.getAddress()
       );
 
       // Verify market has ΔEₜ stored
@@ -357,11 +361,12 @@ describe("VaultWithMarkets E2E", () => {
       
       const factors = Array(10).fill(WAD);
       factors[0] = 2n * WAD; // 2x weight on first bin
+      const seedData = await deploySeedData(factors);
       await core.createMarket(
         0, 100, 10,
         Number(seedTime + 100n), Number(tSet - 100n), Number(tSet),
         10, ethers.parseEther("100"),
-        ethers.ZeroAddress, factors
+        ethers.ZeroAddress, await seedData.getAddress()
       );
 
       // Verify market has deltaEt > 0

@@ -3,6 +3,7 @@ import { expect } from "chai";
 import { deployFullSystem } from "../../helpers/fullSystem";
 import { advancePastBatchEnd } from "../../helpers/constants";
 import { time } from "@nomicfoundation/hardhat-toolbox/network-helpers";
+import { deploySeedData } from "../../helpers";
 
 describe("E2E: vault lifecycle", () => {
   const BATCH_SECONDS = 86400n;
@@ -25,6 +26,7 @@ describe("E2E: vault lifecycle", () => {
     const endTimestamp = settlementTimestamp - 100n;
 
     const baseFactors = Array(10).fill(ethers.parseEther("1"));
+    const seedData = await deploySeedData(baseFactors);
     const marketId = await core.createMarket.staticCall(
       0,
       100,
@@ -35,7 +37,7 @@ describe("E2E: vault lifecycle", () => {
       10,
       ethers.parseEther("100"),
       ethers.ZeroAddress,
-      baseFactors
+      await seedData.getAddress()
     );
     await core.createMarket(
       0,
@@ -47,7 +49,7 @@ describe("E2E: vault lifecycle", () => {
       10,
       ethers.parseEther("100"),
       ethers.ZeroAddress,
-      baseFactors
+      await seedData.getAddress()
     );
 
     const opsStart = settlementTimestamp + BigInt(submitWindow) + 1n;
@@ -61,7 +63,6 @@ describe("E2E: vault lifecycle", () => {
     const { owner, users, core, payment, lpShare } = await deployFullSystem({
       submitWindow: 5,
       opsWindow: 5,
-      claimDelay: 0,
     });
     const [user] = users;
     const coreAddress = await core.getAddress();

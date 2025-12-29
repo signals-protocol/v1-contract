@@ -5,7 +5,7 @@ import "../core/SignalsCore.sol";
 import "../lib/LazyMulSegmentTree.sol";
 import "../lib/ExposureDiffLib.sol";
 import "../lib/TickBinLib.sol";
-import "../interfaces/IRiskModule.sol";
+import "../utils/SeedData.sol";
 
 /// @notice Harness extending SignalsCore with helpers to seed markets/trees for tests.
 contract SignalsCoreHarness is SignalsCore {
@@ -197,7 +197,7 @@ contract SignalsCoreHarness is SignalsCore {
     // ============================================================
 
     /// @notice Create market with uniform prior (backward compatible for tests)
-    /// @dev Generates uniform factors (all 1 WAD) internally
+    /// @dev Generates uniform factors (all 1 WAD) internally and wraps them in SeedData.
     function createMarketUniform(
         int256 minTick,
         int256 maxTick,
@@ -214,15 +214,9 @@ contract SignalsCoreHarness is SignalsCore {
         for (uint256 i = 0; i < numBins; i++) {
             factors[i] = 1e18;
         }
-        
-        // Risk gate first - RiskModule calculates deltaEt from factors
-        _riskGate(abi.encodeCall(
-            IRiskModule.gateCreateMarket,
-            (liquidityParameter, numBins, factors)
-        ));
-        
-        bytes memory ret = _delegate(lifecycleModule, abi.encodeWithSignature(
-            "createMarket(int256,int256,int256,uint64,uint64,uint64,uint32,uint256,address,uint256[])",
+
+        SeedData seedData = new SeedData(abi.encodePacked(factors));
+        marketId = createMarket(
             minTick,
             maxTick,
             tickSpacing,
@@ -232,9 +226,10 @@ contract SignalsCoreHarness is SignalsCore {
             numBins,
             liquidityParameter,
             feePolicy,
-            factors
-        ));
-        if (ret.length > 0) marketId = abi.decode(ret, (uint256));
+            address(seedData)
+        );
+        seedNextChunks(marketId, numBins);
+        return marketId;
     }
 
     /// @dev Set market failed state for testing reopenMarket

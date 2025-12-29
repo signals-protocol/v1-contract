@@ -76,14 +76,19 @@ describe("TradeModule flow (minimal parity)", () => {
     );
 
     const now = (await ethers.provider.getBlock("latest"))!.timestamp;
+    const numBins = marketOverrides.numBins ?? 4;
+    const defaultSeedCursor =
+      marketOverrides.seedCursor ??
+      (marketOverrides.isSeeded === false ? 0 : numBins);
     const market: ISignalsCore.MarketStruct = {
-      isActive: true,
+      isSeeded: marketOverrides.isSeeded ?? true,
       settled: false,
       snapshotChunksDone: false,
       failed: false,
-      numBins: 4,
+      numBins: numBins,
       openPositionCount: 0,
       snapshotChunkCursor: 0,
+      seedCursor: defaultSeedCursor,
       startTimestamp: now - 10,
       endTimestamp: now + 1000,
       settlementTimestamp: now + 1100,
@@ -95,7 +100,8 @@ describe("TradeModule flow (minimal parity)", () => {
       settlementValue: 0,
       liquidityParameter: WAD,
       feePolicy: ethers.ZeroAddress,
-      initialRootSum: 4n * WAD,
+      seedData: marketOverrides.seedData ?? ethers.ZeroAddress,
+      initialRootSum: BigInt(numBins) * WAD,
       accumulatedFees: 0n,
       minFactor: WAD, // uniform prior
       deltaEt: 0n, // Uniform prior: ΔEₜ = 0
@@ -154,8 +160,8 @@ describe("TradeModule flow (minimal parity)", () => {
       .reverted;
   });
 
-  it("reverts on inactive market and invalid ticks", async () => {
-    const { user, core } = await deploySystem({ isActive: false });
+  it("reverts on unseeded market and invalid ticks", async () => {
+    const { user, core } = await deploySystem({ isSeeded: false });
     await expect(core.connect(user).openPosition(1, 0, 4, 1_000, 5_000_000)).to
       .be.reverted;
 
@@ -179,21 +185,22 @@ describe("TradeModule flow (minimal parity)", () => {
     await core.connect(user).openPosition(1, 0, 4, 1_000, quote);
 
     // Mark market settled in the past to satisfy claim gate.
-    // settlementFinalizedAt must be set to past time for claim to be allowed.
+    // settlementTimestamp must be in the past for claim to be allowed.
     const m = await core.markets(1);
     const past = m.endTimestamp - 1000n;
     const settledMarket: ISignalsCore.MarketStruct = {
-      isActive: m.isActive,
+      isSeeded: m.isSeeded,
       settled: true,
       snapshotChunksDone: m.snapshotChunksDone,
       failed: m.failed,
       numBins: m.numBins,
       openPositionCount: m.openPositionCount,
       snapshotChunkCursor: m.snapshotChunkCursor,
+      seedCursor: m.seedCursor,
       startTimestamp: m.startTimestamp,
       endTimestamp: past,
       settlementTimestamp: past,
-      settlementFinalizedAt: past, // Set to past so claim gating passes
+      settlementFinalizedAt: past,
       minTick: m.minTick,
       maxTick: m.maxTick,
       tickSpacing: m.tickSpacing,
@@ -201,6 +208,7 @@ describe("TradeModule flow (minimal parity)", () => {
       settlementValue: m.settlementValue,
       liquidityParameter: m.liquidityParameter,
       feePolicy: m.feePolicy,
+      seedData: m.seedData,
       initialRootSum: m.initialRootSum,
       accumulatedFees: m.accumulatedFees,
       minFactor: m.minFactor,
@@ -228,21 +236,22 @@ describe("TradeModule flow (minimal parity)", () => {
     await expect(core.connect(user).claimPayout(1)).to.be.reverted;
 
     // Settle but too early for claim window.
-    // Claim gating is time-based (settlementFinalizedAt + Δ_claim).
+    // Claim gating is time-based (settlementTimestamp + Δ_claim).
     const currentTime = BigInt(await ethers.provider.getBlock("latest").then(b => b!.timestamp));
     const m = await core.markets(1);
     const earlySettleMarket: ISignalsCore.MarketStruct = {
-      isActive: m.isActive,
+      isSeeded: m.isSeeded,
       settled: true,
       snapshotChunksDone: m.snapshotChunksDone,
       failed: m.failed,
       numBins: m.numBins,
       openPositionCount: m.openPositionCount,
       snapshotChunkCursor: m.snapshotChunkCursor,
+      seedCursor: m.seedCursor,
       startTimestamp: m.startTimestamp,
       endTimestamp: m.endTimestamp,
-      settlementTimestamp: currentTime,
-      settlementFinalizedAt: currentTime + 3600n, // Future: claim window not open yet
+      settlementTimestamp: currentTime + 3600n, // Future: claim window not open yet
+      settlementFinalizedAt: currentTime + 3600n,
       minTick: m.minTick,
       maxTick: m.maxTick,
       tickSpacing: m.tickSpacing,
@@ -250,6 +259,7 @@ describe("TradeModule flow (minimal parity)", () => {
       settlementValue: m.settlementValue,
       liquidityParameter: m.liquidityParameter,
       feePolicy: m.feePolicy,
+      seedData: m.seedData,
       initialRootSum: m.initialRootSum,
       accumulatedFees: m.accumulatedFees,
       minFactor: m.minFactor,
@@ -258,22 +268,23 @@ describe("TradeModule flow (minimal parity)", () => {
     await core.setMarket(1, earlySettleMarket);
     await expect(core.connect(user).claimPayout(1)).to.be.reverted;
 
-    // Allow claim by moving settlementFinalizedAt to past.
-    // Claim gating is time-based (settlementFinalizedAt + Δ_claim).
+    // Allow claim by moving settlementTimestamp to past.
+    // Claim gating is time-based (settlementTimestamp + Δ_claim).
     const m2 = await core.markets(1);
     const pastTime = m2.endTimestamp - 1000n;
     const claimableMarket: ISignalsCore.MarketStruct = {
-      isActive: m2.isActive,
+      isSeeded: m2.isSeeded,
       settled: m2.settled,
       snapshotChunksDone: m2.snapshotChunksDone,
       failed: m2.failed,
       numBins: m2.numBins,
       openPositionCount: m2.openPositionCount,
       snapshotChunkCursor: m2.snapshotChunkCursor,
+      seedCursor: m2.seedCursor,
       startTimestamp: m2.startTimestamp,
       endTimestamp: m2.endTimestamp,
       settlementTimestamp: pastTime,
-      settlementFinalizedAt: pastTime, // Must be in past for claim to succeed
+      settlementFinalizedAt: pastTime,
       minTick: m2.minTick,
       maxTick: m2.maxTick,
       tickSpacing: m2.tickSpacing,
@@ -281,6 +292,7 @@ describe("TradeModule flow (minimal parity)", () => {
       settlementValue: m2.settlementValue,
       liquidityParameter: m2.liquidityParameter,
       feePolicy: m2.feePolicy,
+      seedData: m2.seedData,
       initialRootSum: m2.initialRootSum,
       accumulatedFees: m2.accumulatedFees,
       minFactor: m2.minFactor, // Phase 7
@@ -300,13 +312,14 @@ describe("TradeModule flow (minimal parity)", () => {
     )) as unknown as TradeModule;
     const m = await core.markets(1);
     const feeMarket: ISignalsCore.MarketStruct = {
-      isActive: m.isActive,
+      isSeeded: m.isSeeded,
       settled: m.settled,
       snapshotChunksDone: m.snapshotChunksDone,
       failed: m.failed,
       numBins: m.numBins,
       openPositionCount: m.openPositionCount,
       snapshotChunkCursor: m.snapshotChunkCursor,
+      seedCursor: m.seedCursor,
       startTimestamp: m.startTimestamp,
       endTimestamp: m.endTimestamp,
       settlementTimestamp: m.settlementTimestamp,
@@ -318,6 +331,7 @@ describe("TradeModule flow (minimal parity)", () => {
       settlementValue: m.settlementValue,
       liquidityParameter: m.liquidityParameter,
       feePolicy: await feePolicy.getAddress(),
+      seedData: m.seedData,
       initialRootSum: m.initialRootSum,
       accumulatedFees: m.accumulatedFees,
       minFactor: m.minFactor,

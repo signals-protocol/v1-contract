@@ -138,13 +138,14 @@ export async function deployTradeModuleSystem(
     const marketId = i + 1;
     const config = markets[i];
     const market: ISignalsCore.MarketStruct = {
-      isActive: true,
+      isSeeded: true,
       settled: false,
       snapshotChunksDone: false,
       failed: false,
       numBins: config.numBins,
       openPositionCount: 0,
       snapshotChunkCursor: 0,
+      seedCursor: config.numBins,
       startTimestamp: now - 10,
       endTimestamp: now + (config.endOffset ?? 10_000),
       settlementTimestamp: now + (config.endOffset ?? 10_000) + 100, // Tset > endTimestamp
@@ -156,6 +157,7 @@ export async function deployTradeModuleSystem(
       settlementValue: 0,
       liquidityParameter: config.liquidityParameter ?? WAD,
       feePolicy: ethers.ZeroAddress,
+      seedData: ethers.ZeroAddress,
       // P&L tracking fields
       initialRootSum: BigInt(config.numBins) * WAD, // n * WAD for uniform prior
       accumulatedFees: 0n,
@@ -326,4 +328,3 @@ export async function deployTradeModuleTestEnv() {
 
   return { owner, user, payment, position, feePolicy, core, lazyLib };
 }
-

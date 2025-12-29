@@ -3,6 +3,7 @@ import { ethers } from 'hardhat';
 import { Signer } from 'ethers';
 import { time } from '@nomicfoundation/hardhat-network-helpers';
 import { SignalsCoreHarness, RiskModule, MockERC20 } from '../../../typechain-types';
+import { deploySeedData } from '../../helpers';
 
 /**
  * Core-first Risk Gate Call Order Tests
@@ -122,7 +123,8 @@ describe('Core-first Risk Gate Call Order', () => {
       const start = now + 100;
       const end = start + 86400;
       const settle = end + 3600;
-      
+      const seedData = await deploySeedData(Array(10).fill(WAD));
+
       // Any α > 0 should fail because αlimit ≈ 0
       await expect(core.createMarket(
         0,      // minTick
@@ -134,7 +136,7 @@ describe('Core-first Risk Gate Call Order', () => {
         10,     // numBins
         ethers.parseEther('1'), // liquidityParameter (α = 1)
         ethers.ZeroAddress,
-        Array(10).fill(WAD) // uniform prior
+        await seedData.getAddress()
       )).to.be.revertedWithCustomError(riskModule, 'AlphaExceedsLimit');
     });
 
@@ -150,6 +152,7 @@ describe('Core-first Risk Gate Call Order', () => {
       const start = now + 100;
       const end = start + 86400;
       const settle = end + 3600;
+      const seedData = await deploySeedData(Array(10).fill(WAD));
       
       // Small α should pass
       const tx = await core.createMarket(
@@ -162,7 +165,7 @@ describe('Core-first Risk Gate Call Order', () => {
         10,
         ethers.parseEther('1'), // Small α
         ethers.ZeroAddress,
-        Array(10).fill(WAD)
+        await seedData.getAddress()
       );
       
       expect(tx).to.emit(core, 'MarketCreated');
@@ -184,17 +187,19 @@ describe('Core-first Risk Gate Call Order', () => {
       const start = now + 100;
       const end = start + 86400;
       const settle = end + 3600;
+      const seedData = await deploySeedData(Array(10).fill(WAD));
       
       const tx = await core.createMarket(
         0, 100, 10, start, end, settle, 10,
         ethers.parseEther('10'),
         ethers.ZeroAddress,
-        Array(10).fill(WAD)
+        await seedData.getAddress()
       );
       
       await tx.wait();
       // First market is always ID 1
       marketId = 1n;
+      await core.seedNextChunks(marketId, 10);
       
       // Advance time to trading period
       await time.increaseTo(start + 1);
@@ -233,16 +238,18 @@ describe('Core-first Risk Gate Call Order', () => {
       const start = now + 100;
       const end = start + 86400;
       const settle = end + 3600;
+      const seedData = await deploySeedData(Array(10).fill(WAD));
       
       const tx = await core.createMarket(
         0, 100, 10, start, end, settle, 10,
         ethers.parseEther('10'),
         ethers.ZeroAddress,
-        Array(10).fill(WAD)
+        await seedData.getAddress()
       );
       
       await tx.wait();
       marketId = 1n;
+      await core.seedNextChunks(marketId, 10);
       
       await time.increaseTo(start + 1);
     });
@@ -311,4 +318,3 @@ describe('Core-first Risk Gate Call Order', () => {
     });
   });
 });
-

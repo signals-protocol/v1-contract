@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "../core/SignalsCoreStorage.sol";
 import "../lib/FixedPointMathU.sol";
 import "../lib/RiskMath.sol";
+import "../lib/SeedDataLib.sol";
 import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
 
 /// @title RiskModule
@@ -174,22 +175,19 @@ contract RiskModule is SignalsCoreStorage {
     /**
      * @notice Gate for market creation - validates α limit and prior admissibility
      * @dev Called by SignalsCore BEFORE MarketLifecycleModule.createMarket
-     *      Calculates ΔEₜ from baseFactors internally.
      *      Enforces: αlimit,t+1 = max{0, αbase,t+1 * (1 - k * DD_t)}
      *      Enforces: ΔEₜ ≤ B^eff_{t-1} (prior admissibility)
      * @param liquidityParameter Market α to validate (WAD)
      * @param numBins Number of outcome bins
-     * @param baseFactors Prior factor weights (passed from Core, calculation done here)
+     * @param seedData Address of SeedData contract containing factors
      */
     function gateCreateMarket(
         uint256 liquidityParameter,
         uint32 numBins,
-        uint256[] calldata baseFactors
+        address seedData
     ) external view onlyDelegated {
+        (, , uint256 deltaEt) = SeedDataLib.computeSeedStats(seedData, numBins, liquidityParameter);
         _enforceAlphaLimit(liquidityParameter, numBins);
-        
-        // Calculate ΔEₜ from baseFactors
-        uint256 deltaEt = _calculateDeltaEtFromFactors(liquidityParameter, numBins, baseFactors);
         _enforcePriorAdmissibility(deltaEt);
     }
 
@@ -289,20 +287,4 @@ contract RiskModule is SignalsCoreStorage {
         }
     }
 
-    /**
-     * @notice Calculate ΔEₜ from base factors
-     * @dev Delegates to RiskMath library for calculation
-     * @param alpha Market liquidity parameter α (WAD)
-     * @param numBins Number of outcome bins
-     * @param baseFactors Prior factor weights
-     * @return deltaEt Tail budget (WAD)
-     */
-    function _calculateDeltaEtFromFactors(
-        uint256 alpha,
-        uint32 numBins,
-        uint256[] calldata baseFactors
-    ) internal pure returns (uint256 deltaEt) {
-        return RiskMath.calculateDeltaEtFromFactors(alpha, numBins, baseFactors);
-    }
 }
-

@@ -38,6 +38,12 @@ export {
   randomFactors,
 } from "./utils";
 
+// Seed data helpers
+export {
+  packFactors,
+  deploySeedData,
+} from "./seed";
+
 // Deployment helpers
 export {
   deployFixedPointMathHarness,
@@ -47,5 +53,4 @@ export {
 } from "./deploy";
 
 export { deployFullSystem } from "./fullSystem";
-
 

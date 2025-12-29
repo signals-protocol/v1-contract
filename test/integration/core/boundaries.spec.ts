@@ -95,13 +95,14 @@ describe("Boundaries", () => {
 
     const now = (await ethers.provider.getBlock("latest"))!.timestamp;
     const market: ISignalsCore.MarketStruct = {
-      isActive: true,
+      isSeeded: true,
       settled: false,
       snapshotChunksDone: false,
       failed: false,
       numBins: NUM_BINS,
       openPositionCount: 0,
       snapshotChunkCursor: 0,
+      seedCursor: NUM_BINS,
       startTimestamp: now - 100,
       endTimestamp: now + 100000,
       settlementTimestamp: now + 100100,
@@ -113,6 +114,7 @@ describe("Boundaries", () => {
       settlementValue: 0,
       liquidityParameter: WAD,
       feePolicy: ethers.ZeroAddress,
+      seedData: ethers.ZeroAddress,
       initialRootSum: BigInt(NUM_BINS) * WAD,
       accumulatedFees: 0n,
       minFactor: WAD, // uniform prior
@@ -398,13 +400,14 @@ describe("Boundaries", () => {
 
       const now = (await ethers.provider.getBlock("latest"))!.timestamp;
       const market: ISignalsCore.MarketStruct = {
-        isActive: true,
+        isSeeded: true,
         settled: false,
         snapshotChunksDone: false,
         failed: false,
         numBins: 10,
         openPositionCount: 0,
         snapshotChunkCursor: 0,
+        seedCursor: 10,
         startTimestamp: now + 10000, // future start
         endTimestamp: now + 20000,
         settlementTimestamp: now + 20100,
@@ -416,10 +419,11 @@ describe("Boundaries", () => {
         settlementValue: 0,
         liquidityParameter: WAD,
         feePolicy: ethers.ZeroAddress,
+        seedData: ethers.ZeroAddress,
         initialRootSum: 10n * WAD,
         accumulatedFees: 0n,
-      minFactor: WAD, // uniform prior
-      deltaEt: 0n, // Uniform prior: ΔEₜ = 0
+        minFactor: WAD, // uniform prior
+        deltaEt: 0n, // Uniform prior: ΔEₜ = 0
       };
       await core.setMarket(2, market);
       await core.seedTree(2, Array(10).fill(WAD));
@@ -442,13 +446,14 @@ describe("Boundaries", () => {
 
       const now = (await ethers.provider.getBlock("latest"))!.timestamp;
       const market: ISignalsCore.MarketStruct = {
-        isActive: true,
+        isSeeded: true,
         settled: false,
         snapshotChunksDone: false,
         failed: false,
         numBins: 10,
         openPositionCount: 0,
         snapshotChunkCursor: 0,
+        seedCursor: 10,
         startTimestamp: now - 20000, // past start
         endTimestamp: now - 10000, // past end
         settlementTimestamp: now - 5000,
@@ -460,10 +465,11 @@ describe("Boundaries", () => {
         settlementValue: 0,
         liquidityParameter: WAD,
         feePolicy: ethers.ZeroAddress,
+        seedData: ethers.ZeroAddress,
         initialRootSum: 10n * WAD,
         accumulatedFees: 0n,
-      minFactor: WAD, // uniform prior
-      deltaEt: 0n, // Uniform prior: ΔEₜ = 0
+        minFactor: WAD, // uniform prior
+        deltaEt: 0n, // Uniform prior: ΔEₜ = 0
       };
       await core.setMarket(3, market);
       await core.seedTree(3, Array(10).fill(WAD));
@@ -486,13 +492,14 @@ describe("Boundaries", () => {
 
       const now = (await ethers.provider.getBlock("latest"))!.timestamp;
       const market: ISignalsCore.MarketStruct = {
-        isActive: true,
+        isSeeded: true,
         settled: false,
         snapshotChunksDone: false,
         failed: false,
         numBins: 10,
         openPositionCount: 0,
         snapshotChunkCursor: 0,
+        seedCursor: 10,
         startTimestamp: now - 1000, // past start
         endTimestamp: now + 10000, // future end
         settlementTimestamp: now + 10100,
@@ -504,10 +511,11 @@ describe("Boundaries", () => {
         settlementValue: 0,
         liquidityParameter: WAD,
         feePolicy: ethers.ZeroAddress,
+        seedData: ethers.ZeroAddress,
         initialRootSum: 10n * WAD,
         accumulatedFees: 0n,
-      minFactor: WAD, // uniform prior
-      deltaEt: 0n, // Uniform prior: ΔEₜ = 0
+        minFactor: WAD, // uniform prior
+        deltaEt: 0n, // Uniform prior: ΔEₜ = 0
       };
       await core.setMarket(4, market);
       await core.seedTree(4, Array(10).fill(WAD));
@@ -576,18 +584,19 @@ describe("Boundaries", () => {
   // Market State Boundaries
   // ============================================================
   describe("Market State Boundaries", () => {
-    it("reverts trade on inactive market", async () => {
+    it("reverts trade on unseeded market", async () => {
       const { core, user } = await loadFixture(deployBoundaryFixture);
 
       const now = (await ethers.provider.getBlock("latest"))!.timestamp;
       const market: ISignalsCore.MarketStruct = {
-        isActive: false, // inactive
+        isSeeded: false,
         settled: false,
         snapshotChunksDone: false,
         failed: false,
         numBins: 10,
         openPositionCount: 0,
         snapshotChunkCursor: 0,
+        seedCursor: 0,
         startTimestamp: now - 1000,
         endTimestamp: now + 10000,
         settlementTimestamp: now + 10100,
@@ -599,10 +608,11 @@ describe("Boundaries", () => {
         settlementValue: 0,
         liquidityParameter: WAD,
         feePolicy: ethers.ZeroAddress,
+        seedData: ethers.ZeroAddress,
         initialRootSum: 10n * WAD,
         accumulatedFees: 0n,
-      minFactor: WAD, // uniform prior
-      deltaEt: 0n, // Uniform prior: ΔEₜ = 0
+        minFactor: WAD, // uniform prior
+        deltaEt: 0n, // Uniform prior: ΔEₜ = 0
       };
       await core.setMarket(5, market);
       await core.seedTree(5, Array(10).fill(WAD));
@@ -625,13 +635,14 @@ describe("Boundaries", () => {
 
       const now = (await ethers.provider.getBlock("latest"))!.timestamp;
       const market: ISignalsCore.MarketStruct = {
-        isActive: true,
+        isSeeded: true,
         settled: true, // already settled
         snapshotChunksDone: false,
         failed: false,
         numBins: 10,
         openPositionCount: 0,
         snapshotChunkCursor: 0,
+        seedCursor: 10,
         startTimestamp: now - 1000,
         endTimestamp: now + 10000,
         settlementTimestamp: now + 10100,
@@ -643,10 +654,11 @@ describe("Boundaries", () => {
         settlementValue: 5_000_000,
         liquidityParameter: WAD,
         feePolicy: ethers.ZeroAddress,
+        seedData: ethers.ZeroAddress,
         initialRootSum: 10n * WAD,
         accumulatedFees: 0n,
-      minFactor: WAD, // uniform prior
-      deltaEt: 0n, // Uniform prior: ΔEₜ = 0
+        minFactor: WAD, // uniform prior
+        deltaEt: 0n, // Uniform prior: ΔEₜ = 0
       };
       await core.setMarket(6, market);
       await core.seedTree(6, Array(10).fill(WAD));

@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
+import { deploySeedData } from "../../helpers";
 import {
   SignalsCoreHarness,
   SignalsUSDToken,
@@ -521,6 +522,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       // Factor array with a zero → should revert with InvalidFactor
       const factorsWithZero = Array(10).fill(WAD);
       factorsWithZero[5] = 0n;
+      const seedData = await deploySeedData(factorsWithZero);
 
       await core.setCapitalStack(ethers.parseEther("1000"), 0n);
 
@@ -536,7 +538,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           10,
           ethers.parseEther("100"),
           ethers.ZeroAddress,
-          factorsWithZero
+          await seedData.getAddress()
         )
       ).to.be.revertedWithCustomError(lifecycle, "InvalidFactor");
     });
@@ -570,6 +572,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       // ln(1.1) ≈ 0.0953 WAD
       // ΔEₜ = α * ln(1.1) = 100 * 0.0953 ≈ 9.53 WAD
       const factors = concentratedFactors(10, 2n * WAD);
+      const seedData = await deploySeedData(factors);
 
       // Set backstopNav = 100 WAD (> 9.53, so admissible)
       await core.setCapitalStack(ethers.parseEther("100"), 0n);
@@ -586,7 +589,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           10, // numBins = 10
           ethers.parseEther("100"), // α = 100 (lower to pass α limit)
           ethers.ZeroAddress,
-          factors
+          await seedData.getAddress()
         )
       ).to.not.be.reverted;
     });
@@ -598,6 +601,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       // rootSum = 10 + 9 = 19, minFactor = 1
       // ΔEₜ = α * ln(19/10) = 100 * ln(1.9) ≈ 100 * 0.642 ≈ 64.2 WAD
       const factors = concentratedFactors(10, 10n * WAD);
+      const seedData = await deploySeedData(factors);
 
       // Set backstopNav = 50 WAD (< 64.2, so inadmissible)
       await core.setCapitalStack(ethers.parseEther("50"), 0n);
@@ -614,7 +618,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           10, // numBins = 10
           ethers.parseEther("100"), // α = 100
           ethers.ZeroAddress,
-          factors
+          await seedData.getAddress()
         )
       ).to.be.revertedWithCustomError(risk, "PriorNotAdmissible");
     });
@@ -626,6 +630,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       // rootSum = 2 + 9 = 11, minFactor = 1
       // ΔEₜ = 100 * ln(11/10) ≈ 100 * 0.0953 ≈ 9.53 WAD
       const factors = concentratedFactors(10, 2n * WAD);
+      const seedData = await deploySeedData(factors);
 
       // Set backstopNav to exactly 10 WAD (slightly above 9.53)
       await core.setCapitalStack(ethers.parseEther("10"), 0n);
@@ -642,7 +647,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           10,
           ethers.parseEther("100"), // α = 100
           ethers.ZeroAddress,
-          factors
+          await seedData.getAddress()
         )
       ).to.not.be.reverted;
     });
@@ -654,6 +659,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       // rootSum = n * 1 = 10, minFactor = 1
       // ΔEₜ = α * ln(10/10) = α * ln(1) = 0
       const uniformFactors = Array(10).fill(WAD);
+      const seedData = await deploySeedData(uniformFactors);
 
       // Even with backstopNav = 0, uniform prior should pass
       // (because ΔEₜ = 0 ≤ 0)
@@ -670,7 +676,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           10,
           ethers.parseEther("100"), // α = 100
           ethers.ZeroAddress,
-          uniformFactors
+          await seedData.getAddress()
         )
       ).to.not.be.reverted;
     });
@@ -690,6 +696,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       // = 100 * ln(11 / 10) ≈ 9.53 WAD
       const concentratedFactors = Array(10).fill(WAD);
       concentratedFactors[0] = 2n * WAD;
+      const seedData = await deploySeedData(concentratedFactors);
 
       await core.setCapitalStack(ethers.parseEther("1000"), 0n);
 
@@ -703,7 +710,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         10,
         ethers.parseEther("100"), // α = 100
         ethers.ZeroAddress,
-        concentratedFactors
+        await seedData.getAddress()
       );
 
       const market = await core.harnessGetMarket(1n);
@@ -718,6 +725,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       const WAD = ethers.parseEther("1");
 
       const uniformFactors = Array(10).fill(WAD);
+      const seedData = await deploySeedData(uniformFactors);
 
       await core.setCapitalStack(ethers.parseEther("1000"), 0n);
 
@@ -731,7 +739,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         10,
         ethers.parseEther("100"),
         ethers.ZeroAddress,
-        uniformFactors
+        await seedData.getAddress()
       );
 
       const market = await core.harnessGetMarket(1n);
@@ -744,6 +752,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
 
       const concentratedFactors = Array(10).fill(WAD);
       concentratedFactors[0] = 2n * WAD;
+      const seedData = await deploySeedData(concentratedFactors);
 
       await core.setCapitalStack(ethers.parseEther("10000"), 0n);
 
@@ -758,7 +767,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         10,
         ethers.parseEther("100"),
         ethers.ZeroAddress,
-        concentratedFactors
+        await seedData.getAddress()
       );
 
       // Market 2: α = 200 (different batch)
@@ -772,7 +781,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         10,
         ethers.parseEther("200"),
         ethers.ZeroAddress,
-        concentratedFactors
+        await seedData.getAddress()
       );
 
       const market1 = await core.harnessGetMarket(1n);
@@ -796,6 +805,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
 
       // Uniform factors: all equal to WAD
       const uniformFactors = Array(10).fill(WAD);
+      const seedData = await deploySeedData(uniformFactors);
 
       await core.setCapitalStack(ethers.parseEther("1000"), 0n);
 
@@ -809,7 +819,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         10,
         ethers.parseEther("100"), // α = 100
         ethers.ZeroAddress,
-        uniformFactors
+        await seedData.getAddress()
       );
 
       const market = await core.harnessGetMarket(1n);
@@ -825,6 +835,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       // Skewed factors: first bin has 2x weight
       const skewedFactors = Array(10).fill(WAD);
       skewedFactors[0] = 2n * WAD;
+      const skewedSeedData = await deploySeedData(skewedFactors);
 
       await core.setCapitalStack(ethers.parseEther("1000"), 0n);
 
@@ -838,7 +849,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         10,
         ethers.parseEther("100"), // α = 100
         ethers.ZeroAddress,
-        skewedFactors
+        await skewedSeedData.getAddress()
       );
 
       const market = await core.harnessGetMarket(1n);
@@ -856,6 +867,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       // Extreme skew: first bin has 10x weight
       const extremeFactors = Array(10).fill(WAD);
       extremeFactors[0] = 10n * WAD;
+      const extremeSeedData = await deploySeedData(extremeFactors);
 
       await core.setCapitalStack(ethers.parseEther("10000"), 0n);
 
@@ -869,7 +881,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         10,
         ethers.parseEther("100"),
         ethers.ZeroAddress,
-        extremeFactors
+        await extremeSeedData.getAddress()
       );
 
       const market = await core.harnessGetMarket(1n);
@@ -887,6 +899,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       // One bin with half weight
       const factors = Array(10).fill(WAD);
       factors[5] = WAD / 2n; // minFactor = 0.5 WAD
+      const seedData = await deploySeedData(factors);
 
       await core.setCapitalStack(ethers.parseEther("10000"), 0n);
 
@@ -900,7 +913,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         10,
         ethers.parseEther("100"),
         ethers.ZeroAddress,
-        factors
+        await seedData.getAddress()
       );
 
       const market = await core.harnessGetMarket(1n);
@@ -922,6 +935,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       const now = await time.latest();
       const WAD = ethers.parseEther("1");
       const uniformFactors = Array(10).fill(WAD);
+      const seedData = await deploySeedData(uniformFactors);
 
       await core.setCapitalStack(ethers.parseEther("1000"), 0n);
 
@@ -937,7 +951,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           10,
           ethers.parseEther("100"),
           ethers.ZeroAddress,
-          uniformFactors
+          await seedData.getAddress()
         )
       ).to.not.be.reverted;
     });
@@ -946,6 +960,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       const now = await time.latest();
       const WAD = ethers.parseEther("1");
       const uniformFactors = Array(10).fill(WAD);
+      const seedData = await deploySeedData(uniformFactors);
 
       await core.setCapitalStack(ethers.parseEther("1000"), 0n);
 
@@ -963,7 +978,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         10,
         ethers.parseEther("100"),
         ethers.ZeroAddress,
-        uniformFactors
+        await seedData.getAddress()
       );
 
       // Second market with same batchId (same settlement day) should succeed
@@ -979,7 +994,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           10,
           ethers.parseEther("100"),
           ethers.ZeroAddress,
-          uniformFactors
+          await seedData.getAddress()
         )
       ).to.not.be.reverted;
     });
@@ -988,6 +1003,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       const now = await time.latest();
       const WAD = ethers.parseEther("1");
       const uniformFactors = Array(10).fill(WAD);
+      const seedData = await deploySeedData(uniformFactors);
 
       await core.setCapitalStack(ethers.parseEther("1000"), 0n);
 
@@ -1007,7 +1023,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         10,
         ethers.parseEther("100"),
         ethers.ZeroAddress,
-        uniformFactors
+        await seedData.getAddress()
       );
 
       // Second market (different batch) should succeed
@@ -1022,7 +1038,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           10,
           ethers.parseEther("100"),
           ethers.ZeroAddress,
-          uniformFactors
+          await seedData.getAddress()
         )
       ).to.not.be.reverted;
     });
@@ -1036,6 +1052,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       const now = await time.latest();
       const WAD = ethers.parseEther("1");
       const uniformFactors = Array(10).fill(WAD);
+      const seedData = await deploySeedData(uniformFactors);
 
       // Setup: high NAV so α is valid
       await core.harnessSetLpVault(
@@ -1058,7 +1075,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         10,
         ethers.parseEther("100"), // α = 100
         ethers.ZeroAddress,
-        uniformFactors
+        await seedData.getAddress()
       );
 
       // Mark market as failed using harness
@@ -1072,6 +1089,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       const now = await time.latest();
       const WAD = ethers.parseEther("1");
       const uniformFactors = Array(10).fill(WAD);
+      const seedData = await deploySeedData(uniformFactors);
 
       // Setup: high NAV initially
       await core.harnessSetLpVault(
@@ -1095,7 +1113,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         10,
         ethers.parseEther("1000"), // α = 1000, valid since < 1303
         ethers.ZeroAddress,
-        uniformFactors
+        await seedData.getAddress()
       );
 
       // Mark market as failed
@@ -1126,6 +1144,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       // Skewed prior → ΔEₜ > 0
       const skewedFactors = Array(10).fill(WAD);
       skewedFactors[0] = 2n * WAD;
+      const seedData = await deploySeedData(skewedFactors);
 
       // Setup: high NAV and backstopNav initially
       await core.harnessSetLpVault(
@@ -1148,7 +1167,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         10,
         ethers.parseEther("100"),
         ethers.ZeroAddress,
-        skewedFactors
+        await seedData.getAddress()
       );
 
       // Mark market as failed

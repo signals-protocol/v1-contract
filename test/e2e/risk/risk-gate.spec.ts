@@ -3,13 +3,13 @@ import { expect } from "chai";
 import { time } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { deployFullSystem } from "../../helpers/fullSystem";
 import { uniformFactors } from "../../helpers/constants";
+import { deploySeedData } from "../../helpers";
 
 describe("E2E: risk gate enforcement", () => {
   it("rejects markets that exceed alpha limit when enforced", async () => {
     const { owner, core, payment } = await deployFullSystem({
       submitWindow: 5,
       opsWindow: 5,
-      claimDelay: 0,
     });
     const coreAddress = await core.getAddress();
 
@@ -27,6 +27,7 @@ describe("E2E: risk gate enforcement", () => {
     const end = now + 5;
     const settlement = now + 10;
     const baseFactors = uniformFactors(4);
+    const seedData = await deploySeedData(baseFactors);
 
     await expect(
       core.connect(owner).createMarket(
@@ -39,7 +40,7 @@ describe("E2E: risk gate enforcement", () => {
         4,
         ethers.parseEther("10"),
         ethers.ZeroAddress,
-        baseFactors
+        await seedData.getAddress()
       )
     ).to.be.revertedWithCustomError(core, "AlphaExceedsLimit");
 
@@ -53,7 +54,7 @@ describe("E2E: risk gate enforcement", () => {
       4,
       ethers.parseEther("0.1"),
       ethers.ZeroAddress,
-      baseFactors
+      await seedData.getAddress()
     );
     await core.connect(owner).createMarket(
       0,
@@ -65,7 +66,7 @@ describe("E2E: risk gate enforcement", () => {
       4,
       ethers.parseEther("0.1"),
       ethers.ZeroAddress,
-      baseFactors
+      await seedData.getAddress()
     );
 
     const market = await core.markets(marketId);

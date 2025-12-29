@@ -8,11 +8,11 @@ interface IRiskModule {
     /// @notice Gate for market creation - validates α limit and prior admissibility
     /// @param liquidityParameter Market α to validate (WAD)
     /// @param numBins Number of outcome bins
-    /// @param baseFactors Prior factor weights
+    /// @param seedData Address of SeedData contract containing factors
     function gateCreateMarket(
         uint256 liquidityParameter,
         uint32 numBins,
-        uint256[] calldata baseFactors
+        address seedData
     ) external view;
 
     /// @notice Gate for market reopen - re-validates α and prior
@@ -53,4 +53,3 @@ interface IRiskModule {
         uint256 shares
     ) external view;
 }
-

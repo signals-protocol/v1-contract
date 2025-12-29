@@ -4,13 +4,14 @@ pragma solidity ^0.8.28;
 interface ISignalsCore {
     struct Market {
         // status flags (packable)
-        bool isActive;
+        bool isSeeded;
         bool settled;
         bool snapshotChunksDone;
         bool failed; // Oracle failure marked
         uint32 numBins;
         uint32 openPositionCount;
         uint32 snapshotChunkCursor;
+        uint32 seedCursor;
 
         // timing
         uint64 startTimestamp;
@@ -28,6 +29,7 @@ interface ISignalsCore {
 
         // policy
         address feePolicy;
+        address seedData;
 
         // Fee tracking and P&L calculation
         // Initial root sum for P&L calculation: C_start = α * ln(Z_start)
@@ -111,8 +113,7 @@ interface ISignalsCore {
     /// @param numBins Number of outcome bins
     /// @param liquidityParameter α (alpha) for CLMSR
     /// @param feePolicy Address of fee policy contract
-    /// @param baseFactors Prior factors in WAD (length = numBins). All 1e18 = uniform prior.
-    ///        Concentrated prior: factors vary. ΔEₜ calculated from min(factors).
+    /// @param seedData Address of SeedData contract holding packed factors (numBins * 32 bytes)
     function createMarket(
         int256 minTick,
         int256 maxTick,
@@ -123,14 +124,14 @@ interface ISignalsCore {
         uint32 numBins,
         uint256 liquidityParameter,
         address feePolicy,
-        uint256[] calldata baseFactors
+        address seedData
     ) external returns (uint256 marketId);
 
     function finalizePrimarySettlement(uint256 marketId) external;
 
     function reopenMarket(uint256 marketId) external;
 
-    function setMarketActive(uint256 marketId, bool isActive) external;
+    function seedNextChunks(uint256 marketId, uint32 count) external;
 
     function updateMarketTiming(
         uint256 marketId,

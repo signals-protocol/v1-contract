@@ -76,13 +76,14 @@ describe("Core Security", () => {
     // Create active market
     const now = (await ethers.provider.getBlock("latest"))!.timestamp;
     const market: ISignalsCore.MarketStruct = {
-      isActive: true,
+      isSeeded: true,
       settled: false,
       snapshotChunksDone: false,
       failed: false,
       numBins: 100,
       openPositionCount: 0,
       snapshotChunkCursor: 0,
+      seedCursor: 100,
       startTimestamp: now - 1000,
       endTimestamp: now + 100000,
       settlementTimestamp: now + 100100,
@@ -94,6 +95,7 @@ describe("Core Security", () => {
       settlementValue: 0,
       liquidityParameter: WAD,
       feePolicy: feePolicy.target,
+      seedData: ethers.ZeroAddress,
       initialRootSum: 100n * WAD,
       accumulatedFees: 0n,
       minFactor: WAD, // uniform prior

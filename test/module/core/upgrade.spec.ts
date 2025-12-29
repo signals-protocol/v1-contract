@@ -48,7 +48,7 @@ describe("Access / Upgrade guards", () => {
           10, // numBins
           ethers.parseEther("1"), // liquidityParameter
           ethers.ZeroAddress, // feePolicy
-          Array(10).fill(ethers.parseEther("1")) // baseFactors
+          ethers.ZeroAddress // seedData
         )
       ).to.be.revertedWithCustomError(lifecycleModule, "NotDelegated");
     });

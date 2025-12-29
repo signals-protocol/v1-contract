@@ -41,7 +41,13 @@ export async function deployFullSystem(
 ): Promise<FullSystem> {
   const submitWindow = options.submitWindow ?? 5;
   const opsWindow = options.opsWindow ?? 5;
-  const claimDelay = options.claimDelay ?? 0;
+  const expectedClaimDelay = submitWindow + opsWindow;
+  const claimDelay = options.claimDelay ?? expectedClaimDelay;
+  if (claimDelay !== expectedClaimDelay) {
+    throw new Error(
+      `claimDelay must equal submitWindow + opsWindow (expected ${expectedClaimDelay}, got ${claimDelay})`
+    );
+  }
 
   const signers = await ethers.getSigners();
   const owner = signers[0];

@@ -2,6 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { time, loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { WAD, USDC_DECIMALS } from "../helpers/constants";
+import { deploySeedData } from "../helpers";
 import {
   buildRedstonePayload,
   submitWithPayload,
@@ -77,8 +78,8 @@ describe("Vault Escrow Security", () => {
     );
 
     await core.setLpShareToken(lpShare.target);
-    // Set settlement timeline: sampleWindow=3600, opsWindow=3600, claimDelay=3600
-    await core.setSettlementTimeline(3600, 3600, 3600);
+    // Set settlement timeline: sampleWindow=3600, opsWindow=3600, claimDelay=7200
+    await core.setSettlementTimeline(3600, 3600, 7200);
 
     const feedId = ethers.encodeBytes32String("BTC");
     await core.setRedstoneConfig(feedId, 8, 600, 60);
@@ -133,7 +134,8 @@ describe("Vault Escrow Security", () => {
     const tickSpacing = 100n;
     const minTick = 0n;
     const maxTick = tickSpacing * BigInt(numBins);
-    const baseFactors = Array(numBins).fill(WAD);
+    const factors = Array(numBins).fill(WAD);
+    const seedData = await deploySeedData(factors);
 
     const marketId = await core.createMarket.staticCall(
       minTick,
@@ -145,7 +147,7 @@ describe("Vault Escrow Security", () => {
       numBins,
       WAD,
       ethers.ZeroAddress,
-      baseFactors
+      await seedData.getAddress()
     );
     await core.createMarket(
       minTick,
@@ -157,8 +159,9 @@ describe("Vault Escrow Security", () => {
       numBins,
       WAD,
       ethers.ZeroAddress,
-      baseFactors
+      await seedData.getAddress()
     );
+    await core.seedNextChunks(marketId, numBins);
     return marketId;
   }
 

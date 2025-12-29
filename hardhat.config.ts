@@ -62,6 +62,9 @@ const config: HardhatUserConfig = {
       },
     ],
   },
+  mocha: {
+    timeout: process.env.COVERAGE ? 0 : 20000,
+  },
 };
 
 export default config;

@@ -2,6 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { WAD, USDC_DECIMALS } from "../helpers/constants";
+import { deploySeedData } from "../helpers";
 
 /**
  * Market Security Tests
@@ -11,6 +12,11 @@ import { WAD, USDC_DECIMALS } from "../helpers/constants";
  * - Market parameter validation
  */
 describe("Market Security", () => {
+  async function deploySeed(numBins: number, factors?: bigint[]) {
+    const seedFactors = factors ?? Array(numBins).fill(WAD);
+    return deploySeedData(seedFactors);
+  }
+
   async function deployMarketFixture() {
     const [owner, user1] = await ethers.getSigners();
 
@@ -132,6 +138,7 @@ describe("Market Security", () => {
       const tickSpacing = 1;
 
       const factors: bigint[] = []; // Empty for 0 bins
+      const seedData = await deploySeed(numBins, factors);
 
       await expect(
         core.connect(owner).createMarket(
@@ -144,7 +151,7 @@ describe("Market Security", () => {
           numBins,
           WAD,
           feePolicy.target,
-          factors
+          await seedData.getAddress()
         )
       ).to.be.revertedWithCustomError(lifecycleModule, "BinCountExceedsLimit");
     });
@@ -162,7 +169,7 @@ describe("Market Security", () => {
       const maxTick = numBins; // maxTick = minTick + numBins * tickSpacing
       const tickSpacing = 1;
 
-      const factors = Array(numBins).fill(WAD);
+      const seedData = await deploySeed(numBins);
 
       await expect(
         core.connect(owner).createMarket(
@@ -175,7 +182,7 @@ describe("Market Security", () => {
           numBins,
           WAD,
           feePolicy.target,
-          factors
+          await seedData.getAddress()
         )
       ).to.be.revertedWithCustomError(lifecycleModule, "BinCountExceedsLimit");
     });
@@ -192,6 +199,7 @@ describe("Market Security", () => {
       const tickSpacing = 1;
 
       const factors = Array(numBins).fill(WAD);
+      const seedData = await deploySeed(numBins, factors);
 
       await expect(
         core.connect(owner).createMarket(
@@ -204,7 +212,7 @@ describe("Market Security", () => {
           numBins,
           WAD,
           feePolicy.target,
-          factors
+          await seedData.getAddress()
         )
       ).to.not.be.reverted;
     });
@@ -221,6 +229,7 @@ describe("Market Security", () => {
       const tickSpacing = 1;
 
       const factors = Array(numBins).fill(WAD);
+      const seedData = await deploySeed(numBins, factors);
 
       await expect(
         core.connect(owner).createMarket(
@@ -233,7 +242,7 @@ describe("Market Security", () => {
           numBins,
           WAD,
           feePolicy.target,
-          factors
+          await seedData.getAddress()
         )
       ).to.not.be.reverted;
     });
@@ -250,6 +259,7 @@ describe("Market Security", () => {
       const tickSpacing = 1;
 
       const factors = Array(numBins).fill(WAD);
+      const seedData = await deploySeed(numBins, factors);
 
       await expect(
         core.connect(owner).createMarket(
@@ -262,7 +272,7 @@ describe("Market Security", () => {
           numBins,
           WAD,
           feePolicy.target,
-          factors
+          await seedData.getAddress()
         )
       ).to.not.be.reverted;
     });
@@ -280,7 +290,7 @@ describe("Market Security", () => {
       const maxTick = numBins;
       const tickSpacing = 1;
 
-      const factors = Array(numBins).fill(WAD);
+      const seedData = await deploySeed(256);
 
       await expect(
         core.connect(owner).createMarket(
@@ -293,9 +303,9 @@ describe("Market Security", () => {
           numBins,
           WAD,
           feePolicy.target,
-          factors
+          await seedData.getAddress()
         )
-      ).to.be.revertedWithCustomError(lifecycleModule, "BinCountExceedsLimit");
+      ).to.be.revertedWithCustomError(core, "SeedDataLengthMismatch");
     });
   });
 
@@ -357,4 +367,3 @@ describe("Market Security", () => {
     });
   });
 });
-

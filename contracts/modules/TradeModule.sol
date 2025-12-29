@@ -204,7 +204,7 @@ contract TradeModule is SignalsCoreStorage {
 
     /**
      * @notice Claim payout for a winning position after market settlement
-     * @dev Claim is gated by time: settlementFinalizedAt + Δ_claim
+     * @dev Claim is gated by time: settlementTimestamp + Δ_claim
      *      Payout draws from escrow (reserved at settlement finalization).
      *      NAV is unaffected because payout was already reserved at settlement.
      *      Batch processing status is irrelevant to claim eligibility.
@@ -217,8 +217,8 @@ contract TradeModule is SignalsCoreStorage {
         ISignalsCore.Market storage market = markets[position.marketId];
         require(market.settled, SE.MarketNotSettled(position.marketId));
 
-        // Time-based gating: claim allowed after settlementFinalizedAt + Δ_claim
-        uint64 claimOpen = market.settlementFinalizedAt + claimDelaySeconds;
+        // Time-based gating: claim allowed after Tset + Δ_claim
+        uint64 claimOpen = market.settlementTimestamp + claimDelaySeconds;
         require(block.timestamp >= claimOpen, SE.ClaimTooEarly(claimOpen, uint64(block.timestamp)));
 
         uint256 payout = _calculateClaimAmount(position, market);
@@ -315,7 +315,7 @@ contract TradeModule is SignalsCoreStorage {
         market = markets[marketId];
         require(_marketExists(marketId), SE.MarketNotFound(marketId));
         require(!market.settled, SE.MarketAlreadySettled(marketId));
-        require(market.isActive, SE.MarketNotActive());
+        require(market.isSeeded, SE.MarketNotSeeded());
         require(block.timestamp >= market.startTimestamp, SE.MarketNotStarted());
         require(block.timestamp <= market.endTimestamp, SE.MarketExpired());
     }

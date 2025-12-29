@@ -1,17 +1,17 @@
 {
   "network": "citrea-dev",
-  "version": 8,
+  "version": 6,
   "contracts": {
     "SignalsCoreProxy": "0xa4B12635f964091e2f8C4FAD330797281fdDE9dF",
-    "SignalsCoreImplementation": "0xF1c8a7E59a6fC0d01EB8459028a36c4a4d67506c",
+    "SignalsCoreImplementation": "0xf16e8AD30230882D1244FeE2bB03aFde60df2436",
     "SignalsPositionProxy": "0xB00A0f42003FCfFb9dE68E13829F21448d8EE9C5",
     "SignalsPositionImplementation": "0x0d507C75B0618a4Eb7CC65552a810e594d8f38fE",
-    "TradeModule": "0xBfF486f199BFf1Fc6a36922765e3D020E06c8867",
-    "MarketLifecycleModule": "0x5068ac3556d57CeaE50a741CAa325e6C6fAAF7B0",
-    "OracleModule": "0xf0948aB7342997aACa2eBcc05414A51ba633a5C6",
+    "TradeModule": "0x9594Fa00df80Bc38a9e3602F891D275abbe9caA6",
+    "MarketLifecycleModule": "0x92850Ffd3717b8FE494971026A5a5ea4E237F82B",
+    "OracleModule": "0x6AeD367d3097d9A5e6c3dc2E4775C8C4AA389F34",
     "FeePolicy": "0xA311cA96b8d5BF7aD0236cB39e3d309B2ff5D612",
     "SignalsUSDToken": "0xaC57cf391cE6e60c61fa0ca8B6b4819f452A1Cb4",
-    "LazyMulSegmentTree": "0x098b70665AF742674137be2e91533A2313BADa15",
+    "LazyMulSegmentTree": "0xdcB06B8BBC120530F3EfB6F82482D8Ab5F4a60F1",
     "RiskModule": "0x96a7Ac2d169BDb52f0749c5B79560619c62391ad",
     "LPVaultModule": "0x0F1A36F6f7eaA5f670f0934F496BEB4fa02Fa08b",
     "SignalsLPShare": "0x4b2B72d42A0937393D5349F37E01AaB3FEDb2B67",
@@ -23,13 +23,13 @@
   },
   "config": {
     "settlementSubmitWindow": "600",
-    "settlementFinalizeDeadline": "900",
+    "settlementFinalizeDeadline": "3600",
     "defaultFeeBps": 0,
     "owners": {
       "core": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
       "position": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD"
     },
-    "pendingOpsWindow": "300",
+    "pendingOpsWindow": "600",
     "redstoneFeedId": "BTC",
     "redstoneFeedDecimals": 8,
     "redstoneMaxSampleDistance": "600",
@@ -67,18 +67,7 @@
       "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
       "version": 6,
       "timestamp": 1766910704
-    },
-    {
-      "action": "upgrade",
-      "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
-      "version": 7,
-      "timestamp": 1766984239
-    },
-    {
-      "action": "update-modules",
-      "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
-      "version": 8,
-      "timestamp": 1766984268
     }
-  ]
+  ],
+  "generatedAt": "2025-12-28T08:37:02.067Z"
 }

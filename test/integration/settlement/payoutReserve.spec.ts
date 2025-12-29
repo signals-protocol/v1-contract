@@ -100,12 +100,13 @@ describe("PayoutReserve Spec Tests", () => {
     ).deploy()) as SignalsCoreHarness;
 
     const submitWindow = 300;
-    const finalizeDeadline = 60;
+    const opsWindow = 60;
+    const claimDelay = submitWindow + opsWindow;
     const initData = coreImpl.interface.encodeFunctionData("initialize", [
       payment.target,
       position.target,
       submitWindow,
-      finalizeDeadline,
+      claimDelay,
     ]);
 
     const proxy = (await (
@@ -132,6 +133,7 @@ describe("PayoutReserve Spec Tests", () => {
       MAX_SAMPLE_DISTANCE,
       FUTURE_TOLERANCE
     );
+    await core.setSettlementTimeline(submitWindow, opsWindow, claimDelay);
 
     // Vault configuration
     await core.setMinSeedAmount(usdc("100"));
@@ -229,12 +231,12 @@ describe("PayoutReserve Spec Tests", () => {
 
   // ================================================================
   // SPEC-1: Claim Gating is TIME-BASED, NOT BATCH-BASED
-  // Claim is allowed after settlementFinalizedAt + Δ_claim.
+  // Claim is allowed after Tset + Δ_claim (Δclaim = Δsettle + Δops).
   // Batch processing status is IRRELEVANT to claim eligibility.
   // NAV is unaffected because payout was already escrowed at settlement.
   // ================================================================
-  describe("SPEC-1: Claim Gating - time-based (settlementFinalizedAt + Δ_claim)", () => {
-    it("reverts claimPayout when time < settlementFinalizedAt + Δ_claim", async () => {
+  describe("SPEC-1: Claim Gating - time-based (Tset + Δ_claim)", () => {
+    it("reverts claimPayout when time < Tset + Δ_claim", async () => {
       const { core, seeder, trader, position, trade } = await loadFixture(
         deployFullSystem
       );
@@ -266,15 +268,16 @@ describe("PayoutReserve Spec Tests", () => {
       );
       await submitWithPayload(core, seeder, marketId, payload);
 
-      // finalize after PendingOps ends (submitWindow=300, pendingOpsWindow=60)
+      // finalize during PendingOps (submitWindow=300)
+      const opsStart = tSet + 300n;
       const opsEnd = tSet + 300n + 60n;
-      await time.setNextBlockTimestamp(Number(opsEnd + 1n));
+      await time.setNextBlockTimestamp(Number(opsStart + 1n));
       await core.finalizePrimarySettlement(marketId);
 
       // Market is settled, but we're before claimOpenTime
-      // claimOpenTime = settlementFinalizedAt + settlementFinalizeDeadline
-      // Try to claim at opsEnd + 30s (before 60s deadline after finalize)
-      await time.setNextBlockTimestamp(Number(opsEnd + 30n));
+      // claimOpenTime = Tset + Δclaim (opsEnd)
+      // Try to claim before opsEnd
+      await time.setNextBlockTimestamp(Number(opsEnd - 1n));
 
       // SPEC: claimPayout should REVERT because time < claimOpenTime
       await expect(
@@ -282,7 +285,7 @@ describe("PayoutReserve Spec Tests", () => {
       ).to.be.revertedWithCustomError(trade, "ClaimTooEarly");
     });
 
-    it("allows claimPayout after time >= settlementFinalizedAt + Δ_claim (batch not processed)", async () => {
+    it("allows claimPayout after time >= Tset + Δ_claim (batch not processed)", async () => {
       const { core, seeder, trader, position, payment } = await loadFixture(
         deployFullSystem
       );
@@ -317,13 +320,14 @@ describe("PayoutReserve Spec Tests", () => {
       );
       await submitWithPayload(core, seeder, marketId, payload);
 
-      // finalize after PendingOps ends (submitWindow=300, pendingOpsWindow=60)
+      // finalize during PendingOps
+      const opsStart = tSet + 300n;
       const opsEnd = tSet + 300n + 60n;
-      await time.setNextBlockTimestamp(Number(opsEnd + 1n));
+      await time.setNextBlockTimestamp(Number(opsStart + 1n));
       await core.finalizePrimarySettlement(marketId);
 
-      // claimOpenTime = settlementFinalizedAt + settlementFinalizeDeadline (60s)
-      const claimOpenTime = opsEnd + 1n + 61n;
+      // claimOpenTime = Tset + Δclaim (opsEnd)
+      const claimOpenTime = opsEnd;
 
       // KEY: DO NOT process the batch - claim should still work based on TIME only
       const [, , , , , , processed] = await core.getDailyPnl.staticCall(
@@ -388,7 +392,7 @@ describe("PayoutReserve Spec Tests", () => {
       await time.setNextBlockTimestamp(Number(opsEnd + 1n));
       await core.finalizePrimarySettlement(marketId);
 
-      // Advance time past batch end and claim window (settlementFinalizeDeadline = 60s)
+      // Advance time past batch end and claim window (Tset + Δclaim)
       await advancePastBatchEnd(batchId);
       await core.processDailyBatch(batchId);
 

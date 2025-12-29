@@ -10,8 +10,11 @@ export async function deployAction(env: Environment) {
   console.log(`Deployer: ${deployer.address}`);
 
   const submitWindow = BigInt(process.env.SETTLEMENT_SUBMIT_WINDOW ?? "600");
-  const finalizeDeadline = BigInt(process.env.SETTLEMENT_FINALIZE_DEADLINE ?? "3600");
-  const pendingOpsWindow = BigInt(process.env.SETTLEMENT_PENDING_OPS_WINDOW ?? "600");
+  const pendingOpsWindow = BigInt(process.env.SETTLEMENT_PENDING_OPS_WINDOW ?? "300");
+  const finalizeDeadlineRaw = process.env.SETTLEMENT_FINALIZE_DEADLINE;
+  const finalizeDeadline = finalizeDeadlineRaw
+    ? BigInt(finalizeDeadlineRaw)
+    : submitWindow + pendingOpsWindow;
   const defaultFeeBps = Number(process.env.DEFAULT_FEE_BPS ?? "0");
   const redstoneFeedIdRaw = process.env.REDSTONE_FEED_ID ?? "BTC";
   const redstoneFeedDecimals = Number(process.env.REDSTONE_FEED_DECIMALS ?? "8");
@@ -26,6 +29,12 @@ export async function deployAction(env: Environment) {
   if (!Number.isFinite(redstoneFeedDecimals)) {
     throw new Error(
       `REDSTONE_FEED_DECIMALS must be a number (got ${process.env.REDSTONE_FEED_DECIMALS ?? "unset"})`
+    );
+  }
+  if (finalizeDeadline != submitWindow + pendingOpsWindow) {
+    throw new Error(
+      `SETTLEMENT_FINALIZE_DEADLINE must equal SETTLEMENT_SUBMIT_WINDOW + SETTLEMENT_PENDING_OPS_WINDOW ` +
+        `(submit=${submitWindow}, ops=${pendingOpsWindow}, claim=${finalizeDeadline})`
     );
   }
 

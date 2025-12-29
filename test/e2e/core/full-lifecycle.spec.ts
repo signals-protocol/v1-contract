@@ -4,13 +4,13 @@ import { time } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { deployFullSystem } from "../../helpers/fullSystem";
 import { uniformFactors } from "../../helpers/constants";
 import { buildRedstonePayload, submitWithPayload } from "../../helpers/redstone";
+import { deploySeedData } from "../../helpers";
 
 describe("E2E: full lifecycle", () => {
   it("trades, settles, transfers, and claims", async () => {
     const { owner, users, core, payment, position } = await deployFullSystem({
       submitWindow: 5,
       opsWindow: 5,
-      claimDelay: 5,
     });
     const [trader, receiver] = users;
     const coreAddress = await core.getAddress();
@@ -28,6 +28,7 @@ describe("E2E: full lifecycle", () => {
     const end = now + 50;
     const settlement = now + 60;
     const baseFactors = uniformFactors(4);
+    const seedData = await deploySeedData(baseFactors);
 
     const marketId = await core.createMarket.staticCall(
       0,
@@ -39,7 +40,7 @@ describe("E2E: full lifecycle", () => {
       4,
       ethers.parseEther("1"),
       ethers.ZeroAddress,
-      baseFactors
+      await seedData.getAddress()
     );
     await core.createMarket(
       0,
@@ -51,8 +52,9 @@ describe("E2E: full lifecycle", () => {
       4,
       ethers.parseEther("1"),
       ethers.ZeroAddress,
-      baseFactors
+      await seedData.getAddress()
     );
+    await core.seedNextChunks(marketId, 4);
 
     const quantity = 1_000n;
     const openCost = await core.calculateOpenCost.staticCall(marketId, 1, 3, quantity);
@@ -71,7 +73,7 @@ describe("E2E: full lifecycle", () => {
     const payload = await buildRedstonePayload(2, settlement + 1);
     await submitWithPayload(core, receiver, marketId, payload);
 
-    await time.increaseTo(settlement + 5 + 5 + 1);
+    await time.increaseTo(settlement + 6);
     await core.connect(owner).finalizePrimarySettlement(marketId);
 
     await expect(core.connect(receiver).claimPayout(positionId)).to.be.revertedWithCustomError(
@@ -79,8 +81,7 @@ describe("E2E: full lifecycle", () => {
       "ClaimTooEarly"
     );
 
-    const market = await core.markets(marketId);
-    const claimOpen = Number(market.settlementFinalizedAt) + 5;
+    const claimOpen = settlement + 10;
     await time.increaseTo(claimOpen);
 
     await expect(core.connect(trader).claimPayout(positionId)).to.be.revertedWithCustomError(

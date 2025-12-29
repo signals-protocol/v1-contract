@@ -5,13 +5,14 @@ import { time } from "@nomicfoundation/hardhat-network-helpers";
 const WAD = ethers.parseEther("1");
 
 type MarketStruct = {
-  isActive: boolean;
+  isSeeded: boolean;
   settled: boolean;
   snapshotChunksDone: boolean;
   failed: boolean;
   numBins: number;
   openPositionCount: number;
   snapshotChunkCursor: number;
+  seedCursor: number;
   startTimestamp: bigint;
   endTimestamp: bigint;
   settlementTimestamp: bigint;
@@ -23,6 +24,7 @@ type MarketStruct = {
   settlementValue: number;
   liquidityParameter: bigint;
   feePolicy: string;
+  seedData: string;
   initialRootSum: bigint;
   accumulatedFees: bigint;
   minFactor: bigint;
@@ -35,13 +37,14 @@ function buildMarket(
 ): MarketStruct {
   const numBins = overrides.numBins ?? 4;
   const market: MarketStruct = {
-    isActive: true,
+    isSeeded: true,
     settled: false,
     snapshotChunksDone: false,
     failed: false,
     numBins: numBins,
     openPositionCount: 0,
     snapshotChunkCursor: 0,
+    seedCursor: numBins,
     startTimestamp: baseTime - 10n,
     endTimestamp: baseTime + 1_000n,
     settlementTimestamp: baseTime + 1_100n,
@@ -53,6 +56,7 @@ function buildMarket(
     settlementValue: 0,
     liquidityParameter: ethers.parseEther("1"),
     feePolicy: ethers.ZeroAddress,
+    seedData: ethers.ZeroAddress,
     initialRootSum: BigInt(numBins) * ethers.parseEther("1"),
     accumulatedFees: 0n,
     minFactor: WAD, // uniform prior
@@ -79,14 +83,14 @@ describe("TradeModule validation helpers", () => {
     ).to.be.revertedWithCustomError(harness, "MarketNotFound");
   });
 
-  it("reverts when market is inactive", async () => {
+  it("reverts when market is not seeded", async () => {
     const harness = await deployHarness();
     const now = BigInt(await time.latest());
-    await harness.setMarket(1, buildMarket(now, { isActive: false }));
+    await harness.setMarket(1, buildMarket(now, { isSeeded: false }));
 
     await expect(
       harness.exposedLoadAndValidateMarket(1)
-    ).to.be.revertedWithCustomError(harness, "MarketNotActive");
+    ).to.be.revertedWithCustomError(harness, "MarketNotSeeded");
   });
 
   it("reverts when market has not started or already expired", async () => {

@@ -18,7 +18,7 @@ interface SignalsErrors {
     // ============================================================
     error MarketNotStarted();
     error MarketExpired();
-    error MarketNotActive();
+    error MarketNotSeeded();
     error MarketNotSettled(uint256 marketId);
     error MarketNotFound(uint256 marketId);
     error MarketAlreadySettled(uint256 marketId);
@@ -26,6 +26,8 @@ interface SignalsErrors {
     error MarketNotFailed(uint256 marketId);
     error MarketAlreadyFailed(uint256 marketId);
     error MarketAlreadyFinalized(uint256 marketId);
+    error SeedDataLengthMismatch(uint256 providedBytes, uint256 expectedBytes);
+    error SeedAlreadyComplete(uint256 marketId);
 
     // ============================================================
     // Oracle / Settlement
@@ -39,6 +41,7 @@ interface SignalsErrors {
     error SettlementWindowClosed();
     error PendingOpsNotStarted();
     error NotInPendingOps();
+    error InvalidSettlementTimeline(uint64 claimDelay, uint64 submitWindow, uint64 opsWindow);
     error ClaimTooEarly(uint64 claimOpenTimestamp, uint64 currentTimestamp);
     error PriceOverflow(uint256 scaled);
 

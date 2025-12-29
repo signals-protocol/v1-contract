@@ -4,6 +4,7 @@ import { time } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { deployFullSystem } from "../../helpers/fullSystem";
 import { uniformFactors } from "../../helpers/constants";
 import { buildRedstonePayload, submitWithPayload } from "../../helpers/redstone";
+import { deploySeedData } from "../../helpers";
 
 describe("E2E: module hot-swap", () => {
   it("keeps state consistent after swapping trade/lifecycle modules", async () => {
@@ -20,7 +21,6 @@ describe("E2E: module hot-swap", () => {
     } = await deployFullSystem({
       submitWindow: 5,
       opsWindow: 5,
-      claimDelay: 0,
     });
     const [userA, userB] = users;
     const coreAddress = await core.getAddress();
@@ -40,6 +40,7 @@ describe("E2E: module hot-swap", () => {
     const end = now + 50;
     const settlement = now + 60;
     const baseFactors = uniformFactors(4);
+    const seedData = await deploySeedData(baseFactors);
 
     const marketId = await core.createMarket.staticCall(
       0,
@@ -51,7 +52,7 @@ describe("E2E: module hot-swap", () => {
       4,
       ethers.parseEther("1"),
       ethers.ZeroAddress,
-      baseFactors
+      await seedData.getAddress()
     );
     await core.createMarket(
       0,
@@ -63,8 +64,9 @@ describe("E2E: module hot-swap", () => {
       4,
       ethers.parseEther("1"),
       ethers.ZeroAddress,
-      baseFactors
+      await seedData.getAddress()
     );
+    await core.seedNextChunks(marketId, 4);
 
     const qtyA = 1_000n;
     const costA = await core.calculateOpenCost.staticCall(marketId, 1, 3, qtyA);

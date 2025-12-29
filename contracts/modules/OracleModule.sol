@@ -221,9 +221,7 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
         tSet = market.settlementTimestamp;
         settleEnd = tSet + settlementSubmitWindow;
         opsEnd = settleEnd + pendingOpsWindow;
-        claimOpen = market.settlementFinalizedAt > 0 
-            ? market.settlementFinalizedAt + claimDelaySeconds 
-            : 0;
+        claimOpen = tSet + claimDelaySeconds;
     }
 
     // ============================================================

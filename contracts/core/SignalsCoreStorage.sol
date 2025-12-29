@@ -18,17 +18,18 @@ abstract contract SignalsCoreStorage {
     // settlementSubmitWindow (Δsettle): [Tset, Tset + Δsettle) = SettlementOpen
     //   - Anyone can submit oracle samples during this window
     // pendingOpsWindow (Δops): [Tset + Δsettle, Tset + Δsettle + Δops) = PendingOps
-    //   - No new samples; ops can mark failed
-    // After Tset + Δsettle + Δops: finalizePrimary() becomes callable
+    //   - No new samples; ops can mark failed or finalize
+    // After Tset + Δsettle: finalizePrimary() is callable (during or after PendingOps)
     //
-    // Note: settlementFinalizeDeadline is now used for claim gating (Δclaim)
+    // Δclaim invariant: claimDelaySeconds = settlementSubmitWindow + pendingOpsWindow
+    // Claims open at Tset + Δclaim (finalization still required)
 
     /// @notice Δsettle: Duration of SettlementOpen window (seconds)
     /// @dev Anyone can submit oracle samples during [Tset, Tset + settlementSubmitWindow)
     uint64 public settlementSubmitWindow;
     
-    /// @notice Δclaim: Delay before claims open after finalization (seconds)
-    /// @dev Claims open at settlementFinalizedAt + claimDelaySeconds
+    /// @notice Δclaim: Delay before claims open after Tset (seconds)
+    /// @dev Claims open at settlementTimestamp + claimDelaySeconds
     uint64 public claimDelaySeconds;
     
     /// @notice Δops: Duration of PendingOps window (seconds)

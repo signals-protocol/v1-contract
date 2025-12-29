@@ -78,13 +78,14 @@ async function deploySystem(
 
   const now = (await ethers.provider.getBlock("latest"))!.timestamp;
   const market: ISignalsCore.MarketStruct = {
-    isActive: true,
+    isSeeded: true,
     settled: false,
     snapshotChunksDone: false,
     failed: false,
     numBins: 4,
     openPositionCount: 0,
     snapshotChunkCursor: 0,
+    seedCursor: 4,
     startTimestamp: now - 10,
     endTimestamp: now + 1000,
     settlementTimestamp: now + 1100,
@@ -96,10 +97,11 @@ async function deploySystem(
     settlementValue: 0,
     liquidityParameter: WAD,
     feePolicy: ethers.ZeroAddress,
+    seedData: ethers.ZeroAddress,
     initialRootSum: 4n * WAD,
     accumulatedFees: 0n,
     minFactor: WAD, // uniform prior
-      deltaEt: 0n, // Uniform prior: ΔEₜ = 0
+    deltaEt: 0n, // Uniform prior: ΔEₜ = 0
     ...marketOverrides,
   };
   await core.setMarket(1, market);

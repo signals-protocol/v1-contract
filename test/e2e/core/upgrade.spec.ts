@@ -3,13 +3,13 @@ import { expect } from "chai";
 import { time } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { deployFullSystem } from "../../helpers/fullSystem";
 import { uniformFactors } from "../../helpers/constants";
+import { deploySeedData } from "../../helpers";
 
 describe("E2E: UUPS upgrades", () => {
   it("upgrades core and position without losing state", async () => {
     const { owner, users, core, payment, position } = await deployFullSystem({
       submitWindow: 5,
       opsWindow: 5,
-      claimDelay: 0,
     });
     const [trader] = users;
     const coreAddress = await core.getAddress();
@@ -23,6 +23,7 @@ describe("E2E: UUPS upgrades", () => {
     const end = now + 50;
     const settlement = now + 60;
     const baseFactors = uniformFactors(4);
+    const seedData = await deploySeedData(baseFactors);
 
     const marketId = await core.createMarket.staticCall(
       0,
@@ -34,7 +35,7 @@ describe("E2E: UUPS upgrades", () => {
       4,
       ethers.parseEther("1"),
       ethers.ZeroAddress,
-      baseFactors
+      await seedData.getAddress()
     );
     await core.createMarket(
       0,
@@ -46,8 +47,9 @@ describe("E2E: UUPS upgrades", () => {
       4,
       ethers.parseEther("1"),
       ethers.ZeroAddress,
-      baseFactors
+      await seedData.getAddress()
     );
+    await core.seedNextChunks(marketId, 4);
 
     const quantity = 1_000n;
     const cost = await core.calculateOpenCost.staticCall(marketId, 1, 3, quantity);

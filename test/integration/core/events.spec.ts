@@ -93,13 +93,14 @@ describe("Events & Position Lifecycle", () => {
 
     const now = (await ethers.provider.getBlock("latest"))!.timestamp;
     const market: ISignalsCore.MarketStruct = {
-      isActive: true,
+      isSeeded: true,
       settled: false,
       snapshotChunksDone: false,
       failed: false,
       numBins: NUM_BINS,
       openPositionCount: 0,
       snapshotChunkCursor: 0,
+      seedCursor: NUM_BINS,
       startTimestamp: now - 100,
       endTimestamp: now + 100000,
       settlementTimestamp: now + 100100,
@@ -111,6 +112,7 @@ describe("Events & Position Lifecycle", () => {
       settlementValue: 0,
       liquidityParameter: WAD,
       feePolicy: ethers.ZeroAddress,
+      seedData: ethers.ZeroAddress,
       initialRootSum: BigInt(NUM_BINS) * WAD,
       accumulatedFees: 0n,
       minFactor: WAD, // uniform prior

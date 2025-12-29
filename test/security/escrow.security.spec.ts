@@ -123,7 +123,7 @@ describe("Escrow Security", () => {
     );
 
     // Set settlement timeline
-    await core.setSettlementTimeline(3600, 3600, 86400);
+    await core.setSettlementTimeline(3600, 3600, 7200);
 
     // Configure risk and fee waterfall (required for batch processing)
     await core.setRiskConfig(

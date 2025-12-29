@@ -7,6 +7,7 @@ import "../lib/LazyMulSegmentTree.sol";
 import "../lib/FixedPointMathU.sol";
 import "../lib/ExposureDiffLib.sol";
 import "../lib/TickBinLib.sol";
+import "../lib/SeedDataLib.sol";
 
 /// @notice Delegate-only lifecycle module (skeleton)
 contract MarketLifecycleModule is SignalsCoreStorage {
@@ -28,7 +29,8 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         uint32 numBins,
         uint256 liquidityParameter
     );
-    event MarketFactorsSeeded(uint256 indexed marketId, uint256[] baseFactors);
+    event MarketSeedingProgress(uint256 indexed marketId, uint32 startBin, uint32 count, uint256[] factors);
+    event MarketSeeded(uint256 indexed marketId);
     event MarketSettled(
         uint256 indexed marketId,
         int256 settlementValue,
@@ -50,7 +52,6 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         int256 settlementTick,
         uint64 settlementFinalizedAt
     );
-    event MarketActivationUpdated(uint256 indexed marketId, bool isActive);
     event MarketTimingUpdated(
         uint256 indexed marketId,
         uint64 startTimestamp,
@@ -75,11 +76,9 @@ contract MarketLifecycleModule is SignalsCoreStorage {
 
     // --- External ---
 
-    /// @notice Create a new market with prior-based factors
-    /// @dev Factors define the opening prior q₀,t:
-    ///      - Uniform prior: all factors = 1 WAD → ΔEₜ = 0
-    ///      - Concentrated prior: factors vary → ΔEₜ > 0
-    ///      Prior admissibility is checked: ΔEₜ ≤ B_eff
+    /// @notice Create a new market with prior-based factors stored in SeedData
+    /// @dev Lifecycle validates seedData length, derives rootSum/minFactor/ΔEₜ,
+    ///      initializes the tree to uniform, and defers factor application to seedNextChunks.
     function createMarket(
         int256 minTick,
         int256 maxTick,
@@ -90,7 +89,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         uint32 numBins,
         uint256 liquidityParameter,
         address feePolicy,
-        uint256[] calldata baseFactors
+        address seedData
     ) external onlyDelegated returns (uint256 marketId) {
         _validateMarketParams(minTick, maxTick, tickSpacing, startTimestamp, endTimestamp, settlementTimestamp);
         require(numBins != 0, SE.BinCountExceedsLimit(0, MAX_BIN_COUNT));
@@ -98,17 +97,12 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         uint32 expectedBins = uint32(uint256((maxTick - minTick) / tickSpacing));
         require(expectedBins == numBins, SE.InvalidMarketParameters(minTick, maxTick, tickSpacing));
         require(liquidityParameter != 0, SE.InvalidLiquidityParameter());
-        require(baseFactors.length == numBins, SE.InvalidMarketParameters(minTick, maxTick, tickSpacing));
 
-        uint256 minFactor = type(uint256).max;
-        uint256 rootSum = 0;
-        for (uint256 i = 0; i < numBins; i++) {
-            require(baseFactors[i] != 0, SE.InvalidFactor(baseFactors[i]));
-            if (baseFactors[i] < minFactor) minFactor = baseFactors[i];
-            rootSum += baseFactors[i];
-        }
-
-        uint256 deltaEt = _calculateDeltaEt(liquidityParameter, numBins, rootSum, minFactor);
+        (uint256 rootSum, uint256 minFactor, uint256 deltaEt) = SeedDataLib.computeSeedStats(
+            seedData,
+            numBins,
+            liquidityParameter
+        );
 
         uint64 batchId = _getBatchIdForTimestamp(settlementTimestamp);
 
@@ -116,12 +110,13 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         
         _registerMarketForBatch(batchId);
         ISignalsCore.Market storage market = markets[marketId];
-        market.isActive = true;
+        market.isSeeded = false;
         market.settled = false;
         market.snapshotChunksDone = false;
         market.numBins = numBins;
         market.openPositionCount = 0;
         market.snapshotChunkCursor = 0;
+        market.seedCursor = 0;
         market.startTimestamp = startTimestamp;
         market.endTimestamp = endTimestamp;
         market.settlementTimestamp = settlementTimestamp;
@@ -132,12 +127,12 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         market.settlementValue = 0;
         market.liquidityParameter = liquidityParameter;
         market.feePolicy = feePolicy;
+        market.seedData = seedData;
         market.minFactor = minFactor;
         market.deltaEt = deltaEt; // Store ΔEₜ for batch processing
 
         LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
         tree.init(numBins);
-        tree.seedWithFactors(baseFactors);
 
         // Store initial root sum for P&L calculation
         market.initialRootSum = rootSum;
@@ -152,11 +147,49 @@ contract MarketLifecycleModule is SignalsCoreStorage {
             numBins,
             liquidityParameter
         );
-        emit MarketFactorsSeeded(marketId, baseFactors);
         if (feePolicy != address(0)) {
             emit MarketFeePolicySet(marketId, address(0), feePolicy);
         }
         emit SettlementTimestampUpdated(marketId, settlementTimestamp);
+    }
+
+    /// @notice Apply the next seeding chunk from SeedData
+    /// @param marketId Market identifier
+    /// @param count Number of bins to seed this call
+    function seedNextChunks(uint256 marketId, uint32 count) external onlyDelegated {
+        require(count != 0, SE.ZeroLimit());
+
+        ISignalsCore.Market storage market = markets[marketId];
+        require(_marketExists(marketId), SE.MarketNotFound(marketId));
+        require(!market.isSeeded, SE.SeedAlreadyComplete(marketId));
+        require(market.seedData != address(0), SE.ZeroAddress());
+
+        uint32 cursor = market.seedCursor;
+        uint32 numBins = market.numBins;
+        if (cursor >= numBins) revert SE.SeedAlreadyComplete(marketId);
+
+        uint32 remaining = numBins - cursor;
+        if (count > remaining) {
+            count = remaining;
+        }
+
+        uint256[] memory factors = SeedDataLib.readFactors(market.seedData, cursor, count);
+        LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
+
+        for (uint32 i = 0; i < count; i++) {
+            uint256 factor = factors[i];
+            if (factor == 0) revert SE.InvalidFactor(factor);
+            uint32 bin = cursor + i;
+            tree.applyRangeFactor(bin, bin, factor);
+        }
+
+        market.seedCursor = cursor + count;
+        emit MarketSeedingProgress(marketId, cursor, count, factors);
+
+        if (market.seedCursor >= numBins) {
+            market.isSeeded = true;
+            emit MarketSeeded(marketId);
+        }
     }
 
     // ============================================================
@@ -165,8 +198,8 @@ contract MarketLifecycleModule is SignalsCoreStorage {
     // Timeline:
     //   Trading:        t < Tset
     //   SettlementOpen: Tset ≤ t < Tset + Δsettle (sample submission)
-    //   PendingOps:     Tset + Δsettle ≤ t < Tset + Δsettle + Δops (ops can mark failed)
-    //   After PendingOps: finalizePrimary() or already failed → manual settle
+    //   PendingOps:     Tset + Δsettle ≤ t < Tset + Δsettle + Δops (ops can mark failed or finalize)
+    //   After PendingOps: finalizePrimary still allowed; markFailed only if no candidate
     // ============================================================
 
     /**
@@ -187,9 +220,9 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         uint64 tSet = market.settlementTimestamp;
         uint64 nowTs = uint64(block.timestamp);
         
-        // Can only finalize after PendingOps ends (Tset + Δsettle + Δops)
-        uint64 opsEnd = tSet + settlementSubmitWindow + pendingOpsWindow;
-        require(nowTs >= opsEnd, SE.PendingOpsNotStarted());
+        // Can only finalize once PendingOps starts (Tset + Δsettle)
+        uint64 opsStart = tSet + settlementSubmitWindow;
+        require(nowTs >= opsStart, SE.PendingOpsNotStarted());
 
         int256 settlementTick = _toSettlementTick(market, state.candidateValue);
 
@@ -199,7 +232,6 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         // settlementTimestamp stays as-is (market day key set at creation)
         // settlementFinalizedAt records when settlement tx was mined
         market.settlementFinalizedAt = nowTs;
-        market.isActive = false;
         market.snapshotChunkCursor = 0;
         market.snapshotChunksDone = (market.openPositionCount == 0);
 
@@ -261,7 +293,6 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         state.candidatePriceTimestamp = 0;
 
         market.failed = true;
-        market.isActive = false;
         _markMarketResolved(marketId, _getBatchIdForMarket(marketId));
 
         emit MarketFailed(marketId, nowTs);
@@ -334,21 +365,11 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         market.settlementTick = 0;
         market.settlementTimestamp = 0;
         market.settlementFinalizedAt = 0;
-        market.isActive = true;
         market.snapshotChunkCursor = 0;
         market.snapshotChunksDone = false;
 
         settlementOracleState[marketId] = SettlementOracleState({candidateValue: 0, candidatePriceTimestamp: 0});
         emit MarketReopened(marketId);
-    }
-
-    function setMarketActive(uint256 marketId, bool isActive) external onlyDelegated {
-        ISignalsCore.Market storage market = markets[marketId];
-        require(_marketExists(marketId), SE.MarketNotFound(marketId));
-        require(!isActive || !market.settled, SE.MarketAlreadySettled(marketId));
-
-        market.isActive = isActive;
-        emit MarketActivationUpdated(marketId, isActive);
     }
 
     function updateMarketTiming(
@@ -637,62 +658,6 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         if (!_marketBatchResolved[marketId]) return;
         _marketBatchResolved[marketId] = false;
         _batchMarketState[batchId].resolved -= 1;
-    }
-
-    // ============================================================
-    // ΔEₜ Calculation
-    // Note: α/prior enforcement is in RiskModule gate
-    // ============================================================
-
-    /**
-     * @notice Calculate ΔEₜ (tail budget) from prior factors
-     * @dev E_ent(q₀,t) = C(q₀,t) - min_j q₀,t,j
-     *      where q_b = α * ln(factor_b), C(q) = α * ln(rootSum)
-     *      
-     *      For general prior:
-     *        E_ent = α * ln(rootSum) - α * ln(minFactor) = α * ln(rootSum/minFactor)
-     *      
-     *      ΔEₜ = E_ent - α*ln(n) = α * ln(rootSum / (n * minFactor))
-     *      
-     *      Uniform prior (all factors = 1 WAD):
-     *        rootSum = n * WAD, minFactor = WAD → ΔEₜ = 0
-     *
-     * @param alpha Market liquidity parameter α (WAD)
-     * @param numBins Number of outcome bins n
-     * @param rootSum Sum of all factors (WAD)
-     * @param minFactor Minimum factor value (WAD)
-     * @return deltaEt Tail budget (WAD)
-     */
-    function _calculateDeltaEt(
-        uint256 alpha,
-        uint32 numBins,
-        uint256 rootSum,
-        uint256 minFactor
-    ) internal pure returns (uint256 deltaEt) {
-        // ΔEₜ = α * ln(rootSum / (n * minFactor))
-        // If rootSum == n * minFactor (uniform), ΔEₜ = 0
-        
-        uint256 uniformSum = uint256(numBins) * minFactor;
-        
-        if (rootSum <= uniformSum) {
-            // Uniform or near-uniform prior → no tail risk
-            return 0;
-        }
-        
-        // ΔEₜ = α * ln(rootSum / uniformSum)
-        // SAFETY: Compute conservatively (upper bound) for prior admissibility
-        // Over-estimating ΔEₜ → more priors rejected → safer
-        
-        // ratio = rootSum / uniformSum (in WAD scale) - use ceiling division
-        uint256 ratio = rootSum.wDivUp(uniformSum);
-        
-        // ln(ratio) where ratio > 1 WAD
-        // wLn expects WAD-scaled input and returns WAD-scaled output
-        // Add 1 wei for conservative upper bound
-        uint256 lnRatio = FixedPointMathU.wLn(ratio) + 1;
-        
-        // ΔEₜ = α * lnRatio - use ceiling multiplication
-        deltaEt = alpha.wMulUp(lnRatio);
     }
 
 }

@@ -84,12 +84,13 @@ describe("Lifecycle + Trade integration", () => {
       })
     ).deploy()) as SignalsCoreHarness;
     const submitWindow = 300;
-    const finalizeDeadline = 60;
+    const opsWindow = 60;
+    const claimDelay = submitWindow + opsWindow;
     const initData = coreImpl.interface.encodeFunctionData("initialize", [
       payment.target,
       await position.getAddress(),
       submitWindow,
-      finalizeDeadline,
+      claimDelay,
     ]);
     const proxy = (await (
       await ethers.getContractFactory("TestERC1967Proxy")
@@ -108,6 +109,7 @@ describe("Lifecycle + Trade integration", () => {
     
     // Configure Redstone oracle params
     await core.setRedstoneConfig(FEED_ID, FEED_DECIMALS, MAX_SAMPLE_DISTANCE, FUTURE_TOLERANCE);
+    await core.setSettlementTimeline(submitWindow, opsWindow, claimDelay);
     await position.connect(owner).setCore(await core.getAddress());
 
     return {
@@ -120,7 +122,8 @@ describe("Lifecycle + Trade integration", () => {
       oracleModule,
       core,
       submitWindow,
-      finalizeDeadline,
+      opsWindow,
+      claimDelay,
     };
   }
 
@@ -132,7 +135,6 @@ describe("Lifecycle + Trade integration", () => {
       position,
       core,
       lifecycleModule,
-      finalizeDeadline,
     } = await setup();
 
     const lifecycleEvents = lifecycleModule.attach(await core.getAddress());
@@ -199,8 +201,6 @@ describe("Lifecycle + Trade integration", () => {
     market = await core.markets(marketId);
     expect(market.snapshotChunksDone).to.equal(true);
 
-    // wait for claim window and claim payout
-    await time.increase(finalizeDeadline + 1);
     const balBefore = await payment.balanceOf(user.address);
     await core.connect(user).claimPayout(positionId);
     const balAfter = await payment.balanceOf(user.address);
@@ -259,8 +259,6 @@ describe("Lifecycle + Trade integration", () => {
       .to.emit(lifecycleEvents, "SettlementChunkRequested")
       .withArgs(1, 0);
 
-    await time.increase(61); // finalize window
-
     const balBefore = await payment.balanceOf(user.address);
     await core.connect(user).claimPayout(pos1);
     await core.connect(user).claimPayout(pos2);
@@ -307,7 +305,7 @@ describe("Lifecycle + Trade integration", () => {
     await expect(core.connect(user).increasePosition(1, 1_000, 5_000_000)).to.be
       .reverted;
 
-    // settlement too early (before PendingOps ends)
+    // settlement too early (before PendingOps starts)
     await expect(core.finalizePrimarySettlement(1)).to.be.reverted;
 
     // submit settlement within window (priceTimestamp >= Tset)
@@ -316,15 +314,16 @@ describe("Lifecycle + Trade integration", () => {
     const payload3 = buildRedstonePayload(tickToHumanPrice(1n), Number(priceTimestamp), authorisedWallets);
     await submitWithPayload(core, owner, 1, payload3);
     
-    // finalize after PendingOps ends (submitWindow=300, pendingOpsWindow=60)
-    const opsEnd = settlementTs + 300n + 60n;
-    await time.setNextBlockTimestamp(Number(opsEnd + 1n));
+    // finalize during PendingOps (submitWindow=300)
+    const opsStart = settlementTs + 300n;
+    await time.setNextBlockTimestamp(Number(opsStart + 1n));
     await core.finalizePrimarySettlement(1);
 
-    // claim too early (claim gate = settlementFinalizedAt + finalizeDeadline(60))
+    // claim too early (claim gate = Tset + Δclaim)
     await expect(core.connect(user).claimPayout(1)).to.be.reverted;
 
-    await time.increase(61);
+    const claimOpen = settlementTs + 300n + 60n;
+    await time.setNextBlockTimestamp(Number(claimOpen + 1n));
     await core.connect(user).claimPayout(1);
   });
 });

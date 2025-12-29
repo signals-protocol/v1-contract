@@ -23,13 +23,14 @@ function cloneMarket(
   overrides: Partial<ISignalsCore.MarketStruct> = {}
 ): ISignalsCore.MarketStruct {
   return {
-    isActive: market.isActive,
+    isSeeded: market.isSeeded,
     settled: market.settled,
     snapshotChunksDone: market.snapshotChunksDone,
     failed: market.failed,
     numBins: market.numBins,
     openPositionCount: market.openPositionCount,
     snapshotChunkCursor: market.snapshotChunkCursor,
+    seedCursor: market.seedCursor,
     startTimestamp: market.startTimestamp,
     endTimestamp: market.endTimestamp,
     settlementTimestamp: market.settlementTimestamp,
@@ -41,6 +42,7 @@ function cloneMarket(
     settlementValue: market.settlementValue,
     liquidityParameter: market.liquidityParameter,
     feePolicy: market.feePolicy,
+    seedData: market.seedData,
     initialRootSum: market.initialRootSum,
     accumulatedFees: market.accumulatedFees,
     minFactor: market.minFactor ?? WAD,
@@ -130,6 +132,17 @@ describe("MarketLifecycleModule", () => {
     const now = BigInt(await time.latest());
     const start = now - 100n;
     const end = now + 200n;
+    const marketId = await core.createMarketUniform.staticCall(
+      0,
+      4,
+      1,
+      Number(start),
+      Number(end),
+      Number(end),
+      4,
+      ethers.parseEther("1"),
+      ethers.ZeroAddress
+    );
     await core.createMarketUniform(
       0,
       4,
@@ -141,10 +154,10 @@ describe("MarketLifecycleModule", () => {
       ethers.parseEther("1"),
       ethers.ZeroAddress
     );
-    return { start, end };
+    return { start, end, marketId };
   }
 
-  it("creates market with seeded tree and validated params", async () => {
+  it("creates market and seeds tree via chunks", async () => {
     const { core, lifecycle } = await setup();
     const now = BigInt(await time.latest());
     const start = now + 10n;
@@ -153,18 +166,17 @@ describe("MarketLifecycleModule", () => {
 
     const lifecycleEvents = lifecycle.attach(await core.getAddress());
 
-    const marketId = await core.createMarketUniform.staticCall(
-      0,
-      4,
-      1,
-      Number(start),
-      Number(end),
-      Number(settlementTs),
-      4,
-      ethers.parseEther("1"),
-      ethers.ZeroAddress
+    const expectedFactors = [WAD, WAD, WAD, WAD];
+    const packedFactors = ethers.solidityPacked(
+      Array(expectedFactors.length).fill("uint256"),
+      expectedFactors
     );
-    const tx = await core.createMarketUniform(
+    const seedData = await (
+      await ethers.getContractFactory("SeedData")
+    ).deploy(packedFactors);
+    await seedData.waitForDeployment();
+
+    const marketId = await core.createMarket.staticCall(
       0,
       4,
       1,
@@ -173,20 +185,129 @@ describe("MarketLifecycleModule", () => {
       Number(settlementTs),
       4,
       ethers.parseEther("1"),
-      ethers.ZeroAddress
+      ethers.ZeroAddress,
+      seedData.target
+    );
+    const tx = await core.createMarket(
+      0,
+      4,
+      1,
+      Number(start),
+      Number(end),
+      Number(settlementTs),
+      4,
+      ethers.parseEther("1"),
+      ethers.ZeroAddress,
+      seedData.target
     );
     await expect(tx).to.emit(lifecycleEvents, "MarketCreated");
-    const expectedFactors = [WAD, WAD, WAD, WAD];
-    await expect(tx)
-      .to.emit(lifecycleEvents, "MarketFactorsSeeded")
-      .withArgs(marketId, expectedFactors);
+    const seedTx = await core.seedNextChunks(marketId, 4);
+    await expect(seedTx)
+      .to.emit(lifecycleEvents, "MarketSeedingProgress")
+      .withArgs(marketId, 0, 4, expectedFactors);
+    await expect(seedTx).to.emit(lifecycleEvents, "MarketSeeded").withArgs(marketId);
 
-    const market = await core.markets(marketId);
-    expect(market.isActive).to.equal(true);
+    let market = await core.markets(marketId);
+    expect(market.isSeeded).to.equal(true);
     expect(market.numBins).to.equal(4);
     expect(market.liquidityParameter).to.equal(ethers.parseEther("1"));
     expect(await core.harnessGetTreeSize(marketId)).to.equal(4);
     expect(await core.harnessGetTreeSum(marketId)).to.equal(4n * 10n ** 18n);
+  });
+
+  it("reverts seeding for unknown market", async () => {
+    const { core, lifecycle } = await setup();
+    await expect(core.seedNextChunks(1, 1)).to.be.revertedWithCustomError(
+      lifecycle,
+      "MarketNotFound"
+    );
+  });
+
+  it("seeds in multiple chunks and completes only on final chunk", async () => {
+    const { core, lifecycle } = await setup();
+    const now = BigInt(await time.latest());
+    const start = now + 10n;
+    const end = start + 100n;
+    const settlementTs = end + 50n;
+
+    await core.setCapitalStack(ethers.parseEther("1000000"), 0);
+
+    const lifecycleEvents = lifecycle.attach(await core.getAddress());
+
+    const factors = [WAD, WAD * 2n, WAD * 3n, WAD * 4n, WAD * 5n];
+    const packedFactors = ethers.solidityPacked(
+      Array(factors.length).fill("uint256"),
+      factors
+    );
+    const seedData = await (
+      await ethers.getContractFactory("SeedData")
+    ).deploy(packedFactors);
+    await seedData.waitForDeployment();
+
+    const marketId = await core.createMarket.staticCall(
+      0,
+      5,
+      1,
+      Number(start),
+      Number(end),
+      Number(settlementTs),
+      5,
+      ethers.parseEther("1"),
+      ethers.ZeroAddress,
+      seedData.target
+    );
+    await core.createMarket(
+      0,
+      5,
+      1,
+      Number(start),
+      Number(end),
+      Number(settlementTs),
+      5,
+      ethers.parseEther("1"),
+      ethers.ZeroAddress,
+      seedData.target
+    );
+
+    await expect(core.seedNextChunks(marketId, 0)).to.be.revertedWithCustomError(
+      lifecycle,
+      "ZeroLimit"
+    );
+
+    const seedTx1 = await core.seedNextChunks(marketId, 2);
+    await expect(seedTx1)
+      .to.emit(lifecycleEvents, "MarketSeedingProgress")
+      .withArgs(marketId, 0, 2, factors.slice(0, 2));
+    await expect(seedTx1).to.not.emit(lifecycleEvents, "MarketSeeded");
+
+    let market = await core.markets(marketId);
+    expect(market.seedCursor).to.equal(2);
+    expect(market.isSeeded).to.equal(false);
+
+    const seedTx2 = await core.seedNextChunks(marketId, 2);
+    await expect(seedTx2)
+      .to.emit(lifecycleEvents, "MarketSeedingProgress")
+      .withArgs(marketId, 2, 2, factors.slice(2, 4));
+    await expect(seedTx2).to.not.emit(lifecycleEvents, "MarketSeeded");
+
+    market = await core.markets(marketId);
+    expect(market.seedCursor).to.equal(4);
+    expect(market.isSeeded).to.equal(false);
+
+    const seedTx3 = await core.seedNextChunks(marketId, 10);
+    await expect(seedTx3)
+      .to.emit(lifecycleEvents, "MarketSeedingProgress")
+      .withArgs(marketId, 4, 1, factors.slice(4, 5));
+    await expect(seedTx3).to.emit(lifecycleEvents, "MarketSeeded").withArgs(marketId);
+
+    market = await core.markets(marketId);
+    expect(market.seedCursor).to.equal(5);
+    expect(market.isSeeded).to.equal(true);
+
+    await expect(core.seedNextChunks(marketId, 1)).to.be.revertedWithCustomError(
+      lifecycle,
+      "SeedAlreadyComplete"
+    );
   });
 
   it("rejects invalid market parameters and time ranges", async () => {
@@ -315,7 +436,7 @@ describe("MarketLifecycleModule", () => {
     const goodPayload = buildRedstonePayload(HUMAN_PRICE, Number(goodTs), authorisedWallets);
     await submitWithPayload(core, owner, 1, goodPayload);
     
-    // Test 3: Finalize before opsEnd: should revert with PendingOpsNotStarted
+    // Test 3: Finalize before opsStart: should revert with PendingOpsNotStarted
     await time.setNextBlockTimestamp(Number(goodTs + 10n));
     await expect(core.finalizePrimarySettlement(1)).to.be.revertedWithCustomError(
       lifecycle,
@@ -333,6 +454,32 @@ describe("MarketLifecycleModule", () => {
     // Test 5: Finalize after opsEnd: should succeed
     await time.setNextBlockTimestamp(Number(opsEnd + 2n));
     await expect(core.finalizePrimarySettlement(1)).to.emit(lifecycle.attach(await core.getAddress()), "MarketSettled");
+  });
+
+  it("finalizePrimary allows during PendingOps window", async () => {
+    const { core, lifecycle, owner } = await setup();
+    const { end } = await createDefaultMarket(core);
+    const lifecycleEvents = lifecycle.attach(await core.getAddress());
+
+    const tSet = end;
+    const candidateTs = tSet + 10n;
+    await time.setNextBlockTimestamp(Number(candidateTs + 1n));
+    const payload = buildRedstonePayload(
+      HUMAN_PRICE,
+      Number(candidateTs),
+      authorisedWallets
+    );
+    await submitWithPayload(core, owner, 1, payload);
+
+    const opsStart = tSet + 120n; // settlementSubmitWindow
+    await time.setNextBlockTimestamp(Number(opsStart + 1n));
+    await expect(core.finalizePrimarySettlement(1)).to.emit(
+      lifecycleEvents,
+      "MarketSettled"
+    );
+
+    const market = await core.markets(1);
+    expect(market.settled).to.equal(true);
   });
 
   it("reopens settled market and resets state", async () => {
@@ -354,7 +501,7 @@ describe("MarketLifecycleModule", () => {
     await core.reopenMarket(1);
     const reopened = await core.markets(1);
     expect(reopened.settled).to.equal(false);
-    expect(reopened.isActive).to.equal(true);
+    expect(reopened.isSeeded).to.equal(true);
     expect(reopened.settlementValue).to.equal(0);
     expect(reopened.snapshotChunkCursor).to.equal(0);
     expect(reopened.snapshotChunksDone).to.equal(false);
@@ -376,7 +523,6 @@ describe("MarketLifecycleModule", () => {
 
     const market = await core.markets(1);
     expect(market.failed).to.equal(true);
-    expect(market.isActive).to.equal(false);
     expect(market.settled).to.equal(false);
   });
 
@@ -457,25 +603,16 @@ describe("MarketLifecycleModule", () => {
       .to.be.revertedWithCustomError(lifecycle, "MarketAlreadySettled");
   });
 
-  it("updates market timing and activation", async () => {
+  it("updates market timing", async () => {
     const { core, lifecycle } = await setup();
     await createDefaultMarket(core);
-
-    await core.setMarketActive(1, false);
-    let market = await core.markets(1);
-    expect(market.isActive).to.equal(false);
-    await core.setMarketActive(1, true);
-    market = await core.markets(1);
-    expect(market.isActive).to.equal(true);
-
-    await expect(core.setMarketActive(1, true)).not.to.be.reverted;
 
     await expect(
       core.updateMarketTiming(1, 10, 5, 5)
     ).to.be.revertedWithCustomError(lifecycle, "InvalidTimeRange");
 
     await core.updateMarketTiming(1, 5, 10, 15);
-    market = await core.markets(1);
+    const market = await core.markets(1);
     expect(market.startTimestamp).to.equal(5);
     expect(market.endTimestamp).to.equal(10);
     expect(market.settlementTimestamp).to.equal(15);
