@@ -278,7 +278,7 @@ describe("Market Security", () => {
     });
 
     it("rejects market with large numBins that would DoS settlement", async () => {
-      const { core, owner, feePolicy, lifecycleModule } = await loadFixture(
+      const { core, owner, feePolicy } = await loadFixture(
         deployMarketFixture
       );
 

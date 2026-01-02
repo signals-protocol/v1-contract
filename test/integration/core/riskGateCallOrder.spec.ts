@@ -293,11 +293,12 @@ describe('Core-first Risk Gate Call Order', () => {
       const settle = end + 3600;
       
       // Create market
+      const seedData = await deploySeedData(Array(10).fill(WAD));
       await core.createMarket(
         0, 100, 10, start, end, settle, 10,
         ethers.parseEther('1'),
         ethers.ZeroAddress,
-        Array(10).fill(WAD)
+        await seedData.getAddress()
       );
       
       // Mark as failed
