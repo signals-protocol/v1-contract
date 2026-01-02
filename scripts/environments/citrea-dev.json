@@ -1,9 +1,9 @@
 {
   "network": "citrea-dev",
-  "version": 8,
+  "version": 10,
   "contracts": {
     "SignalsCoreProxy": "0xa4B12635f964091e2f8C4FAD330797281fdDE9dF",
-    "SignalsCoreImplementation": "0xF1c8a7E59a6fC0d01EB8459028a36c4a4d67506c",
+    "SignalsCoreImplementation": "0xBC0899decA5034a92848892A74D1eac984CaA4E4",
     "SignalsPositionProxy": "0xB00A0f42003FCfFb9dE68E13829F21448d8EE9C5",
     "SignalsPositionImplementation": "0x0d507C75B0618a4Eb7CC65552a810e594d8f38fE",
     "TradeModule": "0xBfF486f199BFf1Fc6a36922765e3D020E06c8867",
@@ -13,7 +13,7 @@
     "SignalsUSDToken": "0xaC57cf391cE6e60c61fa0ca8B6b4819f452A1Cb4",
     "LazyMulSegmentTree": "0x098b70665AF742674137be2e91533A2313BADa15",
     "RiskModule": "0x96a7Ac2d169BDb52f0749c5B79560619c62391ad",
-    "LPVaultModule": "0x0F1A36F6f7eaA5f670f0934F496BEB4fa02Fa08b",
+    "LPVaultModule": "0xa6a7aaeEE64d1b0c24BF1454E9D0FeA0C84D73D3",
     "SignalsLPShare": "0x4b2B72d42A0937393D5349F37E01AaB3FEDb2B67",
     "FeePolicyNull": "0x44Ef789AFb4C9F015D0148F2ba0dC99A9cE96997",
     "FeePolicy10bps": "0x68dAdCBbF6a272B475be05315130c0c8Fb3cF6DB",
@@ -79,6 +79,18 @@
       "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
       "version": 8,
       "timestamp": 1766984268
+    },
+    {
+      "action": "upgrade",
+      "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
+      "version": 9,
+      "timestamp": 1767183636
+    },
+    {
+      "action": "update-modules",
+      "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
+      "version": 10,
+      "timestamp": 1767183647
     }
   ]
 }

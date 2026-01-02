@@ -38,8 +38,17 @@ export async function deployAction(env: Environment) {
     );
   }
 
-  const payment = await (await ethers.getContractFactory("SignalsUSDToken")).deploy();
-  await payment.waitForDeployment();
+  const paymentOverride =
+    process.env.PAYMENT_TOKEN_ADDRESS || process.env.SIGNALS_USD_TOKEN_ADDRESS;
+  let paymentAddress: string;
+  if (paymentOverride) {
+    paymentAddress = paymentOverride;
+    console.log(`[deploy] using existing payment token=${paymentAddress}`);
+  } else {
+    const payment = await (await ethers.getContractFactory("SignalsUSDToken")).deploy();
+    await payment.waitForDeployment();
+    paymentAddress = payment.target.toString();
+  }
 
   const feePolicy = await (await ethers.getContractFactory("MockFeePolicy")).deploy(defaultFeeBps);
   await feePolicy.waitForDeployment();
@@ -93,11 +102,18 @@ export async function deployAction(env: Environment) {
   const coreFactory = await ethers.getContractFactory("SignalsCore");
   const coreProxy = await upgrades.deployProxy(
     coreFactory,
-    [payment.target, positionProxy.target, submitWindow, finalizeDeadline],
+    [paymentAddress, positionProxy.target, submitWindow, finalizeDeadline],
     { kind: "uups", unsafeAllow: ["delegatecall"] }
   );
   await coreProxy.waitForDeployment();
   const coreImpl = await upgrades.erc1967.getImplementationAddress(await coreProxy.getAddress());
+  const coreDeployTx = coreProxy.deploymentTransaction();
+  if (coreDeployTx) {
+    const receipt = await coreDeployTx.wait();
+    if (receipt) {
+      console.log(`[deploy] coreProxy block=${receipt.blockNumber} tx=${coreDeployTx.hash}`);
+    }
+  }
 
   const modulesTx = await coreProxy.setModules(
     tradeModule.target,
@@ -114,7 +130,7 @@ export async function deployAction(env: Environment) {
     lpShareName,
     lpShareSymbol,
     coreProxy.target,
-    payment.target
+    paymentAddress
   );
   await lpShare.waitForDeployment();
 
@@ -153,7 +169,7 @@ export async function deployAction(env: Environment) {
     FeePolicy50bps: feePolicy50bps.target.toString(),
     FeePolicy100bps: feePolicy100bps.target.toString(),
     FeePolicy200bps: feePolicy200bps.target.toString(),
-    SignalsUSDToken: payment.target.toString(),
+    SignalsUSDToken: paymentAddress,
     SignalsLPShare: lpShare.target.toString(),
     LazyMulSegmentTree: lazy.target.toString(),
   });

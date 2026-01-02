@@ -1,16 +1,16 @@
 {
   "network": "citrea-prod",
-  "version": 4,
+  "version": 3,
   "contracts": {
     "SignalsCoreProxy": "0x43E4219A6cc754cab0D30929c2D2BebbFf2468A2",
     "SignalsCoreImplementation": "0x36E703604377ABf0926AAA3600fDB422db6B968F",
     "SignalsPositionProxy": "0x48991c8841e92BC91d1545911DA8B9c71DBFEDA1",
     "SignalsPositionImplementation": "0x55407915D0Bad0fdfd653BE6eB2DC3AC3F154b7b",
     "TradeModule": "0x631158aF24e5945a07A8a636AFd3D5B0225E5D52",
-    "MarketLifecycleModule": "0xC35c65dBc1Ee39c76BDfAc71e7379b41C9a6dB4a",
+    "MarketLifecycleModule": "0x1323b960a4C75F03060d9da081562dDB63b90a04",
     "OracleModule": "0xCd2a719D77ecBBe82F296AB257943734cB937Ab5",
     "RiskModule": "0xd4B286F2072005c960095CF205eE6d8cF3332622",
-    "LPVaultModule": "0x32802B45e1510537c5CFC93041EcBeC4905FD57b",
+    "LPVaultModule": "0x40d676DB70580D8eB9B62bC5694696D8c8999f1b",
     "FeePolicy": "0x4BACc02BA058E8063F965020eF982f06227b2E9b",
     "FeePolicyNull": "0x02a7C9102870077e3F90Bd322E60Adc5253eC7D7",
     "FeePolicy10bps": "0xcE1435DE6A430a4EeFEa772b98Ea120f0A52653A",
@@ -19,7 +19,7 @@
     "FeePolicy200bps": "0x3D4479266fFB2dad2d64e9a96aFea56F265fFf1b",
     "SignalsUSDToken": "0xaC57cf391cE6e60c61fa0ca8B6b4819f452A1Cb4",
     "SignalsLPShare": "0x4940D11127f65Dc6cd41434D9F92faFE95B4DAF9",
-    "LazyMulSegmentTree": "0xC04836b6D2c9B38f49435344DEAE7BD27b83343d"
+    "LazyMulSegmentTree": "0x568799e9964dc0a6eeADCA1F9C0440beb7b7fb89"
   },
   "config": {
     "settlementSubmitWindow": "600",
@@ -53,12 +53,11 @@
       },
       "version": 3,
       "timestamp": 1767277002
-    },
-    {
-      "action": "update-modules",
-      "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
-      "version": 4,
-      "timestamp": 1767336290
     }
-  ]
+  ],
+  "release": {
+    "release": "redeploy-202601011415",
+    "gitCommit": "5d26c59f8af665b9d3c4f24a54fdce00a916df1e"
+  },
+  "generatedAt": "2026-01-01T14:16:42.363Z"
 }
