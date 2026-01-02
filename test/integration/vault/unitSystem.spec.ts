@@ -20,8 +20,8 @@ import { ethers } from "hardhat";
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
 import {
   WAD,
-  BATCH_SECONDS,
   advancePastBatchEnd,
+  batchEndTimestamp,
 } from "../../helpers/constants";
 
 describe("UnitSystem Spec Tests", () => {
@@ -165,7 +165,7 @@ describe("UnitSystem Spec Tests", () => {
 
       // Advance time past batch end
       const currentBatchId = await proxy.getCurrentBatchId();
-      const nextBatchEnd = (currentBatchId + 2n) * BATCH_SECONDS;
+      const nextBatchEnd = batchEndTimestamp(currentBatchId + 1n);
       await time.setNextBlockTimestamp(Number(nextBatchEnd) + 1);
       await ethers.provider.send("evm_mine", []);
 

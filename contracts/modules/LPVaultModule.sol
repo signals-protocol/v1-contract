@@ -129,11 +129,11 @@ contract LPVaultModule is SignalsCoreStorage {
         }
 
         // Initialize currentBatchId as a day-key so that:
-        // - MarketLifecycleModule records P&L into batchId = settlementTimestamp / BATCH_SECONDS
+        // - MarketLifecycleModule records P&L into batchId = settlementTimestamp / BATCH_SECONDS (PST day boundary)
         // - LPVaultModule processes batches strictly sequentially (currentBatchId + 1)
         //
         // We set currentBatchId to "yesterday" so the first processDailyBatch targets "today".
-        uint64 todayBatchId = uint64(block.timestamp / uint256(BATCH_SECONDS));
+        uint64 todayBatchId = _toBatchId(uint64(block.timestamp));
         currentBatchId = todayBatchId == 0 ? 0 : todayBatchId - 1;
 
         // Event emits WAD amounts for consistency with internal accounting
@@ -292,10 +292,6 @@ contract LPVaultModule is SignalsCoreStorage {
     function processDailyBatch(uint64 batchId) external onlyDelegated {
         if (!lpVault.isSeeded) revert SE.VaultNotSeeded();
         if (batchId != currentBatchId + 1) revert SE.BatchNotReady(batchId);
-
-        // Prevent processing future batches - batch can only be processed after its time period ends
-        uint64 batchEndTime = (batchId + 1) * BATCH_SECONDS;
-        if (block.timestamp < batchEndTime) revert SE.BatchNotEnded(batchId, batchEndTime, uint64(block.timestamp));
 
         DailyPnlSnapshot storage snap = _dailyPnl[batchId];
         if (snap.processed) revert SE.DailyBatchAlreadyProcessed(batchId);

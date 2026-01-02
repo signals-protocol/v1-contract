@@ -18,7 +18,11 @@ import {
   buildRedstonePayload,
   submitWithPayload,
 } from "../../helpers/redstone";
-import { advancePastBatchEnd, BATCH_SECONDS } from "../../helpers/constants";
+import {
+  advancePastBatchEnd,
+  batchStartTimestamp,
+  toBatchId,
+} from "../../helpers/constants";
 import { deploySeedData } from "../../helpers";
 const WAD = ethers.parseEther("1");
 
@@ -129,8 +133,8 @@ describe("VaultWithMarkets E2E", () => {
 
     // Fix timestamp so batchId (day-key) is deterministic and monotonic
     const latest = BigInt(await time.latest());
-    const seedTime = (latest / BATCH_SECONDS + 1n) * BATCH_SECONDS + 1_000n;
-    const dayKey = seedTime / BATCH_SECONDS;
+    const seedTime = batchStartTimestamp(toBatchId(latest) + 1n) + 1_000n;
+    const dayKey = toBatchId(seedTime);
     const expectedFirstBatchId = dayKey;
 
     // Seed vault (sets currentBatchId = dayKey - 1)
@@ -183,7 +187,7 @@ describe("VaultWithMarkets E2E", () => {
       1n * WAD,
     ]);
 
-    const batchId = tSet / BATCH_SECONDS;
+    const batchId = toBatchId(tSet);
     expect(batchId).to.equal(expectedFirstBatchId);
 
     // Submit oracle price candidate within window [Tset, Tset + submitWindow]
@@ -226,7 +230,7 @@ describe("VaultWithMarkets E2E", () => {
       const { seeder, core, payment } = await loadFixture(deploySystem);
 
       const latest = BigInt(await time.latest());
-      const seedTime = (latest / BATCH_SECONDS + 1n) * BATCH_SECONDS + 1_000n;
+      const seedTime = batchStartTimestamp(toBatchId(latest) + 1n) + 1_000n;
 
       const seedAmount = ethers.parseEther("1000");
       await payment.mint(seeder.address, seedAmount);
@@ -261,7 +265,7 @@ describe("VaultWithMarkets E2E", () => {
       await core.finalizePrimarySettlement(1n);
 
       // Process batch - should succeed (uniform prior has ΔEₜ = 0, and no grant needed with no loss)
-      const batchId = tSet / BATCH_SECONDS;
+      const batchId = toBatchId(tSet);
       await advancePastBatchEnd(batchId);
       await expect(core.processDailyBatch(batchId)).to.not.be.reverted;
 
@@ -275,7 +279,7 @@ describe("VaultWithMarkets E2E", () => {
       const { seeder, core, payment } = await loadFixture(deploySystem);
 
       const latest = BigInt(await time.latest());
-      const seedTime = (latest / BATCH_SECONDS + 1n) * BATCH_SECONDS + 1_000n;
+      const seedTime = batchStartTimestamp(toBatchId(latest) + 1n) + 1_000n;
 
       const seedAmount = ethers.parseEther("1000");
       await payment.mint(seeder.address, seedAmount);
@@ -324,7 +328,7 @@ describe("VaultWithMarkets E2E", () => {
       await core.finalizePrimarySettlement(1n);
 
       // Process batch
-      const batchId = tSet / BATCH_SECONDS;
+      const batchId = toBatchId(tSet);
       await advancePastBatchEnd(batchId);
       await core.processDailyBatch(batchId);
 
@@ -342,7 +346,7 @@ describe("VaultWithMarkets E2E", () => {
       const { seeder, core, payment } = await loadFixture(deploySystem);
 
       const latest = BigInt(await time.latest());
-      const seedTime = (latest / BATCH_SECONDS + 1n) * BATCH_SECONDS + 1_000n;
+      const seedTime = batchStartTimestamp(toBatchId(latest) + 1n) + 1_000n;
 
       const seedAmount = ethers.parseEther("1000");
       await payment.mint(seeder.address, seedAmount);
@@ -357,7 +361,7 @@ describe("VaultWithMarkets E2E", () => {
 
       // Create market with concentrated prior (ΔEₜ > 0)
       const tSet = seedTime + 500n;
-      const batchId = tSet / BATCH_SECONDS;
+      const batchId = toBatchId(tSet);
       
       const factors = Array(10).fill(WAD);
       factors[0] = 2n * WAD; // 2x weight on first bin

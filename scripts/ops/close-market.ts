@@ -67,6 +67,7 @@ const CONFIG: CloseMarketConfig = {
 // === Helpers ================================================================
 const USD_DECIMALS = 6;
 const BATCH_SECONDS = 86400n;
+const BATCH_TIMEZONE_OFFSET = 8n * 3600n;
 
 function usd6(value: string): bigint {
   return hre.ethers.parseUnits(value, USD_DECIMALS);
@@ -77,6 +78,11 @@ function resolveSettlementValue(): bigint {
     return BigInt(CONFIG.settlement.tick) * 1_000_000n;
   }
   return usd6(CONFIG.settlement.valueUsd);
+}
+
+function toBatchId(timestamp: bigint): bigint {
+  if (timestamp < BATCH_TIMEZONE_OFFSET) return 0n;
+  return (timestamp - BATCH_TIMEZONE_OFFSET) / BATCH_SECONDS;
 }
 
 function computeAutoTiming(now: number) {
@@ -160,7 +166,7 @@ async function main() {
   }
 
   if (CONFIG.batch.run) {
-    const batchId = BigInt(market.settlementTimestamp) / BATCH_SECONDS;
+    const batchId = toBatchId(BigInt(market.settlementTimestamp));
     const [total, resolved] = await core.getBatchMarketState(batchId);
     if (total === 0n) {
       console.warn(`[close-market] skip batch ${batchId.toString()} (no markets assigned)`);

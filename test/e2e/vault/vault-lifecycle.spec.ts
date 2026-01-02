@@ -1,18 +1,20 @@
 import { ethers } from "hardhat";
 import { expect } from "chai";
 import { deployFullSystem } from "../../helpers/fullSystem";
-import { advancePastBatchEnd } from "../../helpers/constants";
+import {
+  advancePastBatchEnd,
+  batchEndTimestamp,
+  batchStartTimestamp,
+} from "../../helpers/constants";
 import { time } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { deploySeedData } from "../../helpers";
 
 describe("E2E: vault lifecycle", () => {
-  const BATCH_SECONDS = 86400n;
-
   async function createFailedMarketInBatch(core: any, batchId: bigint) {
     const submitWindow = await core.settlementSubmitWindow();
     const now = BigInt(await time.latest());
-    const batchStart = batchId * BATCH_SECONDS;
-    const batchEnd = (batchId + 1n) * BATCH_SECONDS;
+    const batchStart = batchStartTimestamp(batchId);
+    const batchEnd = batchEndTimestamp(batchId);
 
     let settlementTimestamp = batchStart + 1000n;
     if (settlementTimestamp <= now) {

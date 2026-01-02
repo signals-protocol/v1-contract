@@ -508,7 +508,7 @@ contract SignalsCore is
         _delegate(vaultModule, abi.encodeWithSignature("cancelWithdraw(uint64)", requestId));
     }
 
-    function processDailyBatch(uint64 batchId) external whenNotPaused nonReentrant {
+    function processDailyBatch(uint64 batchId) external onlyOwner whenNotPaused nonReentrant {
         _delegate(vaultModule, abi.encodeWithSignature("processDailyBatch(uint64)", batchId));
     }
 

@@ -1,7 +1,12 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { time, loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-import { WAD, USDC_DECIMALS } from "../helpers/constants";
+import {
+  WAD,
+  USDC_DECIMALS,
+  batchEndTimestamp,
+  batchStartTimestamp,
+} from "../helpers/constants";
 import { deploySeedData } from "../helpers";
 import {
   buildRedstonePayload,
@@ -16,8 +21,6 @@ import {
  * HIGH-01: Free balance must reserve processed withdrawals
  */
 describe("Vault Escrow Security", () => {
-  const BATCH_SECONDS = 86400n;
-  
   async function deploySecurityFixture() {
     const [owner, user1, user2, attacker] = await ethers.getSigners();
 
@@ -122,7 +125,7 @@ describe("Vault Escrow Security", () => {
    * Create a market that settles in a specific batch
    */
   async function createMarketInBatch(core: any, batchId: bigint, numBins: number = 10) {
-    const settlementTimestamp = batchId * BATCH_SECONDS + 43200n; // Middle of batch day
+    const settlementTimestamp = batchStartTimestamp(batchId) + 43200n; // Middle of batch day
     const now = await time.latest();
     const startTime = BigInt(now) + 60n;
     const endTime = settlementTimestamp - 1n;
@@ -170,7 +173,7 @@ describe("Vault Escrow Security", () => {
   // ============================================================
   describe("CRITICAL-02: Batch Processing Before Market Finalized", () => {
     it("reverts processDailyBatch when batch market is not settled", async () => {
-      const { core, attacker, lpVaultModule } = await loadFixture(deploySecurityFixture);
+      const { core, owner, lpVaultModule } = await loadFixture(deploySecurityFixture);
       
       const currentBatchId = await core.currentBatchId();
       const targetBatchId = currentBatchId + 1n;
@@ -180,7 +183,7 @@ describe("Vault Escrow Security", () => {
       expect(marketId).to.be.gt(0);
       
       // Fast forward to after batch end time (but DON'T finalize market)
-      const batchEndTime = (targetBatchId + 1n) * BATCH_SECONDS;
+      const batchEndTime = batchEndTimestamp(targetBatchId);
       await time.setNextBlockTimestamp(Number(batchEndTime) + 1);
       
       // Market is NOT settled yet
@@ -190,7 +193,7 @@ describe("Vault Escrow Security", () => {
       // Attacker tries to process batch without market being settled
       // This should revert to prevent settlement DoS
       await expect(
-        core.connect(attacker).processDailyBatch(targetBatchId)
+        core.connect(owner).processDailyBatch(targetBatchId)
       ).to.be.revertedWithCustomError(lpVaultModule, "BatchMarketsNotResolved")
         .withArgs(targetBatchId, 0n, 1n);
     });
@@ -224,7 +227,7 @@ describe("Vault Escrow Security", () => {
       await core.finalizePrimarySettlement(marketId);
       
       // Fast forward to after batch end
-      const batchEndTime = (targetBatchId + 1n) * BATCH_SECONDS;
+      const batchEndTime = batchEndTimestamp(targetBatchId);
       await time.setNextBlockTimestamp(Number(batchEndTime) + 1);
       
       // Now batch processing should succeed
@@ -249,7 +252,7 @@ describe("Vault Escrow Security", () => {
 
       await core.markSettlementFailed(marketId1);
 
-      const batchEndTime = (targetBatchId + 1n) * BATCH_SECONDS;
+      const batchEndTime = batchEndTimestamp(targetBatchId);
       await time.setNextBlockTimestamp(Number(batchEndTime) + 1);
 
       await expect(
@@ -270,7 +273,7 @@ describe("Vault Escrow Security", () => {
       // Process a batch with a resolved market first
       const currentBatchId = await core.currentBatchId();
       const emptyBatchId = currentBatchId + 1n;
-      const batchEndTime = (emptyBatchId + 1n) * BATCH_SECONDS;
+      const batchEndTime = batchEndTimestamp(emptyBatchId);
       await time.setNextBlockTimestamp(Number(batchEndTime) + 1);
       await seedBatchForProcessing(core, emptyBatchId);
       await core.connect(owner).processDailyBatch(emptyBatchId);
@@ -296,7 +299,7 @@ describe("Vault Escrow Security", () => {
       await core.finalizePrimarySettlement(marketId);
       
       // Process the batch after finalization - should work
-      const targetBatchEndTime = (targetBatchId + 1n) * BATCH_SECONDS;
+      const targetBatchEndTime = batchEndTimestamp(targetBatchId);
       await time.setNextBlockTimestamp(Number(targetBatchEndTime) + 1);
       await expect(
         core.connect(owner).processDailyBatch(targetBatchId)
@@ -318,7 +321,7 @@ describe("Vault Escrow Security", () => {
       // Eligible batch = currentBatchId + 1
       const currentBatchId = await core.currentBatchId();
       const eligibleBatchId = currentBatchId + 1n;
-      const batchEndTime = (eligibleBatchId + 1n) * BATCH_SECONDS;
+      const batchEndTime = batchEndTimestamp(eligibleBatchId);
       await time.setNextBlockTimestamp(Number(batchEndTime) + 1);
       await seedBatchForProcessing(core, eligibleBatchId);
       await core.processDailyBatch(eligibleBatchId);
@@ -340,7 +343,7 @@ describe("Vault Escrow Security", () => {
       
       const currentBatchId = await core.currentBatchId();
       const depositBatchId = currentBatchId + 1n;
-      const depositBatchEnd = (depositBatchId + 1n) * BATCH_SECONDS;
+      const depositBatchEnd = batchEndTimestamp(depositBatchId);
       await time.setNextBlockTimestamp(Number(depositBatchEnd) + 1);
       await seedBatchForProcessing(core, depositBatchId);
       await core.processDailyBatch(depositBatchId);
@@ -360,7 +363,7 @@ describe("Vault Escrow Security", () => {
       // Process all intermediate batches
       let nextBatch = depositBatchId + 1n;
       while (nextBatch <= eligibleBatchId) {
-        const endTime = (nextBatch + 1n) * BATCH_SECONDS;
+        const endTime = batchEndTimestamp(nextBatch);
         await time.setNextBlockTimestamp(Number(endTime) + 1);
         await seedBatchForProcessing(core, nextBatch);
         await core.processDailyBatch(nextBatch);
@@ -418,7 +421,7 @@ describe("Vault Escrow Security", () => {
       // Process batch
       const currentBatchId = await core.currentBatchId();
       const eligibleBatchId = currentBatchId + 1n;
-      const batchEndTime = (eligibleBatchId + 1n) * BATCH_SECONDS;
+      const batchEndTime = batchEndTimestamp(eligibleBatchId);
       await time.setNextBlockTimestamp(Number(batchEndTime) + 1);
       await seedBatchForProcessing(core, eligibleBatchId);
       await core.processDailyBatch(eligibleBatchId);
@@ -455,7 +458,7 @@ describe("Vault Escrow Security", () => {
       // Process deposit batch
       const currentBatchId = await core.currentBatchId();
       const depositBatchId = currentBatchId + 1n;
-      const depositBatchEnd = (depositBatchId + 1n) * BATCH_SECONDS;
+      const depositBatchEnd = batchEndTimestamp(depositBatchId);
       await time.setNextBlockTimestamp(Number(depositBatchEnd) + 1);
       await seedBatchForProcessing(core, depositBatchId);
       await core.processDailyBatch(depositBatchId);
@@ -474,7 +477,7 @@ describe("Vault Escrow Security", () => {
       
       let nextBatch = depositBatchId + 1n;
       while (nextBatch <= eligibleBatchId) {
-        const endTime = (nextBatch + 1n) * BATCH_SECONDS;
+        const endTime = batchEndTimestamp(nextBatch);
         await time.setNextBlockTimestamp(Number(endTime) + 1);
         await seedBatchForProcessing(core, nextBatch);
         await core.processDailyBatch(nextBatch);
@@ -500,7 +503,7 @@ describe("Vault Escrow Security", () => {
       // Process and claim deposit (request ID 0)
       const currentBatchId = await core.currentBatchId();
       const depositBatchId = currentBatchId + 1n;
-      const depositBatchEnd = (depositBatchId + 1n) * BATCH_SECONDS;
+      const depositBatchEnd = batchEndTimestamp(depositBatchId);
       await time.setNextBlockTimestamp(Number(depositBatchEnd) + 1);
       await seedBatchForProcessing(core, depositBatchId);
       await core.processDailyBatch(depositBatchId);
@@ -515,7 +518,7 @@ describe("Vault Escrow Security", () => {
       
       let nextBatch = depositBatchId + 1n;
       while (nextBatch <= eligibleBatchId) {
-        const endTime = (nextBatch + 1n) * BATCH_SECONDS;
+        const endTime = batchEndTimestamp(nextBatch);
         await time.setNextBlockTimestamp(Number(endTime) + 1);
         await seedBatchForProcessing(core, nextBatch);
         await core.processDailyBatch(nextBatch);

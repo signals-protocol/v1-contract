@@ -16,7 +16,7 @@ interface ISignalsCore {
         // timing
         uint64 startTimestamp;
         uint64 endTimestamp;
-        uint64 settlementTimestamp; // Market day key (based on endTimestamp)
+        uint64 settlementTimestamp; // Market day key (PST day boundary)
         uint64 settlementFinalizedAt; // Actual finalization timestamp
 
         // ticks / math

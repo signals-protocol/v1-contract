@@ -506,19 +506,19 @@ contract MarketLifecycleModule is SignalsCoreStorage {
 
     /**
      * @notice Get batch ID for a market (based on settlement date)
-     * @dev Uses market's settlement timestamp truncated to day
+     * @dev Uses market's settlement timestamp truncated to PST day
      * @param marketId Market identifier
      * @return batchId Batch identifier (day-based)
      */
     function _getBatchIdForMarket(uint256 marketId) internal view returns (uint64) {
         ISignalsCore.Market storage market = markets[marketId];
-        // Use settlement timestamp divided by day (BATCH_SECONDS)
-        // This groups all markets settling on the same day into one batch (day-key)
-        return market.settlementTimestamp / BATCH_SECONDS;
+        // Use settlement timestamp divided by day (PST day boundary)
+        // This groups all markets settling on the same PST day into one batch (day-key)
+        return _toBatchId(market.settlementTimestamp);
     }
 
     function _getBatchIdForTimestamp(uint64 settlementTimestamp) internal pure returns (uint64) {
-        return settlementTimestamp / BATCH_SECONDS;
+        return _toBatchId(settlementTimestamp);
     }
 
     /**

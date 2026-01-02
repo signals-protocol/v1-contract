@@ -37,6 +37,20 @@ export const LOOSE_TOLERANCE = ethers.parseEther("0.0001"); // 1e-4 WAD
 export const ONE_DAY = 86400;
 export const ONE_HOUR = 3600;
 export const BATCH_SECONDS = 86400n; // 1 day
+export const PST_OFFSET_SECONDS = 8n * 3600n;
+
+export function toBatchId(timestamp: bigint): bigint {
+  if (timestamp < PST_OFFSET_SECONDS) return 0n;
+  return (timestamp - PST_OFFSET_SECONDS) / BATCH_SECONDS;
+}
+
+export function batchStartTimestamp(batchId: bigint): bigint {
+  return batchId * BATCH_SECONDS + PST_OFFSET_SECONDS;
+}
+
+export function batchEndTimestamp(batchId: bigint): bigint {
+  return batchStartTimestamp(batchId + 1n);
+}
 
 // Creates uniform prior factors (all 1 WAD).
 // Use this for createMarket calls to get ΔEₜ = 0.
@@ -46,7 +60,7 @@ export function uniformFactors(numBins: number): bigint[] {
 
 // Helper to advance time past batch end for processDailyBatch
 export async function advancePastBatchEnd(batchId: bigint) {
-  const batchEndTime = Number((batchId + 1n) * BATCH_SECONDS) + 1;
+  const batchEndTime = Number(batchEndTimestamp(batchId)) + 1;
   const currentTime = await time.latest();
   // Only advance if batch end time is in the future
   if (batchEndTime > currentTime) {

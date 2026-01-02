@@ -14,7 +14,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
 import { LPVaultModuleProxy, MockERC20 } from "../../../typechain-types";
-import { WAD, BATCH_SECONDS } from "../../helpers/constants";
+import { WAD, batchEndTimestamp } from "../../helpers/constants";
 
 // Helper for 6-decimal token amounts.
 function usdc(amount: string | number): bigint {
@@ -84,7 +84,7 @@ describe("BatchAccounting Spec Tests", () => {
     const currentBatchId = await fixture.proxy.getCurrentBatchId();
     
     // Advance time past the next batch end to allow processDailyBatch calls
-    const nextBatchEnd = (currentBatchId + 2n) * BATCH_SECONDS;
+    const nextBatchEnd = batchEndTimestamp(currentBatchId + 1n);
     await time.setNextBlockTimestamp(Number(nextBatchEnd) + 1);
     await ethers.provider.send("evm_mine", []);
     

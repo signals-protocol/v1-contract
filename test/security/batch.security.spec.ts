@@ -1,18 +1,16 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { time, loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-import { USDC_DECIMALS } from "../helpers/constants";
+import { USDC_DECIMALS, batchEndTimestamp } from "../helpers/constants";
 
 /**
  * Batch Processing Security Tests
  * 
  * Tests for:
  * - Future batch processing prevention
- * - Batch timing enforcement
+ * - Batch access control
  */
 describe("Batch Processing Security", () => {
-  const BATCH_SECONDS = 86400n; // 1 day
-  
   async function deployBatchFixture() {
     const [owner, user1] = await ethers.getSigners();
 
@@ -109,40 +107,15 @@ describe("Batch Processing Security", () => {
     await core.harnessSetBatchMarketState(batchId, 1n, 1n);
   }
   
-  describe("Future Batch Prevention", () => {
-    it("reverts processing batch before its time period ends", async () => {
-      const { core, owner, lpVaultModule } = await loadFixture(deployBatchFixture);
-      
-      const currentBatchId = await core.currentBatchId();
-      const nextBatchId = currentBatchId + 1n;
-      
-      // Calculate when next batch period ends
-      const batchEndTime = (nextBatchId + 1n) * BATCH_SECONDS;
-      
-      // Set time to before batch end
-      const beforeBatchEnd = Number(batchEndTime) - 1000;
-      await time.setNextBlockTimestamp(beforeBatchEnd);
-      
-      // Try to process next batch - should fail
-      await expect(
-        core.connect(owner).processDailyBatch(nextBatchId)
-      ).to.be.revertedWithCustomError(lpVaultModule, "BatchNotEnded");
-    });
-    
-    it("allows processing batch after its time period ends", async () => {
+  describe("Batch Timing & Access", () => {
+    it("allows processing batch even before its time period ends", async () => {
       const { core, owner } = await loadFixture(deployBatchFixture);
       
       const currentBatchId = await core.currentBatchId();
       const nextBatchId = currentBatchId + 1n;
       
-      // Calculate when next batch period ends
-      const batchEndTime = (nextBatchId + 1n) * BATCH_SECONDS;
-      
-      // Set time to after batch end
-      await time.setNextBlockTimestamp(Number(batchEndTime) + 1);
       await seedBatchForProcessing(core, nextBatchId);
       
-      // Process batch - should succeed
       await expect(
         core.connect(owner).processDailyBatch(nextBatchId)
       ).to.not.be.reverted;
@@ -153,7 +126,7 @@ describe("Batch Processing Security", () => {
 
       const currentBatchId = await core.currentBatchId();
       const nextBatchId = currentBatchId + 1n;
-      const batchEndTime = (nextBatchId + 1n) * BATCH_SECONDS;
+      const batchEndTime = batchEndTimestamp(nextBatchId);
 
       await time.setNextBlockTimestamp(Number(batchEndTime) + 1);
 
@@ -163,26 +136,18 @@ describe("Batch Processing Security", () => {
         .withArgs(nextBatchId);
     });
     
-    it("prevents attacker from pre-processing batch to block settlement", async () => {
-      const { core, owner, user1, lpVaultModule } = await loadFixture(deployBatchFixture);
+    it("prevents non-owner from processing batch", async () => {
+      const { core, owner, user1 } = await loadFixture(deployBatchFixture);
       
       const currentBatchId = await core.currentBatchId();
       const nextBatchId = currentBatchId + 1n;
       
-      // Calculate batch end time
-      const batchEndTime = (nextBatchId + 1n) * BATCH_SECONDS;
+      await seedBatchForProcessing(core, nextBatchId);
       
-      // Attacker tries to process batch early
-      await time.setNextBlockTimestamp(Number(batchEndTime) - 10000);
-      
-      // Should be blocked by timing check
       await expect(
         core.connect(user1).processDailyBatch(nextBatchId)
-      ).to.be.revertedWithCustomError(lpVaultModule, "BatchNotEnded");
+      ).to.be.revertedWithCustomError(core, "OwnableUnauthorizedAccount");
       
-      // Later, after batch period ends, legitimate processing works
-      await time.setNextBlockTimestamp(Number(batchEndTime) + 1);
-      await seedBatchForProcessing(core, nextBatchId);
       await expect(
         core.connect(owner).processDailyBatch(nextBatchId)
       ).to.not.be.reverted;
@@ -197,7 +162,7 @@ describe("Batch Processing Security", () => {
       const farFutureBatchId = currentBatchId + 5n;
       
       // Set time far in future
-      const farFutureBatchEnd = (farFutureBatchId + 1n) * BATCH_SECONDS;
+      const farFutureBatchEnd = batchEndTimestamp(farFutureBatchId);
       await time.setNextBlockTimestamp(Number(farFutureBatchEnd) + 1);
       
       // Try to skip batches - should fail
@@ -214,7 +179,7 @@ describe("Batch Processing Security", () => {
       // Process 3 batches sequentially
       for (let i = 1n; i <= 3n; i++) {
         const batchId = startBatchId + i;
-        const batchEndTime = (batchId + 1n) * BATCH_SECONDS;
+        const batchEndTime = batchEndTimestamp(batchId);
         
         await time.setNextBlockTimestamp(Number(batchEndTime) + 1);
         await seedBatchForProcessing(core, batchId);
@@ -231,7 +196,7 @@ describe("Batch Processing Security", () => {
       
       const currentBatchId = await core.currentBatchId();
       const nextBatchId = currentBatchId + 1n;
-      const batchEndTime = (nextBatchId + 1n) * BATCH_SECONDS;
+      const batchEndTime = batchEndTimestamp(nextBatchId);
       
       // Process batch once
       await time.setNextBlockTimestamp(Number(batchEndTime) + 1);

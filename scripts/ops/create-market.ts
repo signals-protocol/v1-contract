@@ -119,6 +119,7 @@ const USD_DECIMALS = 6;
 const WAD_DECIMALS = 18;
 const WAD = 10n ** 18n;
 const BATCH_SECONDS = 86400;
+const BATCH_TIMEZONE_OFFSET = 8 * 3600;
 
 function usd6(value: string): bigint {
   return hre.ethers.parseUnits(value, USD_DECIMALS);
@@ -138,6 +139,11 @@ function computeNumBins(minTick: number, maxTick: number, tickSpacing: number): 
     throw new Error("Invalid ticks: (maxTick - minTick) must be divisible by tickSpacing");
   }
   return range / tickSpacing;
+}
+
+function toBatchId(timestamp: number): number {
+  const adjusted = timestamp - BATCH_TIMEZONE_OFFSET;
+  return Math.floor(Math.max(0, adjusted) / BATCH_SECONDS);
 }
 
 async function decodeRevert(err: unknown) {
@@ -344,7 +350,7 @@ async function main() {
     for (let i = 1n; i <= nextMarketId; i++) {
       const market = await core.markets(i);
       if (market.numBins === 0n) continue;
-      const batchId = Math.floor(Number(market.settlementTimestamp) / BATCH_SECONDS);
+      const batchId = toBatchId(Number(market.settlementTimestamp));
       existingBatches.add(batchId);
       console.log(
         `[create-market] existing marketId=${i.toString()} batchId=${batchId} settled=${market.settled}`
@@ -352,7 +358,7 @@ async function main() {
     }
   }
 
-  let targetBatchId = Math.floor(settlementTimestamp / BATCH_SECONDS);
+  let targetBatchId = toBatchId(settlementTimestamp);
   if (existingBatches.has(targetBatchId)) {
     console.warn(
       `[create-market] batchId=${targetBatchId} already has market(s); continuing (one-to-many allowed)`

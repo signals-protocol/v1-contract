@@ -32,7 +32,11 @@ import {
   buildRedstonePayload,
   submitWithPayload,
 } from "../../helpers/redstone";
-import { advancePastBatchEnd, BATCH_SECONDS } from "../../helpers/constants";
+import {
+  advancePastBatchEnd,
+  batchStartTimestamp,
+  toBatchId,
+} from "../../helpers/constants";
 const WAD = ethers.parseEther("1");
 
 // Redstone feed config (for setRedstoneConfig)
@@ -177,8 +181,8 @@ describe("PayoutReserve Spec Tests", () => {
   ) {
     // Set deterministic timestamp aligned to batch boundary
     const latest = BigInt(await time.latest());
-    const baseBatchId = latest / BATCH_SECONDS + 1n;
-    const seedTime = baseBatchId * BATCH_SECONDS + 100n;
+    const baseBatchId = toBatchId(latest) + 1n;
+    const seedTime = batchStartTimestamp(baseBatchId) + 100n;
 
     // Seed vault
     await time.setNextBlockTimestamp(Number(seedTime));
@@ -218,6 +222,7 @@ describe("PayoutReserve Spec Tests", () => {
       ethers.ZeroAddress
     );
 
+    const batchId = toBatchId(tSet);
     return {
       marketId,
       seedTime,
@@ -225,7 +230,7 @@ describe("PayoutReserve Spec Tests", () => {
       start,
       end,
       winningTick: _winningTick,
-      batchId: baseBatchId,
+      batchId,
     };
   }
 
@@ -708,7 +713,7 @@ describe("PayoutReserve Spec Tests", () => {
     it("markFailed → manualSettleFailedMarket records PnL to batch", async () => {
       // Seed vault
       const latest = BigInt(await time.latest());
-      const seedTime = (latest / BATCH_SECONDS + 1n) * BATCH_SECONDS + 1_000n;
+      const seedTime = batchStartTimestamp(toBatchId(latest) + 1n) + 1_000n;
 
       await payment.mint(seeder.address, usdc("100000"));
       await payment
@@ -755,7 +760,7 @@ describe("PayoutReserve Spec Tests", () => {
       expect(marketAfterSettle.settled).to.equal(true);
 
       // Verify PnL was recorded to batch
-      const batchId = tSet / BATCH_SECONDS;
+      const batchId = toBatchId(tSet);
       const [, , , , , , processed] = await core.getDailyPnl.staticCall(
         batchId
       );
@@ -766,7 +771,7 @@ describe("PayoutReserve Spec Tests", () => {
     it("batch executes independently of claim timing", async () => {
       // Seed vault
       const latest = BigInt(await time.latest());
-      const seedTime = (latest / BATCH_SECONDS + 1n) * BATCH_SECONDS + 1_000n;
+      const seedTime = batchStartTimestamp(toBatchId(latest) + 1n) + 1_000n;
 
       await payment.mint(seeder.address, usdc("100000"));
       await payment
@@ -806,7 +811,7 @@ describe("PayoutReserve Spec Tests", () => {
       await core.finalizePrimarySettlement(1n);
 
       // Process batch - should succeed regardless of claim timing
-      const batchId = tSet / BATCH_SECONDS;
+      const batchId = toBatchId(tSet);
       await advancePastBatchEnd(batchId);
       await expect(core.processDailyBatch(batchId)).to.not.be.reverted;
 
@@ -825,7 +830,7 @@ describe("PayoutReserve Spec Tests", () => {
       // correctly, maintaining the batch-NAV invariant
 
       const latest = BigInt(await time.latest());
-      const seedTime = (latest / BATCH_SECONDS + 1n) * BATCH_SECONDS + 1_000n;
+      const seedTime = batchStartTimestamp(toBatchId(latest) + 1n) + 1_000n;
 
       await payment.mint(seeder.address, usdc("100000"));
       await payment
@@ -856,7 +861,7 @@ describe("PayoutReserve Spec Tests", () => {
       await core.finalizeSecondarySettlement(1n, 50);
 
       // Process batch
-      const batchId = tSet / BATCH_SECONDS;
+      const batchId = toBatchId(tSet);
       await advancePastBatchEnd(batchId);
       await core.processDailyBatch(batchId);
 

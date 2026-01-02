@@ -9,6 +9,19 @@ import "../lib/LazyMulSegmentTree.sol";
 abstract contract SignalsCoreStorage {
     /// @dev Batch/day granularity for daily accounting. Used to derive batchId as day-key.
     uint64 internal constant BATCH_SECONDS = 86_400;
+    /// @dev PST (UTC-8) day boundary offset in seconds.
+    uint64 internal constant BATCH_TIMEZONE_OFFSET = 28_800;
+
+    function _toBatchId(uint64 timestamp) internal pure returns (uint64) {
+        if (timestamp < BATCH_TIMEZONE_OFFSET) {
+            return 0;
+        }
+        return (timestamp - BATCH_TIMEZONE_OFFSET) / BATCH_SECONDS;
+    }
+
+    function _batchStartTimestamp(uint64 batchId) internal pure returns (uint64) {
+        return batchId * BATCH_SECONDS + BATCH_TIMEZONE_OFFSET;
+    }
 
     // ============================================================
     // Settlement Timeline Configuration
