@@ -52,13 +52,11 @@
       "kind": "uups"
     },
     {
-      "address": "0xB00A0f42003FCfFb9dE68E13829F21448d8EE9C5",
-      "txHash": "0xaf9d7d4222464a318e27e50521c16918d370bb386adfa189e10e6c6c2e7ee95a",
+      "address": "0xa4B12635f964091e2f8C4FAD330797281fdDE9dF",
       "kind": "uups"
     },
     {
-      "address": "0xa4B12635f964091e2f8C4FAD330797281fdDE9dF",
-      "txHash": "0xc3197453d7f9107e99cc0eaf09d74e9dbefab372004639f1346ec7c652c404b3",
+      "address": "0xB00A0f42003FCfFb9dE68E13829F21448d8EE9C5",
       "kind": "uups"
     }
   ],
@@ -89,7 +87,7 @@
             "label": "_positions",
             "offset": 0,
             "slot": "2",
-            "type": "t_mapping(t_uint256,t_struct(Position)26390_storage)",
+            "type": "t_mapping(t_uint256,t_struct(Position)26700_storage)",
             "contract": "SignalsPositionStorage",
             "src": "contracts/position/SignalsPositionStorage.sol:9"
           },
@@ -263,7 +261,7 @@
             "label": "mapping(uint256 => uint256[])",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_struct(Position)26390_storage)": {
+          "t_mapping(t_uint256,t_struct(Position)26700_storage)": {
             "label": "mapping(uint256 => struct ISignalsPosition.Position)",
             "numberOfBytes": "32"
           },
@@ -271,7 +269,7 @@
             "label": "mapping(uint256 => uint256)",
             "numberOfBytes": "32"
           },
-          "t_struct(Position)26390_storage": {
+          "t_struct(Position)26700_storage": {
             "label": "struct ISignalsPosition.Position",
             "members": [
               {
@@ -392,7 +390,11 @@
             }
           ]
         }
-      }
+      },
+      "allAddresses": [
+        "0x0d507C75B0618a4Eb7CC65552a810e594d8f38fE",
+        "0x55407915D0Bad0fdfd653BE6eB2DC3AC3F154b7b"
+      ]
     },
     "787f1af1dd7d6fc5ef4b2416c36be058c7cd55084baf42cdf74559a68a220e53": {
       "address": "0x7ff4025A02dc976500d127132F42649cF969C261",
@@ -5002,7 +5004,11 @@
             }
           ]
         }
-      }
+      },
+      "allAddresses": [
+        "0xF1c8a7E59a6fC0d01EB8459028a36c4a4d67506c",
+        "0x36E703604377ABf0926AAA3600fDB422db6B968F"
+      ]
     },
     "aaef8b957deaf390af69cf9ca7a913b07e8d9cca76c6898707425ecd285e6f9f": {
       "address": "0xBC0899decA5034a92848892A74D1eac984CaA4E4",

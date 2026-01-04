@@ -1,19 +1,19 @@
 {
   "network": "citrea-dev",
-  "version": 10,
+  "version": 13,
   "contracts": {
     "SignalsCoreProxy": "0xa4B12635f964091e2f8C4FAD330797281fdDE9dF",
-    "SignalsCoreImplementation": "0xBC0899decA5034a92848892A74D1eac984CaA4E4",
+    "SignalsCoreImplementation": "0x36E703604377ABf0926AAA3600fDB422db6B968F",
     "SignalsPositionProxy": "0xB00A0f42003FCfFb9dE68E13829F21448d8EE9C5",
-    "SignalsPositionImplementation": "0x0d507C75B0618a4Eb7CC65552a810e594d8f38fE",
-    "TradeModule": "0xBfF486f199BFf1Fc6a36922765e3D020E06c8867",
-    "MarketLifecycleModule": "0x5068ac3556d57CeaE50a741CAa325e6C6fAAF7B0",
-    "OracleModule": "0xf0948aB7342997aACa2eBcc05414A51ba633a5C6",
+    "SignalsPositionImplementation": "0x55407915D0Bad0fdfd653BE6eB2DC3AC3F154b7b",
+    "TradeModule": "0x631158aF24e5945a07A8a636AFd3D5B0225E5D52",
+    "MarketLifecycleModule": "0xC35c65dBc1Ee39c76BDfAc71e7379b41C9a6dB4a",
+    "OracleModule": "0xCd2a719D77ecBBe82F296AB257943734cB937Ab5",
     "FeePolicy": "0xA311cA96b8d5BF7aD0236cB39e3d309B2ff5D612",
     "SignalsUSDToken": "0xaC57cf391cE6e60c61fa0ca8B6b4819f452A1Cb4",
-    "LazyMulSegmentTree": "0x098b70665AF742674137be2e91533A2313BADa15",
-    "RiskModule": "0x96a7Ac2d169BDb52f0749c5B79560619c62391ad",
-    "LPVaultModule": "0xa6a7aaeEE64d1b0c24BF1454E9D0FeA0C84D73D3",
+    "LazyMulSegmentTree": "0xC04836b6D2c9B38f49435344DEAE7BD27b83343d",
+    "RiskModule": "0xd4B286F2072005c960095CF205eE6d8cF3332622",
+    "LPVaultModule": "0x32802B45e1510537c5CFC93041EcBeC4905FD57b",
     "SignalsLPShare": "0x4b2B72d42A0937393D5349F37E01AaB3FEDb2B67",
     "FeePolicyNull": "0x44Ef789AFb4C9F015D0148F2ba0dC99A9cE96997",
     "FeePolicy10bps": "0x68dAdCBbF6a272B475be05315130c0c8Fb3cF6DB",
@@ -91,6 +91,28 @@
       "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
       "version": 10,
       "timestamp": 1767183647
+    },
+    {
+      "action": "upgrade",
+      "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
+      "version": 11,
+      "timestamp": 1767531088
+    },
+    {
+      "action": "update-modules",
+      "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
+      "version": 12,
+      "timestamp": 1767531133
+    },
+    {
+      "action": "sync-prod",
+      "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
+      "version": 13,
+      "timestamp": 1767531888,
+      "meta": {
+        "source": "citrea-prod",
+        "prodVersion": 4
+      }
     }
   ]
 }
