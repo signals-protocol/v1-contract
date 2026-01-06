@@ -8,6 +8,10 @@ dotenv.config();
 const defaultAccounts = process.env.DEPLOYER_KEY
   ? [process.env.DEPLOYER_KEY]
   : [];
+const hardhatAccountCount = Number.parseInt(
+  process.env.HARDHAT_ACCOUNTS || "30",
+  10
+);
 const CITREA_RPC =
   process.env.CITREA_RPC_URL || "https://rpc.testnet.citrea.xyz";
 
@@ -24,6 +28,14 @@ const config: HardhatUserConfig = {
     tests: "./test",
   },
   networks: {
+    hardhat: {
+      chainId: 31337,
+      accounts: {
+        count: Number.isFinite(hardhatAccountCount)
+          ? hardhatAccountCount
+          : 30,
+      },
+    },
     localhost: {
       chainId: 31337,
     },
