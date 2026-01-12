@@ -441,7 +441,7 @@ describe("OracleModule", () => {
 
       const m = await core.markets(1);
       expect(m.settled).to.equal(true);
-      expect(m.failed).to.equal(true);
+      expect(m.failed).to.equal(false);
       expect(m.settlementValue).to.equal(2);
     });
 

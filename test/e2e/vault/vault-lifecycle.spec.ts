@@ -57,6 +57,7 @@ describe("E2E: vault lifecycle", () => {
     const opsStart = settlementTimestamp + BigInt(submitWindow) + 1n;
     await time.setNextBlockTimestamp(Number(opsStart));
     await core.markSettlementFailed(marketId);
+    await core.finalizeSecondarySettlement(marketId, 100_000_000n);
 
     return marketId;
   }

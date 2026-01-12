@@ -70,7 +70,7 @@ describe("E2E: failure path", () => {
     await core.connect(owner).finalizeSecondarySettlement(marketId, settlementValue);
 
     const market = await core.markets(marketId);
-    expect(market.failed).to.equal(true);
+    expect(market.failed).to.equal(false);
     expect(market.settled).to.equal(true);
 
     await time.increaseTo(settlement + 10);

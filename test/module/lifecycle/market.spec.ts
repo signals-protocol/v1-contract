@@ -573,7 +573,7 @@ describe("MarketLifecycleModule", () => {
 
     const market = await core.markets(1);
     expect(market.settled).to.equal(true);
-    expect(market.failed).to.equal(true);
+    expect(market.failed).to.equal(false);
     expect(market.settlementValue).to.equal(settlementValue);
   });
 

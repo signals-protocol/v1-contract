@@ -1,13 +1,13 @@
 {
   "network": "citrea-prod",
-  "version": 4,
+  "version": 5,
   "contracts": {
     "SignalsCoreProxy": "0x43E4219A6cc754cab0D30929c2D2BebbFf2468A2",
     "SignalsCoreImplementation": "0x36E703604377ABf0926AAA3600fDB422db6B968F",
     "SignalsPositionProxy": "0x48991c8841e92BC91d1545911DA8B9c71DBFEDA1",
     "SignalsPositionImplementation": "0x55407915D0Bad0fdfd653BE6eB2DC3AC3F154b7b",
     "TradeModule": "0x631158aF24e5945a07A8a636AFd3D5B0225E5D52",
-    "MarketLifecycleModule": "0xC35c65dBc1Ee39c76BDfAc71e7379b41C9a6dB4a",
+    "MarketLifecycleModule": "0xCBF07222185a8B4762c37f4BB03f91e758C5881C",
     "OracleModule": "0xCd2a719D77ecBBe82F296AB257943734cB937Ab5",
     "RiskModule": "0xd4B286F2072005c960095CF205eE6d8cF3332622",
     "LPVaultModule": "0x32802B45e1510537c5CFC93041EcBeC4905FD57b",
@@ -19,7 +19,7 @@
     "FeePolicy200bps": "0x3D4479266fFB2dad2d64e9a96aFea56F265fFf1b",
     "SignalsUSDToken": "0xaC57cf391cE6e60c61fa0ca8B6b4819f452A1Cb4",
     "SignalsLPShare": "0x4940D11127f65Dc6cd41434D9F92faFE95B4DAF9",
-    "LazyMulSegmentTree": "0xC04836b6D2c9B38f49435344DEAE7BD27b83343d"
+    "LazyMulSegmentTree": "0x9Dfa8443038B3D0dD139309a14a81Fa17bCe8A07"
   },
   "config": {
     "settlementSubmitWindow": "600",
@@ -59,6 +59,12 @@
       "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
       "version": 4,
       "timestamp": 1767336290
+    },
+    {
+      "action": "update-modules",
+      "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
+      "version": 5,
+      "timestamp": 1767869625
     }
   ]
 }

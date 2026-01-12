@@ -125,14 +125,21 @@ describe("Vault Escrow Security", () => {
    * Create a market that settles in a specific batch
    */
   async function createMarketInBatch(core: any, batchId: bigint, numBins: number = 10) {
-    const settlementTimestamp = batchStartTimestamp(batchId) + 43200n; // Middle of batch day
-    const now = await time.latest();
-    const startTime = BigInt(now) + 60n;
-    const endTime = settlementTimestamp - 1n;
+    const batchStart = batchStartTimestamp(batchId);
+    const batchEnd = batchEndTimestamp(batchId);
+    const now = BigInt(await time.latest());
 
-    if (startTime >= endTime) {
-      throw new Error("Invalid time range: startTime >= endTime");
+    let settlementTimestamp = batchStart + 43200n; // Middle of batch day
+    const minSettlement = now + 120n;
+    if (settlementTimestamp <= minSettlement) {
+      settlementTimestamp = minSettlement;
     }
+    if (settlementTimestamp >= batchEnd) {
+      settlementTimestamp = batchEnd - 1n;
+    }
+
+    const endTime = settlementTimestamp - 1n;
+    const startTime = endTime - 3600n;
 
     const tickSpacing = 100n;
     const minTick = 0n;
@@ -236,7 +243,7 @@ describe("Vault Escrow Security", () => {
       ).to.not.be.reverted;
     });
 
-    it("requires all markets in batch to be resolved (settled or failed)", async () => {
+    it("requires all markets in batch to be settled (secondary for failed markets)", async () => {
       const { core, owner, lpVaultModule } = await loadFixture(deploySecurityFixture);
 
       const currentBatchId = await core.currentBatchId();
@@ -246,9 +253,12 @@ describe("Vault Escrow Security", () => {
       const marketId2 = await createMarketInBatch(core, targetBatchId);
 
       const market1 = await core.markets(marketId1);
+      const market2 = await core.markets(marketId2);
       const submitWindow = await core.settlementSubmitWindow();
-      const opsStart = Number(market1.settlementTimestamp) + Number(submitWindow) + 1;
-      await time.setNextBlockTimestamp(opsStart);
+      const opsStart1 = market1.settlementTimestamp + submitWindow + 1n;
+      const opsStart2 = market2.settlementTimestamp + submitWindow + 1n;
+      const opsStart = opsStart1 > opsStart2 ? opsStart1 : opsStart2;
+      await time.setNextBlockTimestamp(Number(opsStart));
 
       await core.markSettlementFailed(marketId1);
 
@@ -258,9 +268,17 @@ describe("Vault Escrow Security", () => {
       await expect(
         core.connect(owner).processDailyBatch(targetBatchId)
       ).to.be.revertedWithCustomError(lpVaultModule, "BatchMarketsNotResolved")
-        .withArgs(targetBatchId, 1n, 2n);
+        .withArgs(targetBatchId, 0n, 2n);
 
       await core.markSettlementFailed(marketId2);
+
+      await expect(
+        core.connect(owner).processDailyBatch(targetBatchId)
+      ).to.be.revertedWithCustomError(lpVaultModule, "BatchMarketsNotResolved")
+        .withArgs(targetBatchId, 0n, 2n);
+
+      await core.finalizeSecondarySettlement(marketId1, 100_000_000n);
+      await core.finalizeSecondarySettlement(marketId2, 100_000_000n);
 
       await expect(
         core.connect(owner).processDailyBatch(targetBatchId)
