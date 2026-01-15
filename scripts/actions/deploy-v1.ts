@@ -16,6 +16,10 @@ export async function deployAction(env: Environment) {
     ? BigInt(finalizeDeadlineRaw)
     : submitWindow + pendingOpsWindow;
   const defaultFeeBps = Number(process.env.DEFAULT_FEE_BPS ?? "0");
+  const thetaBaseBpsRaw = process.env.THETA_BASE_BPS ?? "30";
+  const thetaMaxBpsRaw = process.env.THETA_MAX_BPS ?? "3000";
+  const thetaWindowSecRaw = process.env.THETA_WINDOW_SEC ?? "7200";
+  const thetaBetaRaw = process.env.THETA_BETA ?? "4";
   const redstoneFeedIdRaw = process.env.REDSTONE_FEED_ID ?? "BTC";
   const redstoneFeedDecimals = Number(process.env.REDSTONE_FEED_DECIMALS ?? "8");
   const redstoneMaxSampleDistance = BigInt(process.env.REDSTONE_MAX_SAMPLE_DISTANCE ?? "600");
@@ -25,6 +29,22 @@ export async function deployAction(env: Environment) {
 
   if (!Number.isFinite(defaultFeeBps)) {
     throw new Error(`DEFAULT_FEE_BPS must be a number (got ${process.env.DEFAULT_FEE_BPS ?? "unset"})`);
+  }
+  const thetaBeta = Number(thetaBetaRaw);
+  if (!Number.isFinite(thetaBeta)) {
+    throw new Error(`THETA_BETA must be a number (got ${thetaBetaRaw})`);
+  }
+  let thetaBaseBps: bigint;
+  let thetaMaxBps: bigint;
+  let thetaWindowSeconds: bigint;
+  try {
+    thetaBaseBps = BigInt(thetaBaseBpsRaw);
+    thetaMaxBps = BigInt(thetaMaxBpsRaw);
+    thetaWindowSeconds = BigInt(thetaWindowSecRaw);
+  } catch {
+    throw new Error(
+      `Theta params must be integers (base=${thetaBaseBpsRaw} max=${thetaMaxBpsRaw} window=${thetaWindowSecRaw})`
+    );
   }
   if (!Number.isFinite(redstoneFeedDecimals)) {
     throw new Error(
@@ -153,6 +173,11 @@ export async function deployAction(env: Environment) {
   );
   await redstoneTx.wait();
 
+  const thetaFeePolicy = await (
+    await ethers.getContractFactory("ThetaTimeFeePolicy")
+  ).deploy(coreProxy.target, thetaBaseBps, thetaMaxBps, thetaWindowSeconds, thetaBeta);
+  await thetaFeePolicy.waitForDeployment();
+
   updateContracts(env, {
     SignalsCoreProxy: coreProxy.target.toString(),
     SignalsCoreImplementation: coreImpl,
@@ -169,6 +194,7 @@ export async function deployAction(env: Environment) {
     FeePolicy50bps: feePolicy50bps.target.toString(),
     FeePolicy100bps: feePolicy100bps.target.toString(),
     FeePolicy200bps: feePolicy200bps.target.toString(),
+    FeePolicyThetaTime: thetaFeePolicy.target.toString(),
     SignalsUSDToken: paymentAddress,
     SignalsLPShare: lpShare.target.toString(),
     LazyMulSegmentTree: lazy.target.toString(),

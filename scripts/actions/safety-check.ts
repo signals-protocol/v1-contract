@@ -200,6 +200,7 @@ export async function safetyCheckAction(env: Environment) {
     "FeePolicy50bps",
     "FeePolicy100bps",
     "FeePolicy200bps",
+    "FeePolicyThetaTime",
     "SignalsUSDToken",
     "SignalsLPShare",
     "LazyMulSegmentTree",

@@ -34,8 +34,20 @@ export async function verifyAction(env: Environment) {
   const canVerifyLinkedModules = Boolean(moduleLibraries);
 
   const defaultFeeBps = parseNumber(envData.config?.defaultFeeBps ?? process.env.DEFAULT_FEE_BPS);
+  const thetaBaseBps = parseNumber(process.env.THETA_BASE_BPS);
+  const thetaMaxBps = parseNumber(process.env.THETA_MAX_BPS);
+  const thetaWindowSec = parseNumber(process.env.THETA_WINDOW_SEC);
+  const thetaBeta = parseNumber(process.env.THETA_BETA);
   if (envData.contracts.FeePolicy && defaultFeeBps === undefined) {
     missing.push("MockFeePolicy constructor args (defaultFeeBps)");
+  }
+  if (envData.contracts.FeePolicyThetaTime) {
+    if (envData.contracts.SignalsCoreProxy === undefined) {
+      missing.push("ThetaTimeFeePolicy constructor args (core)");
+    }
+    if (thetaBaseBps === undefined || thetaMaxBps === undefined || thetaWindowSec === undefined || thetaBeta === undefined) {
+      missing.push("ThetaTimeFeePolicy constructor args (base/max/window/beta)");
+    }
   }
   if (!lazyAddress && (envData.contracts.TradeModule || envData.contracts.MarketLifecycleModule)) {
     missing.push("LazyMulSegmentTree library address");
@@ -159,6 +171,29 @@ export async function verifyAction(env: Environment) {
             name: "PercentFeePolicy200bps",
             address: envData.contracts.FeePolicy200bps,
             contract: "contracts/fees/PercentFeePolicies.sol:PercentFeePolicy200bps",
+          },
+        ]
+      : []),
+    ...(envData.contracts.FeePolicyThetaTime
+      ? [
+          {
+            name: "ThetaTimeFeePolicy",
+            address: envData.contracts.FeePolicyThetaTime,
+            contract: "contracts/fees/ThetaTimeFeePolicy.sol:ThetaTimeFeePolicy",
+            constructorArguments:
+              thetaBaseBps === undefined ||
+              thetaMaxBps === undefined ||
+              thetaWindowSec === undefined ||
+              thetaBeta === undefined ||
+              !envData.contracts.SignalsCoreProxy
+                ? undefined
+                : [
+                    envData.contracts.SignalsCoreProxy,
+                    thetaBaseBps,
+                    thetaMaxBps,
+                    thetaWindowSec,
+                    thetaBeta,
+                  ],
           },
         ]
       : []),
