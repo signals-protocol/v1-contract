@@ -10,7 +10,11 @@ import { time } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { deploySeedData } from "../../helpers";
 
 describe("E2E: vault lifecycle", () => {
-  async function createFailedMarketInBatch(core: any, batchId: bigint) {
+  async function createFailedMarketInBatch(
+    core: any,
+    batchId: bigint,
+    feePolicyAddress: string
+  ) {
     const submitWindow = await core.settlementSubmitWindow();
     const now = BigInt(await time.latest());
     const batchStart = batchStartTimestamp(batchId);
@@ -38,7 +42,7 @@ describe("E2E: vault lifecycle", () => {
       settlementTimestamp,
       10,
       ethers.parseEther("100"),
-      ethers.ZeroAddress,
+      feePolicyAddress,
       await seedData.getAddress()
     );
     await core.createMarket(
@@ -50,7 +54,7 @@ describe("E2E: vault lifecycle", () => {
       settlementTimestamp,
       10,
       ethers.parseEther("100"),
-      ethers.ZeroAddress,
+      feePolicyAddress,
       await seedData.getAddress()
     );
 
@@ -62,7 +66,8 @@ describe("E2E: vault lifecycle", () => {
   }
 
   it("seeds, deposits, processes batch, and withdraws", async () => {
-    const { owner, users, core, payment, lpShare } = await deployFullSystem({
+    const { owner, users, core, payment, lpShare, feePolicy } =
+      await deployFullSystem({
       submitWindow: 5,
       opsWindow: 5,
     });
@@ -90,7 +95,7 @@ describe("E2E: vault lifecycle", () => {
 
     const currentBatch = await core.getCurrentBatchId();
     const batchId = currentBatch + 1n;
-    await createFailedMarketInBatch(core, batchId);
+    await createFailedMarketInBatch(core, batchId, feePolicy.target);
     await advancePastBatchEnd(batchId);
     await core.processDailyBatch(Number(batchId));
     await core.connect(user).claimDeposit(0);
@@ -102,7 +107,7 @@ describe("E2E: vault lifecycle", () => {
     await core.connect(user).requestWithdraw(withdrawShares);
 
     const nextBatchId = batchId + 1n;
-    await createFailedMarketInBatch(core, nextBatchId);
+    await createFailedMarketInBatch(core, nextBatchId, feePolicy.target);
     await advancePastBatchEnd(nextBatchId);
     await core.processDailyBatch(Number(nextBatchId));
 

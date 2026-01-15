@@ -94,7 +94,7 @@ contract TradeModule is SignalsCoreStorage {
     ) external onlyDelegated returns (uint256 positionId) {
         require(quantity != 0, SE.InvalidQuantity(quantity));
         ISignalsCore.Market storage market = _loadAndValidateMarket(marketId);
-        address feePolicy = market.feePolicy != address(0) ? market.feePolicy : defaultFeePolicy;
+        address feePolicy = market.feePolicy;
 
         uint256 qtyWad = uint256(quantity).toWad();
         
@@ -138,7 +138,7 @@ contract TradeModule is SignalsCoreStorage {
         require(positionContract.ownerOf(positionId) == msg.sender, SE.UnauthorizedCaller(msg.sender));
 
         ISignalsCore.Market storage market = _loadAndValidateMarket(position.marketId);
-        address feePolicy = market.feePolicy != address(0) ? market.feePolicy : defaultFeePolicy;
+        address feePolicy = market.feePolicy;
 
         uint256 qtyWad = uint256(quantity).toWad();
         
@@ -363,7 +363,7 @@ contract TradeModule is SignalsCoreStorage {
 
         ISignalsCore.Market storage market = _loadAndValidateMarket(position.marketId);
         require(quantity <= position.quantity, SE.InsufficientPositionQuantity(quantity, position.quantity));
-        feePolicy = market.feePolicy != address(0) ? market.feePolicy : defaultFeePolicy;
+        feePolicy = market.feePolicy;
 
         uint256 qtyWad = uint256(quantity).toWad();
         

@@ -7,7 +7,7 @@ import { deploySeedData } from "../../helpers";
 
 describe("E2E: risk gate enforcement", () => {
   it("rejects markets that exceed alpha limit when enforced", async () => {
-    const { owner, core, payment } = await deployFullSystem({
+    const { owner, core, payment, feePolicy } = await deployFullSystem({
       submitWindow: 5,
       opsWindow: 5,
     });
@@ -39,7 +39,7 @@ describe("E2E: risk gate enforcement", () => {
         settlement,
         4,
         ethers.parseEther("10"),
-        ethers.ZeroAddress,
+        feePolicy.target,
         await seedData.getAddress()
       )
     ).to.be.revertedWithCustomError(core, "AlphaExceedsLimit");
@@ -53,7 +53,7 @@ describe("E2E: risk gate enforcement", () => {
       settlement + 100,
       4,
       ethers.parseEther("0.1"),
-      ethers.ZeroAddress,
+      feePolicy.target,
       await seedData.getAddress()
     );
     await core.connect(owner).createMarket(
@@ -65,7 +65,7 @@ describe("E2E: risk gate enforcement", () => {
       settlement + 100,
       4,
       ethers.parseEther("0.1"),
-      ethers.ZeroAddress,
+      feePolicy.target,
       await seedData.getAddress()
     );
 

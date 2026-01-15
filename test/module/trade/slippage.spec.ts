@@ -51,7 +51,7 @@ describe("TradeModule slippage and bounds", () => {
   });
 
   it("rejects trades on settled market", async () => {
-    const { users, core } = await deployMinimalTradeSystem();
+    const { users, core, feePolicy } = await deployMinimalTradeSystem();
     const user = users[0];
     
     // Get current market and update to settled state
@@ -75,7 +75,7 @@ describe("TradeModule slippage and bounds", () => {
       settlementTick: 0,
       settlementValue: 0,
       liquidityParameter: WAD,
-      feePolicy: ethers.ZeroAddress,
+      feePolicy: feePolicy.target,
       seedData: ethers.ZeroAddress,
       initialRootSum: 4n * WAD,
       accumulatedFees: 0n,

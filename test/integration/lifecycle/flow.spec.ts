@@ -8,6 +8,7 @@ import {
   SignalsCoreHarness,
   SignalsPosition,
   TestERC1967Proxy,
+  MockFeePolicy,
 } from "../../../typechain-types";
 import {
   DATA_FEED_ID,
@@ -99,6 +100,10 @@ describe("Lifecycle + Trade integration", () => {
       "SignalsCoreHarness",
       await proxy.getAddress()
     )) as SignalsCoreHarness;
+
+    const feePolicy = (await (
+      await ethers.getContractFactory("MockFeePolicy")
+    ).deploy(0)) as MockFeePolicy;
     await core.setModules(
       tradeModule.target,
       lifecycleModule.target,
@@ -121,6 +126,7 @@ describe("Lifecycle + Trade integration", () => {
       lifecycleModule,
       oracleModule,
       core,
+      feePolicy,
       submitWindow,
       opsWindow,
       claimDelay,
@@ -135,6 +141,7 @@ describe("Lifecycle + Trade integration", () => {
       position,
       core,
       lifecycleModule,
+      feePolicy,
     } = await setup();
 
     const lifecycleEvents = lifecycleModule.attach(await core.getAddress());
@@ -152,7 +159,7 @@ describe("Lifecycle + Trade integration", () => {
       Number(settlementTs),
       4,
       ethers.parseEther("1"),
-      ethers.ZeroAddress
+      feePolicy.target
     );
     await expect(
       core.createMarketUniform(
@@ -164,7 +171,7 @@ describe("Lifecycle + Trade integration", () => {
         Number(settlementTs),
         4,
         ethers.parseEther("1"),
-        ethers.ZeroAddress
+        feePolicy.target
       )
     ).to.emit(lifecycleEvents, "MarketCreated");
 
@@ -216,6 +223,7 @@ describe("Lifecycle + Trade integration", () => {
       position,
       core,
       lifecycleModule,
+      feePolicy,
     } = await setup();
 
     const lifecycleEvents = lifecycleModule.attach(await core.getAddress());
@@ -233,7 +241,7 @@ describe("Lifecycle + Trade integration", () => {
       Number(settlementTs),
       4,
       ethers.parseEther("1"),
-      ethers.ZeroAddress
+      feePolicy.target
     );
 
     await payment.transfer(user.address, 10_000_000n);
@@ -271,7 +279,7 @@ describe("Lifecycle + Trade integration", () => {
   });
 
   it("enforces time gates for trading, settlement, and claim windows", async () => {
-    const { owner, user, payment, core } = await setup();
+    const { owner, user, payment, core, feePolicy } = await setup();
     const now = BigInt(await time.latest());
     const start = now + 100n;
     const end = start + 100n;
@@ -285,7 +293,7 @@ describe("Lifecycle + Trade integration", () => {
       Number(settlementTs),
       4,
       ethers.parseEther("1"),
-      ethers.ZeroAddress
+      feePolicy.target
     );
 
     await payment.transfer(user.address, 10_000_000n);

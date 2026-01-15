@@ -99,7 +99,7 @@ describe("TradeModule flow (minimal parity)", () => {
       settlementTick: 0,
       settlementValue: 0,
       liquidityParameter: WAD,
-      feePolicy: ethers.ZeroAddress,
+      feePolicy: feePolicy.target,
       seedData: marketOverrides.seedData ?? ethers.ZeroAddress,
       initialRootSum: BigInt(numBins) * WAD,
       accumulatedFees: 0n,

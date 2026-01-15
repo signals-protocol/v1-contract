@@ -156,7 +156,7 @@ export async function deployTradeModuleSystem(
       settlementTick: 0,
       settlementValue: 0,
       liquidityParameter: config.liquidityParameter ?? WAD,
-      feePolicy: ethers.ZeroAddress,
+      feePolicy: feePolicy.target,
       seedData: ethers.ZeroAddress,
       // P&L tracking fields
       initialRootSum: BigInt(config.numBins) * WAD, // n * WAD for uniform prior

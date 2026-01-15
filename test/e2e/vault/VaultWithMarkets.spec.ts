@@ -95,6 +95,10 @@ describe("VaultWithMarkets E2E", () => {
       await proxy.getAddress()
     )) as SignalsCoreHarness;
 
+    const feePolicy = await (
+      await ethers.getContractFactory("MockFeePolicy")
+    ).deploy(0);
+
     await core.setModules(
       ethers.ZeroAddress,
       lifecycle.target,
@@ -125,11 +129,11 @@ describe("VaultWithMarkets E2E", () => {
     );
     await core.setCapitalStack(0n, 0n);
 
-    return { owner, seeder, core, payment };
+    return { owner, seeder, core, payment, feePolicy };
   }
 
   it("finalizePrimary records daily PnL and vault consumes it in processDailyBatch", async () => {
-    const { owner, seeder, core, payment } = await loadFixture(deploySystem);
+    const { owner, seeder, core, payment, feePolicy } = await loadFixture(deploySystem);
 
     // Fix timestamp so batchId (day-key) is deterministic and monotonic
     const latest = BigInt(await time.latest());
@@ -164,7 +168,7 @@ describe("VaultWithMarkets E2E", () => {
       Number(tSet),
       4,
       WAD,
-      ethers.ZeroAddress
+      feePolicy.target
     );
     await core.createMarketUniform(
       0,
@@ -175,7 +179,7 @@ describe("VaultWithMarkets E2E", () => {
       Number(tSet),
       4,
       WAD,
-      ethers.ZeroAddress
+      feePolicy.target
     );
 
     // Manipulate tree state to create non-zero P&L at settlement
@@ -227,7 +231,7 @@ describe("VaultWithMarkets E2E", () => {
   // ==================================================================
   describe("ΔEₜ Grant Cap Wiring", () => {
     it("batch succeeds when grantNeed ≤ ΔEₜ (uniform prior, no grant needed)", async () => {
-      const { seeder, core, payment } = await loadFixture(deploySystem);
+      const { seeder, core, payment, feePolicy } = await loadFixture(deploySystem);
 
       const latest = BigInt(await time.latest());
       const seedTime = batchStartTimestamp(toBatchId(latest) + 1n) + 1_000n;
@@ -251,7 +255,7 @@ describe("VaultWithMarkets E2E", () => {
         Number(tSet),
         10,
         WAD,
-        ethers.ZeroAddress
+        feePolicy.target
       );
 
       // Submit oracle and settle
@@ -276,7 +280,7 @@ describe("VaultWithMarkets E2E", () => {
     });
 
     it("market ΔEₜ is stored and propagated to batch snapshot", async () => {
-      const { seeder, core, payment } = await loadFixture(deploySystem);
+      const { seeder, core, payment, feePolicy } = await loadFixture(deploySystem);
 
       const latest = BigInt(await time.latest());
       const seedTime = batchStartTimestamp(toBatchId(latest) + 1n) + 1_000n;
@@ -307,7 +311,7 @@ describe("VaultWithMarkets E2E", () => {
         Number(tSet),
         10,
         ethers.parseEther("100"), // α = 100
-        ethers.ZeroAddress,
+        feePolicy.target,
         await seedData.getAddress()
       );
 
@@ -343,7 +347,7 @@ describe("VaultWithMarkets E2E", () => {
       // E2E verification that market's deltaEt is correctly stored and used
       // in the fee waterfall's grant cap calculation during batch processing.
     // Note: System allows multiple markets per batch; ΔEₜ sums per batch.
-      const { seeder, core, payment } = await loadFixture(deploySystem);
+      const { seeder, core, payment, feePolicy } = await loadFixture(deploySystem);
 
       const latest = BigInt(await time.latest());
       const seedTime = batchStartTimestamp(toBatchId(latest) + 1n) + 1_000n;
@@ -370,7 +374,7 @@ describe("VaultWithMarkets E2E", () => {
         0, 100, 10,
         Number(seedTime + 100n), Number(tSet - 100n), Number(tSet),
         10, ethers.parseEther("100"),
-        ethers.ZeroAddress, await seedData.getAddress()
+        feePolicy.target, await seedData.getAddress()
       );
 
       // Verify market has deltaEt > 0

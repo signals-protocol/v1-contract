@@ -114,7 +114,7 @@ describe("CLMSR Invariants", () => {
       settlementTick: 0,
       settlementValue: 0,
       liquidityParameter: WAD,
-      feePolicy: ethers.ZeroAddress,
+      feePolicy: feePolicy.target,
       seedData: ethers.ZeroAddress,
       initialRootSum: BigInt(NUM_BINS) * WAD,
       accumulatedFees: 0n,
@@ -161,7 +161,7 @@ describe("CLMSR Invariants", () => {
   // ============================================================
   describe("Sum Monotonicity", () => {
     it("INV-1: Buy increases total sum", async () => {
-      const { core, user, marketId } = await loadFixture(
+      const { core, user, marketId, feePolicy } = await loadFixture(
         deployInvariantFixture
       );
 
@@ -207,7 +207,7 @@ describe("CLMSR Invariants", () => {
     });
 
     it("INV-3: Multiple buys monotonically increase sum", async () => {
-      const { core, user, marketId } = await loadFixture(
+      const { core, user, marketId, feePolicy } = await loadFixture(
         deployInvariantFixture
       );
 
@@ -234,7 +234,7 @@ describe("CLMSR Invariants", () => {
   // ============================================================
   describe("Range Isolation", () => {
     it("INV-4: Buy only affects bins in range", async () => {
-      const { core, user, marketId } = await loadFixture(
+      const { core, user, marketId, feePolicy } = await loadFixture(
         deployInvariantFixture
       );
 
@@ -562,7 +562,7 @@ describe("CLMSR Invariants", () => {
   // ============================================================
   describe("Path Independence", () => {
     it("INV-PI-1: Same start/end state yields same cost regardless of path", async () => {
-      const { core, user, marketId } = await loadFixture(
+      const { core, user, marketId, feePolicy } = await loadFixture(
         deployInvariantFixture
       );
 
@@ -595,7 +595,7 @@ describe("CLMSR Invariants", () => {
         settlementTick: 0,
         settlementValue: 0,
         liquidityParameter: WAD,
-        feePolicy: ethers.ZeroAddress,
+        feePolicy: feePolicy.target,
         seedData: ethers.ZeroAddress,
         initialRootSum: BigInt(NUM_BINS) * WAD,
         accumulatedFees: 0n,

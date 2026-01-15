@@ -111,7 +111,7 @@ describe("Events & Position Lifecycle", () => {
       settlementTick: 0,
       settlementValue: 0,
       liquidityParameter: WAD,
-      feePolicy: ethers.ZeroAddress,
+      feePolicy: feePolicy.target,
       seedData: ethers.ZeroAddress,
       initialRootSum: BigInt(NUM_BINS) * WAD,
       accumulatedFees: 0n,

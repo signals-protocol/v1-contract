@@ -16,6 +16,8 @@ import {
   toSettlementValue,
 } from "../../helpers/redstone";
 
+const DUMMY_POLICY = "0x0000000000000000000000000000000000000001";
+
 describe("OracleModule", () => {
   async function setup() {
     const [owner, other] = await ethers.getSigners();
@@ -100,7 +102,7 @@ describe("OracleModule", () => {
       settlementTick: 0,
       settlementValue: 0,
       liquidityParameter: WAD,
-      feePolicy: ethers.ZeroAddress,
+      feePolicy: DUMMY_POLICY,
       seedData: ethers.ZeroAddress,
       initialRootSum: 4n * WAD,
       accumulatedFees: 0n,

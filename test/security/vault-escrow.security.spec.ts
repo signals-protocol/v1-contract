@@ -65,6 +65,8 @@ describe("Vault Escrow Security", () => {
     );
     const core = await ethers.getContractAt("SignalsCoreHarness", coreProxy.target);
 
+    const feePolicy = await (await ethers.getContractFactory("MockFeePolicy")).deploy(0);
+
     const lpShare = await (await ethers.getContractFactory("SignalsLPShare")).deploy(
       "Signals LP Share",
       "sLP",
@@ -114,7 +116,7 @@ describe("Vault Escrow Security", () => {
     // Seed vault
     await core.connect(owner).seedVault(ethers.parseUnits("100000", USDC_DECIMALS));
 
-    return { core, payment, lpShare, owner, user1, user2, attacker, lpVaultModule, lifecycleModule, tradeModule };
+    return { core, payment, lpShare, owner, user1, user2, attacker, lpVaultModule, lifecycleModule, tradeModule, feePolicy };
   }
 
   async function seedBatchForProcessing(core: any, batchId: bigint) {
@@ -124,7 +126,12 @@ describe("Vault Escrow Security", () => {
   /**
    * Create a market that settles in a specific batch
    */
-  async function createMarketInBatch(core: any, batchId: bigint, numBins: number = 10) {
+  async function createMarketInBatch(
+    core: any,
+    batchId: bigint,
+    feePolicyAddress: string,
+    numBins: number = 10
+  ) {
     const settlementTimestamp = batchStartTimestamp(batchId) + 43200n; // Middle of batch day
     const now = await time.latest();
     const startTime = BigInt(now) + 60n;
@@ -149,7 +156,7 @@ describe("Vault Escrow Security", () => {
       settlementTimestamp,
       numBins,
       WAD,
-      ethers.ZeroAddress,
+      feePolicyAddress,
       await seedData.getAddress()
     );
     await core.createMarket(
@@ -161,7 +168,7 @@ describe("Vault Escrow Security", () => {
       settlementTimestamp,
       numBins,
       WAD,
-      ethers.ZeroAddress,
+      feePolicyAddress,
       await seedData.getAddress()
     );
     await core.seedNextChunks(marketId, numBins);
@@ -173,13 +180,13 @@ describe("Vault Escrow Security", () => {
   // ============================================================
   describe("CRITICAL-02: Batch Processing Before Market Finalized", () => {
     it("reverts processDailyBatch when batch market is not settled", async () => {
-      const { core, owner, lpVaultModule } = await loadFixture(deploySecurityFixture);
+      const { core, owner, lpVaultModule, feePolicy } = await loadFixture(deploySecurityFixture);
       
       const currentBatchId = await core.currentBatchId();
       const targetBatchId = currentBatchId + 1n;
       
       // Create market that settles in targetBatchId
-      const marketId = await createMarketInBatch(core, targetBatchId);
+      const marketId = await createMarketInBatch(core, targetBatchId, feePolicy.target);
       expect(marketId).to.be.gt(0);
       
       // Fast forward to after batch end time (but DON'T finalize market)
@@ -199,13 +206,13 @@ describe("Vault Escrow Security", () => {
     });
 
     it("allows processDailyBatch after market is finalized", async () => {
-      const { core, owner } = await loadFixture(deploySecurityFixture);
+      const { core, owner, feePolicy } = await loadFixture(deploySecurityFixture);
       
       const currentBatchId = await core.currentBatchId();
       const targetBatchId = currentBatchId + 1n;
       
       // Create market that settles in targetBatchId
-      const marketId = await createMarketInBatch(core, targetBatchId);
+      const marketId = await createMarketInBatch(core, targetBatchId, feePolicy.target);
       
       // Fast forward to settlement time
       const market = await core.markets(marketId);
@@ -237,13 +244,13 @@ describe("Vault Escrow Security", () => {
     });
 
     it("requires all markets in batch to be resolved (settled or failed)", async () => {
-      const { core, owner, lpVaultModule } = await loadFixture(deploySecurityFixture);
+      const { core, owner, lpVaultModule, feePolicy } = await loadFixture(deploySecurityFixture);
 
       const currentBatchId = await core.currentBatchId();
       const targetBatchId = currentBatchId + 1n;
 
-      const marketId1 = await createMarketInBatch(core, targetBatchId);
-      const marketId2 = await createMarketInBatch(core, targetBatchId);
+      const marketId1 = await createMarketInBatch(core, targetBatchId, feePolicy.target);
+      const marketId2 = await createMarketInBatch(core, targetBatchId, feePolicy.target);
 
       const market1 = await core.markets(marketId1);
       const submitWindow = await core.settlementSubmitWindow();
@@ -268,7 +275,7 @@ describe("Vault Escrow Security", () => {
     });
 
     it("prevents finalize after batch is processed (DoS attack)", async () => {
-      const { core, owner } = await loadFixture(deploySecurityFixture);
+      const { core, owner, feePolicy } = await loadFixture(deploySecurityFixture);
       
       // Process a batch with a resolved market first
       const currentBatchId = await core.currentBatchId();
@@ -280,7 +287,7 @@ describe("Vault Escrow Security", () => {
       
       // Now create market for next batch
       const targetBatchId = emptyBatchId + 1n;
-      const marketId = await createMarketInBatch(core, targetBatchId);
+      const marketId = await createMarketInBatch(core, targetBatchId, feePolicy.target);
       
       // Complete settlement
       const market = await core.markets(marketId);

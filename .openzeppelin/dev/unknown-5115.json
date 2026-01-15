@@ -87,7 +87,7 @@
             "label": "_positions",
             "offset": 0,
             "slot": "2",
-            "type": "t_mapping(t_uint256,t_struct(Position)26700_storage)",
+            "type": "t_mapping(t_uint256,t_struct(Position)26742_storage)",
             "contract": "SignalsPositionStorage",
             "src": "contracts/position/SignalsPositionStorage.sol:9"
           },
@@ -261,7 +261,7 @@
             "label": "mapping(uint256 => uint256[])",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_struct(Position)26700_storage)": {
+          "t_mapping(t_uint256,t_struct(Position)26742_storage)": {
             "label": "mapping(uint256 => struct ISignalsPosition.Position)",
             "numberOfBytes": "32"
           },
@@ -269,7 +269,7 @@
             "label": "mapping(uint256 => uint256)",
             "numberOfBytes": "32"
           },
-          "t_struct(Position)26700_storage": {
+          "t_struct(Position)26742_storage": {
             "label": "struct ISignalsPosition.Position",
             "members": [
               {

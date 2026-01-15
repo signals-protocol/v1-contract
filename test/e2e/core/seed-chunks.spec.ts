@@ -7,7 +7,7 @@ import { deploySeedData } from "../../helpers";
 
 describe("E2E: seeding chunks gating", () => {
   it("blocks trading until market is fully seeded", async () => {
-    const { owner, users, core, payment } = await deployFullSystem({
+    const { owner, users, core, payment, feePolicy } = await deployFullSystem({
       submitWindow: 5,
       opsWindow: 5,
     });
@@ -38,7 +38,7 @@ describe("E2E: seeding chunks gating", () => {
       settlement,
       numBins,
       ethers.parseEther("1"),
-      ethers.ZeroAddress,
+      feePolicy.target,
       await seedData.getAddress()
     );
     await core.createMarket(
@@ -50,7 +50,7 @@ describe("E2E: seeding chunks gating", () => {
       settlement,
       numBins,
       ethers.parseEther("1"),
-      ethers.ZeroAddress,
+      feePolicy.target,
       await seedData.getAddress()
     );
 

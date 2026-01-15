@@ -18,6 +18,7 @@ describe("E2E: module hot-swap", () => {
       vaultModule,
       oracleModule,
       lazyLibrary,
+      feePolicy,
     } = await deployFullSystem({
       submitWindow: 5,
       opsWindow: 5,
@@ -51,7 +52,7 @@ describe("E2E: module hot-swap", () => {
       settlement,
       4,
       ethers.parseEther("1"),
-      ethers.ZeroAddress,
+      feePolicy.target,
       await seedData.getAddress()
     );
     await core.createMarket(
@@ -63,7 +64,7 @@ describe("E2E: module hot-swap", () => {
       settlement,
       4,
       ethers.parseEther("1"),
-      ethers.ZeroAddress,
+      feePolicy.target,
       await seedData.getAddress()
     );
     await core.seedNextChunks(marketId, 4);

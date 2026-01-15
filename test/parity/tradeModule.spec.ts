@@ -96,7 +96,7 @@ async function deploySystem(
     settlementTick: 0,
     settlementValue: 0,
     liquidityParameter: WAD,
-    feePolicy: ethers.ZeroAddress,
+    feePolicy: feePolicy.target,
     seedData: ethers.ZeroAddress,
     initialRootSum: 4n * WAD,
     accumulatedFees: 0n,

@@ -35,7 +35,8 @@ async function deploySystem() {
   const payment = await (
     await ethers.getContractFactory("SignalsUSDToken")
   ).deploy();
-  await (await ethers.getContractFactory("MockFeePolicy")).deploy(0); // feePolicy not used directly
+  const feePolicy = await (await ethers.getContractFactory("MockFeePolicy")).deploy(0);
+  await feePolicy.waitForDeployment();
 
   const positionImplFactory = await ethers.getContractFactory(
     "SignalsPosition"
@@ -150,12 +151,13 @@ async function deploySystem() {
     payment,
     position,
     lifecycleModule,
+    feePolicy,
   };
 }
 
 describe("Settlement chunks and claim totals", () => {
   it("reverts requestSettlementChunks before market is settled", async () => {
-    const { core, lifecycleModule } = await deploySystem();
+    const { core, lifecycleModule, feePolicy } = await deploySystem();
 
     const now = BigInt(await time.latest());
     const start = now - 10n;
@@ -163,7 +165,7 @@ describe("Settlement chunks and claim totals", () => {
     const settleTs = end + 10n;
     await core.createMarketUniform(
       0, 4, 1, Number(start), Number(end), Number(settleTs),
-      4, WAD, ethers.ZeroAddress
+      4, WAD, feePolicy.target
     );
 
     // Market is active but not settled
@@ -173,7 +175,7 @@ describe("Settlement chunks and claim totals", () => {
   });
 
   it("handles multiple users/positions across chunks and preserves payout totals", async () => {
-    const { owner, u1, u2, u3, core, payment, lifecycleModule } =
+    const { owner, u1, u2, u3, core, payment, lifecycleModule, feePolicy } =
       await deploySystem();
 
     const now = BigInt(await time.latest());
@@ -189,7 +191,7 @@ describe("Settlement chunks and claim totals", () => {
       Number(settleTs),
       4,
       WAD,
-      ethers.ZeroAddress
+      feePolicy.target
     );
 
     // open positions: 3 users, 4 positions -> ensure openPositionCount drives multiple chunks
@@ -258,7 +260,7 @@ describe("Settlement chunks and claim totals", () => {
   it("completes snapshot in single chunk when positions < CHUNK_SIZE", async () => {
     // CHUNK_SIZE = 512 in MarketLifecycleModule
     // With 4 positions, only 1 chunk is needed (4 < 512)
-    const { owner, u1, u2, u3, core, lifecycleModule } = await deploySystem();
+    const { owner, u1, u2, u3, core, lifecycleModule, feePolicy } = await deploySystem();
 
     const now = BigInt(await time.latest());
     const start = now - 10n;
@@ -266,7 +268,7 @@ describe("Settlement chunks and claim totals", () => {
     const settleTs = end + 10n;
     await core.createMarketUniform(
       0, 4, 1, Number(start), Number(end), Number(settleTs),
-      4, WAD, ethers.ZeroAddress
+      4, WAD, feePolicy.target
     );
 
     // Create 4 positions (less than CHUNK_SIZE=512)
@@ -300,7 +302,7 @@ describe("Settlement chunks and claim totals", () => {
   });
 
   it("reverts claim on non-winning position (payout = 0)", async () => {
-    const { owner, u1, core, payment } = await deploySystem();
+    const { owner, u1, core, payment, feePolicy } = await deploySystem();
 
     const now = BigInt(await time.latest());
     const start = now - 10n;
@@ -308,7 +310,7 @@ describe("Settlement chunks and claim totals", () => {
     const settleTs = end + 10n;
     await core.createMarketUniform(
       0, 4, 1, Number(start), Number(end), Number(settleTs),
-      4, WAD, ethers.ZeroAddress
+      4, WAD, feePolicy.target
     );
 
     // Position 1: [2,4) - will lose when settlementTick = 1
@@ -334,7 +336,7 @@ describe("Settlement chunks and claim totals", () => {
   });
 
   it("boundary: settlementTick equals upperTick - 1 (winning)", async () => {
-    const { owner, u1, core, payment } = await deploySystem();
+    const { owner, u1, core, payment, feePolicy } = await deploySystem();
 
     const now = BigInt(await time.latest());
     const start = now - 10n;
@@ -342,7 +344,7 @@ describe("Settlement chunks and claim totals", () => {
     const settleTs = end + 10n;
     await core.createMarketUniform(
       0, 4, 1, Number(start), Number(end), Number(settleTs),
-      4, WAD, ethers.ZeroAddress
+      4, WAD, feePolicy.target
     );
 
     // Position [1,3) - winning if settlementTick = 2 (upper - 1)
@@ -368,7 +370,7 @@ describe("Settlement chunks and claim totals", () => {
   });
 
   it("boundary: settlementTick equals lowerTick (winning)", async () => {
-    const { owner, u1, core, payment } = await deploySystem();
+    const { owner, u1, core, payment, feePolicy } = await deploySystem();
 
     const now = BigInt(await time.latest());
     const start = now - 10n;
@@ -376,7 +378,7 @@ describe("Settlement chunks and claim totals", () => {
     const settleTs = end + 10n;
     await core.createMarketUniform(
       0, 4, 1, Number(start), Number(end), Number(settleTs),
-      4, WAD, ethers.ZeroAddress
+      4, WAD, feePolicy.target
     );
 
     // Position [2,4) - winning if settlementTick = 2 (equals lowerTick)
@@ -402,7 +404,7 @@ describe("Settlement chunks and claim totals", () => {
   });
 
   it("boundary: settlementTick equals upperTick (losing)", async () => {
-    const { owner, u1, core, payment } = await deploySystem();
+    const { owner, u1, core, payment, feePolicy } = await deploySystem();
 
     const now = BigInt(await time.latest());
     const start = now - 10n;
@@ -410,7 +412,7 @@ describe("Settlement chunks and claim totals", () => {
     const settleTs = end + 10n;
     await core.createMarketUniform(
       0, 4, 1, Number(start), Number(end), Number(settleTs),
-      4, WAD, ethers.ZeroAddress
+      4, WAD, feePolicy.target
     );
 
     // Position [0,2) - losing if settlementTick = 2 (equals upperTick)

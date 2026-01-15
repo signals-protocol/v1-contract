@@ -97,6 +97,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         uint32 expectedBins = uint32(uint256((maxTick - minTick) / tickSpacing));
         require(expectedBins == numBins, SE.InvalidMarketParameters(minTick, maxTick, tickSpacing));
         require(liquidityParameter != 0, SE.InvalidLiquidityParameter());
+        require(feePolicy != address(0), SE.ZeroAddress());
 
         (uint256 rootSum, uint256 minFactor, uint256 deltaEt) = SeedDataLib.computeSeedStats(
             seedData,

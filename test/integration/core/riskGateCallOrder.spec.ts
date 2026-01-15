@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import { ethers } from 'hardhat';
 import { Signer } from 'ethers';
 import { time } from '@nomicfoundation/hardhat-network-helpers';
-import { SignalsCoreHarness, RiskModule, MockERC20 } from '../../../typechain-types';
+import { SignalsCoreHarness, RiskModule, MockERC20, MockFeePolicy } from '../../../typechain-types';
 import { deploySeedData } from '../../helpers';
 
 /**
@@ -21,6 +21,7 @@ describe('Core-first Risk Gate Call Order', () => {
   let core: SignalsCoreHarness;
   let paymentToken: MockERC20;
   let riskModule: RiskModule;
+  let feePolicy: MockFeePolicy;
 
   beforeEach(async () => {
     [owner] = await ethers.getSigners();
@@ -97,6 +98,8 @@ describe('Core-first Risk Gate Call Order', () => {
     await paymentToken.mint(await owner.getAddress(), 100_000_000_000n); // 100k USDC
     await paymentToken.approve(await core.getAddress(), ethers.MaxUint256);
     await core.seedVault(10_000_000_000n); // 10k USDC
+
+    feePolicy = await (await ethers.getContractFactory('MockFeePolicy')).deploy(0) as MockFeePolicy;
   });
 
   describe('createMarket gate enforcement', () => {
@@ -135,7 +138,7 @@ describe('Core-first Risk Gate Call Order', () => {
         settle,
         10,     // numBins
         ethers.parseEther('1'), // liquidityParameter (α = 1)
-        ethers.ZeroAddress,
+        feePolicy.target,
         await seedData.getAddress()
       )).to.be.revertedWithCustomError(riskModule, 'AlphaExceedsLimit');
     });
@@ -164,7 +167,7 @@ describe('Core-first Risk Gate Call Order', () => {
         settle,
         10,
         ethers.parseEther('1'), // Small α
-        ethers.ZeroAddress,
+        feePolicy.target,
         await seedData.getAddress()
       );
       
@@ -192,7 +195,7 @@ describe('Core-first Risk Gate Call Order', () => {
       const tx = await core.createMarket(
         0, 100, 10, start, end, settle, 10,
         ethers.parseEther('10'),
-        ethers.ZeroAddress,
+        feePolicy.target,
         await seedData.getAddress()
       );
       
@@ -243,7 +246,7 @@ describe('Core-first Risk Gate Call Order', () => {
       const tx = await core.createMarket(
         0, 100, 10, start, end, settle, 10,
         ethers.parseEther('10'),
-        ethers.ZeroAddress,
+        feePolicy.target,
         await seedData.getAddress()
       );
       
@@ -297,7 +300,7 @@ describe('Core-first Risk Gate Call Order', () => {
       await core.createMarket(
         0, 100, 10, start, end, settle, 10,
         ethers.parseEther('1'),
-        ethers.ZeroAddress,
+        feePolicy.target,
         await seedData.getAddress()
       );
       

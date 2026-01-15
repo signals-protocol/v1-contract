@@ -3,6 +3,7 @@ import { ethers } from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 const WAD = ethers.parseEther("1");
+const DUMMY_POLICY = "0x0000000000000000000000000000000000000001";
 
 type MarketStruct = {
   isSeeded: boolean;
@@ -55,7 +56,7 @@ function buildMarket(
     settlementTick: 0,
     settlementValue: 0,
     liquidityParameter: ethers.parseEther("1"),
-    feePolicy: ethers.ZeroAddress,
+    feePolicy: DUMMY_POLICY,
     seedData: ethers.ZeroAddress,
     initialRootSum: BigInt(numBins) * ethers.parseEther("1"),
     accumulatedFees: 0n,

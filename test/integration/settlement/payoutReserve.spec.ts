@@ -17,6 +17,7 @@ import {
   LazyMulSegmentTree,
   LPVaultModule,
   MarketLifecycleModule,
+  MockFeePolicy,
   MockERC20,
   MockSignalsPosition,
   OracleModule,
@@ -122,6 +123,9 @@ describe("PayoutReserve Spec Tests", () => {
       await proxy.getAddress()
     )) as SignalsCoreHarness;
 
+    const feePolicy = await (await ethers.getContractFactory("MockFeePolicy")).deploy(0);
+    await feePolicy.waitForDeployment();
+
     await core.setModules(
       trade.target,
       lifecycle.target,
@@ -171,12 +175,14 @@ describe("PayoutReserve Spec Tests", () => {
       payment,
       position,
       trade,
+      feePolicy,
     };
   }
 
   async function setupMarketWithPosition(
     core: SignalsCoreHarness,
     seeder: HardhatEthersSigner,
+    feePolicyAddress: string,
     _winningTick: number = 1
   ) {
     // Set deterministic timestamp aligned to batch boundary
@@ -207,7 +213,7 @@ describe("PayoutReserve Spec Tests", () => {
       Number(tSet),
       4, // numBins
       WAD, // liquidityParameter
-      ethers.ZeroAddress // feePolicy
+      feePolicyAddress
     );
 
     await core.createMarketUniform(
@@ -219,7 +225,7 @@ describe("PayoutReserve Spec Tests", () => {
       Number(tSet),
       4,
       WAD,
-      ethers.ZeroAddress
+      feePolicyAddress
     );
 
     const batchId = toBatchId(tSet);
@@ -242,11 +248,11 @@ describe("PayoutReserve Spec Tests", () => {
   // ================================================================
   describe("SPEC-1: Claim Gating - time-based (Tset + Δ_claim)", () => {
     it("reverts claimPayout when time < Tset + Δ_claim", async () => {
-      const { core, seeder, trader, position, trade } = await loadFixture(
+      const { core, seeder, trader, position, trade, feePolicy } = await loadFixture(
         deployFullSystem
       );
 
-      const { marketId, tSet } = await setupMarketWithPosition(core, seeder);
+      const { marketId, tSet } = await setupMarketWithPosition(core, seeder, feePolicy.target);
 
       // Create a position
       const positionId = 1n;
@@ -291,13 +297,14 @@ describe("PayoutReserve Spec Tests", () => {
     });
 
     it("allows claimPayout after time >= Tset + Δ_claim (batch not processed)", async () => {
-      const { core, seeder, trader, position, payment } = await loadFixture(
+      const { core, seeder, trader, position, payment, feePolicy } = await loadFixture(
         deployFullSystem
       );
 
       const { marketId, tSet, batchId } = await setupMarketWithPosition(
         core,
-        seeder
+        seeder,
+        feePolicy.target
       );
 
       // Create a winning position
@@ -360,13 +367,14 @@ describe("PayoutReserve Spec Tests", () => {
   // ================================================================
   describe("SPEC-2: claimPayout does NOT change NAV/Price", () => {
     it("NAV is unchanged after claimPayout", async () => {
-      const { core, seeder, trader, position } = await loadFixture(
+      const { core, seeder, trader, position, feePolicy } = await loadFixture(
         deployFullSystem
       );
 
       const { marketId, tSet, batchId } = await setupMarketWithPosition(
         core,
-        seeder
+        seeder,
+        feePolicy.target
       );
 
       // Create winning position
@@ -420,13 +428,14 @@ describe("PayoutReserve Spec Tests", () => {
     });
 
     it("multiple claims do not change NAV", async () => {
-      const { core, seeder, trader, owner, position } = await loadFixture(
+      const { core, seeder, trader, owner, position, feePolicy } = await loadFixture(
         deployFullSystem
       );
 
       const { marketId, tSet, batchId } = await setupMarketWithPosition(
         core,
-        seeder
+        seeder,
+        feePolicy.target
       );
 
       // Create multiple winning positions
@@ -482,13 +491,14 @@ describe("PayoutReserve Spec Tests", () => {
   // ================================================================
   describe("SPEC-3: Payout reserve affects L_t", () => {
     it("L_t includes payout deduction (ΔC_t - Payout_t)", async () => {
-      const { core, seeder, position, trader } = await loadFixture(
+      const { core, seeder, position, trader, feePolicy } = await loadFixture(
         deployFullSystem
       );
 
       const { marketId, tSet, batchId } = await setupMarketWithPosition(
         core,
-        seeder
+        seeder,
+        feePolicy.target
       );
 
       // Create a position that will win
@@ -538,12 +548,13 @@ describe("PayoutReserve Spec Tests", () => {
   // ================================================================
   describe("SPEC-4: Payout reserve invariant", () => {
     it("total winning payouts equals escrow reserve", async () => {
-      const { core, seeder, trader, owner, position, payment } =
+      const { core, seeder, trader, owner, position, payment, feePolicy } =
         await loadFixture(deployFullSystem);
 
       const { marketId, tSet, batchId } = await setupMarketWithPosition(
         core,
-        seeder
+        seeder,
+        feePolicy.target
       );
 
       // Create positions: some winning, some losing
@@ -603,13 +614,14 @@ describe("PayoutReserve Spec Tests", () => {
     });
 
     it("reverts double claim on same position", async () => {
-      const { core, seeder, trader, position } = await loadFixture(
+      const { core, seeder, trader, position, feePolicy } = await loadFixture(
         deployFullSystem
       );
 
       const { marketId, tSet, batchId } = await setupMarketWithPosition(
         core,
-        seeder
+        seeder,
+        feePolicy.target
       );
 
       // Create winning position
@@ -641,13 +653,14 @@ describe("PayoutReserve Spec Tests", () => {
     });
 
     it("reverts claim by non-owner", async () => {
-      const { core, seeder, trader, owner, position } = await loadFixture(
+      const { core, seeder, trader, owner, position, feePolicy } = await loadFixture(
         deployFullSystem
       );
 
       const { marketId, tSet, batchId } = await setupMarketWithPosition(
         core,
-        seeder
+        seeder,
+        feePolicy.target
       );
 
       // Create position owned by trader
@@ -674,11 +687,11 @@ describe("PayoutReserve Spec Tests", () => {
     });
 
     it("reverts claim on unsettled market", async () => {
-      const { core, seeder, trader, position, trade } = await loadFixture(
+      const { core, seeder, trader, position, trade, feePolicy } = await loadFixture(
         deployFullSystem
       );
 
-      const { marketId } = await setupMarketWithPosition(core, seeder);
+      const { marketId } = await setupMarketWithPosition(core, seeder, feePolicy.target);
 
       // Create position but DON'T settle
       const positionId = 1n;
@@ -702,12 +715,14 @@ describe("PayoutReserve Spec Tests", () => {
     let core: SignalsCoreHarness;
     let payment: MockERC20;
     let seeder: HardhatEthersSigner;
+    let feePolicy: MockFeePolicy;
 
     beforeEach(async () => {
       const fixture = await loadFixture(deployFullSystem);
       core = fixture.core;
       payment = fixture.payment;
       seeder = fixture.seeder;
+      feePolicy = fixture.feePolicy;
     });
 
     it("markFailed → manualSettleFailedMarket records PnL to batch", async () => {
@@ -734,7 +749,7 @@ describe("PayoutReserve Spec Tests", () => {
         Number(tSet),
         10,
         ethers.parseEther("100"),
-        ethers.ZeroAddress
+        feePolicy.target
       );
 
       // Wait for settlement window to expire without oracle submission
@@ -792,7 +807,7 @@ describe("PayoutReserve Spec Tests", () => {
         Number(tSet),
         10,
         ethers.parseEther("100"),
-        ethers.ZeroAddress
+        feePolicy.target
       );
 
       // Submit oracle price
@@ -851,7 +866,7 @@ describe("PayoutReserve Spec Tests", () => {
         Number(tSet),
         10,
         ethers.parseEther("100"),
-        ethers.ZeroAddress
+        feePolicy.target
       );
 
       // Fail and manually settle

@@ -8,7 +8,7 @@ import { deploySeedData } from "../../helpers";
 
 describe("E2E: full lifecycle", () => {
   it("trades, settles, transfers, and claims", async () => {
-    const { owner, users, core, payment, position } = await deployFullSystem({
+    const { owner, users, core, payment, position, feePolicy } = await deployFullSystem({
       submitWindow: 5,
       opsWindow: 5,
     });
@@ -39,7 +39,7 @@ describe("E2E: full lifecycle", () => {
       settlement,
       4,
       ethers.parseEther("1"),
-      ethers.ZeroAddress,
+      feePolicy.target,
       await seedData.getAddress()
     );
     await core.createMarket(
@@ -51,7 +51,7 @@ describe("E2E: full lifecycle", () => {
       settlement,
       4,
       ethers.parseEther("1"),
-      ethers.ZeroAddress,
+      feePolicy.target,
       await seedData.getAddress()
     );
     await core.seedNextChunks(marketId, 4);

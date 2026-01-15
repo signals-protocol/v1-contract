@@ -108,6 +108,10 @@ describe("MarketLifecycleModule", () => {
       proxy.target
     )) as SignalsCoreHarness;
 
+    const feePolicy = await (
+      await ethers.getContractFactory("MockFeePolicy")
+    ).deploy(0);
+
     await core.setModules(
       ethers.ZeroAddress,
       lifecycleImpl.target,
@@ -125,10 +129,14 @@ describe("MarketLifecycleModule", () => {
       lifecycle: lifecycleImpl,
       oracleModule,
       lazyLib,
+      feePolicy,
     };
   }
 
-  async function createDefaultMarket(core: SignalsCoreHarness) {
+  async function createDefaultMarket(
+    core: SignalsCoreHarness,
+    feePolicyAddress: string
+  ) {
     const now = BigInt(await time.latest());
     const start = now - 100n;
     const end = now + 200n;
@@ -141,7 +149,7 @@ describe("MarketLifecycleModule", () => {
       Number(end),
       4,
       ethers.parseEther("1"),
-      ethers.ZeroAddress
+      feePolicyAddress
     );
     await core.createMarketUniform(
       0,
@@ -152,13 +160,13 @@ describe("MarketLifecycleModule", () => {
       Number(end),
       4,
       ethers.parseEther("1"),
-      ethers.ZeroAddress
+      feePolicyAddress
     );
     return { start, end, marketId };
   }
 
   it("creates market and seeds tree via chunks", async () => {
-    const { core, lifecycle } = await setup();
+    const { core, lifecycle, feePolicy } = await setup();
     const now = BigInt(await time.latest());
     const start = now + 10n;
     const end = start + 100n;
@@ -185,7 +193,7 @@ describe("MarketLifecycleModule", () => {
       Number(settlementTs),
       4,
       ethers.parseEther("1"),
-      ethers.ZeroAddress,
+      feePolicy.target,
       seedData.target
     );
     const tx = await core.createMarket(
@@ -197,7 +205,7 @@ describe("MarketLifecycleModule", () => {
       Number(settlementTs),
       4,
       ethers.parseEther("1"),
-      ethers.ZeroAddress,
+      feePolicy.target,
       seedData.target
     );
     await expect(tx).to.emit(lifecycleEvents, "MarketCreated");
@@ -216,7 +224,7 @@ describe("MarketLifecycleModule", () => {
   });
 
   it("reverts seeding for unknown market", async () => {
-    const { core, lifecycle } = await setup();
+    const { core, lifecycle, feePolicy } = await setup();
     await expect(core.seedNextChunks(1, 1)).to.be.revertedWithCustomError(
       lifecycle,
       "MarketNotFound"
@@ -224,7 +232,7 @@ describe("MarketLifecycleModule", () => {
   });
 
   it("seeds in multiple chunks and completes only on final chunk", async () => {
-    const { core, lifecycle } = await setup();
+    const { core, lifecycle, feePolicy } = await setup();
     const now = BigInt(await time.latest());
     const start = now + 10n;
     const end = start + 100n;
@@ -253,7 +261,7 @@ describe("MarketLifecycleModule", () => {
       Number(settlementTs),
       5,
       ethers.parseEther("1"),
-      ethers.ZeroAddress,
+      feePolicy.target,
       seedData.target
     );
     await core.createMarket(
@@ -265,7 +273,7 @@ describe("MarketLifecycleModule", () => {
       Number(settlementTs),
       5,
       ethers.parseEther("1"),
-      ethers.ZeroAddress,
+      feePolicy.target,
       seedData.target
     );
 
@@ -311,7 +319,7 @@ describe("MarketLifecycleModule", () => {
   });
 
   it("rejects invalid market parameters and time ranges", async () => {
-    const { core, lifecycle } = await setup();
+    const { core, lifecycle, feePolicy } = await setup();
     await expect(
       core.createMarketUniform(
         0,
@@ -322,7 +330,7 @@ describe("MarketLifecycleModule", () => {
         1,
         1,
         ethers.parseEther("1"),
-        ethers.ZeroAddress
+        feePolicy.target
       )
     ).to.be.revertedWithCustomError(lifecycle, "InvalidMarketParameters");
 
@@ -336,7 +344,7 @@ describe("MarketLifecycleModule", () => {
         1,
         1,
         ethers.parseEther("1"),
-        ethers.ZeroAddress
+        feePolicy.target
       )
     ).to.be.revertedWithCustomError(lifecycle, "InvalidMarketParameters");
 
@@ -350,7 +358,7 @@ describe("MarketLifecycleModule", () => {
         5,
         4,
         ethers.parseEther("1"),
-        ethers.ZeroAddress
+        feePolicy.target
       )
     ).to.be.revertedWithCustomError(lifecycle, "InvalidTimeRange");
 
@@ -364,18 +372,36 @@ describe("MarketLifecycleModule", () => {
         5,
         4,
         ethers.parseEther("1"),
-        ethers.ZeroAddress
+        feePolicy.target
       )
     ).to.be.revertedWithCustomError(lifecycle, "InvalidTimeRange");
 
     await expect(
-      core.createMarketUniform(0, 4, 1, 0, 10, 10, 4, 0, ethers.ZeroAddress)
+      core.createMarketUniform(0, 4, 1, 0, 10, 10, 4, 0, feePolicy.target)
     ).to.be.revertedWithCustomError(lifecycle, "InvalidLiquidityParameter");
   });
 
+  it("reverts when fee policy is zero", async () => {
+    const { core, lifecycle } = await setup();
+    const now = await time.latest();
+    await expect(
+      core.createMarketUniform(
+        0,
+        4,
+        1,
+        now + 10,
+        now + 100,
+        now + 150,
+        4,
+        ethers.parseEther("1"),
+        ethers.ZeroAddress
+      )
+    ).to.be.revertedWithCustomError(lifecycle, "ZeroAddress");
+  });
+
   it("settles market when candidate exists and marks snapshot state", async () => {
-    const { core, lifecycle, oracleModule } = await setup();
-    const { end } = await createDefaultMarket(core);
+    const { core, lifecycle, oracleModule, feePolicy } = await setup();
+    const { end } = await createDefaultMarket(core, feePolicy.target);
     const lifecycleEvents = lifecycle.attach(await core.getAddress());
 
     // Submit oracle candidate during settlement window
@@ -415,8 +441,8 @@ describe("MarketLifecycleModule", () => {
   });
 
   it("finalizePrimary enforces candidate and window checks", async () => {
-    const { core, lifecycle, oracleModule } = await setup();
-    const { end } = await createDefaultMarket(core);
+    const { core, lifecycle, oracleModule, feePolicy } = await setup();
+    const { end } = await createDefaultMarket(core, feePolicy.target);
     const tSet = end; // settlementTimestamp = endTimestamp
     const opsEnd = tSet + 120n + 60n; // submitWindow + pendingOpsWindow
 
@@ -457,8 +483,8 @@ describe("MarketLifecycleModule", () => {
   });
 
   it("finalizePrimary allows during PendingOps window", async () => {
-    const { core, lifecycle, owner } = await setup();
-    const { end } = await createDefaultMarket(core);
+    const { core, lifecycle, owner, feePolicy } = await setup();
+    const { end } = await createDefaultMarket(core, feePolicy.target);
     const lifecycleEvents = lifecycle.attach(await core.getAddress());
 
     const tSet = end;
@@ -483,8 +509,8 @@ describe("MarketLifecycleModule", () => {
   });
 
   it("reopens settled market and resets state", async () => {
-    const { core } = await setup();
-    await createDefaultMarket(core);
+    const { core, feePolicy } = await setup();
+    await createDefaultMarket(core, feePolicy.target);
     const market = await core.markets(1);
     await core.harnessSetMarket(
       1,
@@ -508,8 +534,8 @@ describe("MarketLifecycleModule", () => {
   });
 
   it("marks settlement failed during PendingOps window when no candidate", async () => {
-    const { core, lifecycle } = await setup();
-    const { end } = await createDefaultMarket(core);
+    const { core, lifecycle, feePolicy } = await setup();
+    const { end } = await createDefaultMarket(core, feePolicy.target);
     const lifecycleEvents = lifecycle.attach(await core.getAddress());
     const tSet = end;
     const opsStart = tSet + 120n; // settlementSubmitWindow
@@ -527,8 +553,8 @@ describe("MarketLifecycleModule", () => {
   });
 
   it("rejects markSettlementFailed before PendingOps starts", async () => {
-    const { core, lifecycle } = await setup();
-    const { end } = await createDefaultMarket(core);
+    const { core, lifecycle, feePolicy } = await setup();
+    const { end } = await createDefaultMarket(core, feePolicy.target);
     const tSet = end;
 
     // Before PendingOps
@@ -538,8 +564,8 @@ describe("MarketLifecycleModule", () => {
   });
 
   it("rejects markSettlementFailed after PendingOps if candidate exists", async () => {
-    const { core, oracleModule } = await setup();
-    const { end } = await createDefaultMarket(core);
+    const { core, oracleModule, feePolicy } = await setup();
+    const { end } = await createDefaultMarket(core, feePolicy.target);
     const tSet = end;
     const opsEnd = tSet + 120n + 60n;
 
@@ -556,8 +582,8 @@ describe("MarketLifecycleModule", () => {
   });
 
   it("finalizes secondary settlement for failed market", async () => {
-    const { core, lifecycle } = await setup();
-    const { end } = await createDefaultMarket(core);
+    const { core, lifecycle, feePolicy } = await setup();
+    const { end } = await createDefaultMarket(core, feePolicy.target);
     const lifecycleEvents = lifecycle.attach(await core.getAddress());
     const tSet = end;
     const opsStart = tSet + 120n;
@@ -578,16 +604,16 @@ describe("MarketLifecycleModule", () => {
   });
 
   it("rejects finalizeSecondarySettlement for non-failed market", async () => {
-    const { core, lifecycle } = await setup();
-    await createDefaultMarket(core);
+    const { core, lifecycle, feePolicy } = await setup();
+    await createDefaultMarket(core, feePolicy.target);
 
     await expect(core.finalizeSecondarySettlement(1, 1_000_000n))
       .to.be.revertedWithCustomError(lifecycle, "MarketNotFailed");
   });
 
   it("rejects finalizeSecondarySettlement for already settled market", async () => {
-    const { core, lifecycle } = await setup();
-    const { end } = await createDefaultMarket(core);
+    const { core, lifecycle, feePolicy } = await setup();
+    const { end } = await createDefaultMarket(core, feePolicy.target);
     const tSet = end;
     const opsStart = tSet + 120n;
 
@@ -604,8 +630,8 @@ describe("MarketLifecycleModule", () => {
   });
 
   it("updates market timing", async () => {
-    const { core, lifecycle } = await setup();
-    await createDefaultMarket(core);
+    const { core, lifecycle, feePolicy } = await setup();
+    await createDefaultMarket(core, feePolicy.target);
 
     await expect(
       core.updateMarketTiming(1, 10, 5, 5)
@@ -619,8 +645,8 @@ describe("MarketLifecycleModule", () => {
   });
 
   it("emits settlement chunk requests and marks completion", async () => {
-    const { core, lifecycle } = await setup();
-    await createDefaultMarket(core);
+    const { core, lifecycle, feePolicy } = await setup();
+    await createDefaultMarket(core, feePolicy.target);
     const lifecycleEvents = lifecycle.attach(await core.getAddress());
 
     const market = await core.markets(1);
@@ -651,8 +677,8 @@ describe("MarketLifecycleModule", () => {
   });
 
   it("rejects re-settlement and supports multi-chunk ordering", async () => {
-    const { core, lifecycle } = await setup();
-    await createDefaultMarket(core);
+    const { core, lifecycle, feePolicy } = await setup();
+    await createDefaultMarket(core, feePolicy.target);
     const lifecycleEvents = lifecycle.attach(await core.getAddress());
 
     // Mark as settled with large openPositionCount to force multiple chunks
@@ -693,8 +719,8 @@ describe("MarketLifecycleModule", () => {
   });
 
   it("handles zero open positions and chunk input validation", async () => {
-    const { core, lifecycle } = await setup();
-    await createDefaultMarket(core);
+    const { core, lifecycle, feePolicy } = await setup();
+    await createDefaultMarket(core, feePolicy.target);
     const lifecycleEvents = lifecycle.attach(await core.getAddress());
     const market = await core.markets(1);
     await core.harnessSetMarket(

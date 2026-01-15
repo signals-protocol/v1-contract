@@ -113,7 +113,7 @@ describe("Boundaries", () => {
       settlementTick: 0,
       settlementValue: 0,
       liquidityParameter: WAD,
-      feePolicy: ethers.ZeroAddress,
+      feePolicy: feePolicy.target,
       seedData: ethers.ZeroAddress,
       initialRootSum: BigInt(NUM_BINS) * WAD,
       accumulatedFees: 0n,
@@ -396,7 +396,7 @@ describe("Boundaries", () => {
     }
 
     it("reverts trade before market start", async () => {
-      const { core, user } = await loadFixture(deployTimeBoundaryFixture);
+      const { core, user, feePolicy } = await loadFixture(deployTimeBoundaryFixture);
 
       const now = (await ethers.provider.getBlock("latest"))!.timestamp;
       const market: ISignalsCore.MarketStruct = {
@@ -418,7 +418,7 @@ describe("Boundaries", () => {
         settlementTick: 0,
         settlementValue: 0,
         liquidityParameter: WAD,
-        feePolicy: ethers.ZeroAddress,
+        feePolicy: feePolicy.target,
         seedData: ethers.ZeroAddress,
         initialRootSum: 10n * WAD,
         accumulatedFees: 0n,
@@ -442,7 +442,7 @@ describe("Boundaries", () => {
     });
 
     it("reverts trade after market end", async () => {
-      const { core, user } = await loadFixture(deployTimeBoundaryFixture);
+      const { core, user, feePolicy } = await loadFixture(deployTimeBoundaryFixture);
 
       const now = (await ethers.provider.getBlock("latest"))!.timestamp;
       const market: ISignalsCore.MarketStruct = {
@@ -464,7 +464,7 @@ describe("Boundaries", () => {
         settlementTick: 0,
         settlementValue: 0,
         liquidityParameter: WAD,
-        feePolicy: ethers.ZeroAddress,
+        feePolicy: feePolicy.target,
         seedData: ethers.ZeroAddress,
         initialRootSum: 10n * WAD,
         accumulatedFees: 0n,
@@ -488,7 +488,7 @@ describe("Boundaries", () => {
     });
 
     it("allows trade during active market period", async () => {
-      const { core, user } = await loadFixture(deployTimeBoundaryFixture);
+      const { core, user, feePolicy } = await loadFixture(deployTimeBoundaryFixture);
 
       const now = (await ethers.provider.getBlock("latest"))!.timestamp;
       const market: ISignalsCore.MarketStruct = {
@@ -510,7 +510,7 @@ describe("Boundaries", () => {
         settlementTick: 0,
         settlementValue: 0,
         liquidityParameter: WAD,
-        feePolicy: ethers.ZeroAddress,
+        feePolicy: feePolicy.target,
         seedData: ethers.ZeroAddress,
         initialRootSum: 10n * WAD,
         accumulatedFees: 0n,
@@ -585,7 +585,7 @@ describe("Boundaries", () => {
   // ============================================================
   describe("Market State Boundaries", () => {
     it("reverts trade on unseeded market", async () => {
-      const { core, user } = await loadFixture(deployBoundaryFixture);
+      const { core, user, feePolicy } = await loadFixture(deployBoundaryFixture);
 
       const now = (await ethers.provider.getBlock("latest"))!.timestamp;
       const market: ISignalsCore.MarketStruct = {
@@ -607,7 +607,7 @@ describe("Boundaries", () => {
         settlementTick: 0,
         settlementValue: 0,
         liquidityParameter: WAD,
-        feePolicy: ethers.ZeroAddress,
+        feePolicy: feePolicy.target,
         seedData: ethers.ZeroAddress,
         initialRootSum: 10n * WAD,
         accumulatedFees: 0n,
@@ -631,7 +631,7 @@ describe("Boundaries", () => {
     });
 
     it("reverts trade on settled market", async () => {
-      const { core, user } = await loadFixture(deployBoundaryFixture);
+      const { core, user, feePolicy } = await loadFixture(deployBoundaryFixture);
 
       const now = (await ethers.provider.getBlock("latest"))!.timestamp;
       const market: ISignalsCore.MarketStruct = {
@@ -653,7 +653,7 @@ describe("Boundaries", () => {
         settlementTick: 5,
         settlementValue: 5_000_000,
         liquidityParameter: WAD,
-        feePolicy: ethers.ZeroAddress,
+        feePolicy: feePolicy.target,
         seedData: ethers.ZeroAddress,
         initialRootSum: 10n * WAD,
         accumulatedFees: 0n,
