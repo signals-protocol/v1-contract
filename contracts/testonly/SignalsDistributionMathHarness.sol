@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../core/lib/ClmsrMath.sol";
+import "../lib/ClmsrMath.sol";
 
 /// @title ClmsrMathCostHarness
 /// @notice Test harness to expose ClmsrMath cost/proceeds functions
@@ -30,4 +30,3 @@ contract ClmsrMathCostHarness {
         return ClmsrMath._safeExp(numeratorWad, alpha);
     }
 }
-
