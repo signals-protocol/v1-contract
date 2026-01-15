@@ -75,7 +75,7 @@ describe("TradeModule slippage and bounds", () => {
       settlementTick: 0,
       settlementValue: 0,
       liquidityParameter: WAD,
-      feePolicy: feePolicy.target,
+      feePolicy: feePolicy.target.toString(),
       seedData: ethers.ZeroAddress,
       initialRootSum: 4n * WAD,
       accumulatedFees: 0n,

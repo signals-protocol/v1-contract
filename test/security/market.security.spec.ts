@@ -150,7 +150,7 @@ describe("Market Security", () => {
           now + 10100,
           numBins,
           WAD,
-          feePolicy.target,
+          feePolicy.target.toString(),
           await seedData.getAddress()
         )
       ).to.be.revertedWithCustomError(lifecycleModule, "BinCountExceedsLimit");
@@ -181,7 +181,7 @@ describe("Market Security", () => {
           now + 10100,
           numBins,
           WAD,
-          feePolicy.target,
+          feePolicy.target.toString(),
           await seedData.getAddress()
         )
       ).to.be.revertedWithCustomError(lifecycleModule, "BinCountExceedsLimit");
@@ -211,7 +211,7 @@ describe("Market Security", () => {
           now + 10100,
           numBins,
           WAD,
-          feePolicy.target,
+          feePolicy.target.toString(),
           await seedData.getAddress()
         )
       ).to.not.be.reverted;
@@ -241,7 +241,7 @@ describe("Market Security", () => {
           now + 10100,
           numBins,
           WAD,
-          feePolicy.target,
+          feePolicy.target.toString(),
           await seedData.getAddress()
         )
       ).to.not.be.reverted;
@@ -271,7 +271,7 @@ describe("Market Security", () => {
           now + 10100,
           numBins,
           WAD,
-          feePolicy.target,
+          feePolicy.target.toString(),
           await seedData.getAddress()
         )
       ).to.not.be.reverted;
@@ -302,7 +302,7 @@ describe("Market Security", () => {
           now + 10100,
           numBins,
           WAD,
-          feePolicy.target,
+          feePolicy.target.toString(),
           await seedData.getAddress()
         )
       ).to.be.revertedWithCustomError(core, "SeedDataLengthMismatch");
@@ -333,7 +333,7 @@ describe("Market Security", () => {
           now + 10100,
           numBins,
           WAD,
-          feePolicy.target
+          feePolicy.target.toString()
         )
       ).to.be.revertedWithCustomError(lifecycleModule, "BinCountExceedsLimit");
     });
@@ -361,7 +361,7 @@ describe("Market Security", () => {
           now + 10100,
           numBins,
           WAD,
-          feePolicy.target
+          feePolicy.target.toString()
         )
       ).to.be.revertedWithCustomError(lifecycleModule, "BinCountExceedsLimit");
     });

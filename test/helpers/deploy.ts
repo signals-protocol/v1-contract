@@ -127,7 +127,7 @@ export async function deployTradeModuleSystem(
     opts.submitWindow ?? 300,
     opts.settlementWindow ?? 60,
     owner.address,
-    feePolicy.target
+    feePolicy.target.toString()
   );
 
   // Set up markets
@@ -156,7 +156,7 @@ export async function deployTradeModuleSystem(
       settlementTick: 0,
       settlementValue: 0,
       liquidityParameter: config.liquidityParameter ?? WAD,
-      feePolicy: feePolicy.target,
+      feePolicy: feePolicy.target.toString(),
       seedData: ethers.ZeroAddress,
       // P&L tracking fields
       initialRootSum: BigInt(config.numBins) * WAD, // n * WAD for uniform prior

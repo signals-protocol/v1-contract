@@ -159,7 +159,7 @@ describe("Lifecycle + Trade integration", () => {
       Number(settlementTs),
       4,
       ethers.parseEther("1"),
-      feePolicy.target
+      feePolicy.target.toString()
     );
     await expect(
       core.createMarketUniform(
@@ -171,7 +171,7 @@ describe("Lifecycle + Trade integration", () => {
         Number(settlementTs),
         4,
         ethers.parseEther("1"),
-        feePolicy.target
+        feePolicy.target.toString()
       )
     ).to.emit(lifecycleEvents, "MarketCreated");
 
@@ -241,7 +241,7 @@ describe("Lifecycle + Trade integration", () => {
       Number(settlementTs),
       4,
       ethers.parseEther("1"),
-      feePolicy.target
+      feePolicy.target.toString()
     );
 
     await payment.transfer(user.address, 10_000_000n);
@@ -293,7 +293,7 @@ describe("Lifecycle + Trade integration", () => {
       Number(settlementTs),
       4,
       ethers.parseEther("1"),
-      feePolicy.target
+      feePolicy.target.toString()
     );
 
     await payment.transfer(user.address, 10_000_000n);

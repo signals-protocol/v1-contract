@@ -72,7 +72,7 @@ describe("TradeModule flow (minimal parity)", () => {
       1,
       1,
       owner.address,
-      feePolicy.target
+      feePolicy.target.toString()
     );
 
     const now = (await ethers.provider.getBlock("latest"))!.timestamp;
@@ -99,7 +99,7 @@ describe("TradeModule flow (minimal parity)", () => {
       settlementTick: 0,
       settlementValue: 0,
       liquidityParameter: WAD,
-      feePolicy: feePolicy.target,
+      feePolicy: feePolicy.target.toString(),
       seedData: marketOverrides.seedData ?? ethers.ZeroAddress,
       initialRootSum: BigInt(numBins) * WAD,
       accumulatedFees: 0n,

@@ -1,4 +1,5 @@
 import { expect } from "chai";
+import type { Interface } from "ethers";
 import { artifacts, ethers } from "hardhat";
 import { time } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { deployTradeModuleSystem } from "../../helpers/deploy";
@@ -6,7 +7,11 @@ import { ONE_HOUR, WAD } from "../../helpers/constants";
 
 const ZERO_CONTEXT = ethers.ZeroHash;
 
-function findEvent(receipt: Awaited<ReturnType<typeof ethers.provider.getTransactionReceipt>>, iface: ethers.Interface, name: string) {
+function findEvent(
+  receipt: Awaited<ReturnType<typeof ethers.provider.getTransactionReceipt>>,
+  iface: Interface,
+  name: string
+) {
   for (const log of receipt!.logs) {
     try {
       const parsed = iface.parseLog(log);
@@ -66,7 +71,7 @@ describe("TradeModule + ThetaTimeFeePolicy", () => {
       settlementTick: market.settlementTick,
       settlementValue: market.settlementValue,
       liquidityParameter: market.liquidityParameter,
-      feePolicy: feePolicy.target,
+      feePolicy: feePolicy.target.toString(),
       seedData: market.seedData,
       initialRootSum: market.initialRootSum,
       accumulatedFees: market.accumulatedFees,
@@ -105,7 +110,7 @@ describe("TradeModule + ThetaTimeFeePolicy", () => {
       { blockTag: openReceipt!.blockNumber }
     );
     expect(openFeeEvent!.args.feeAmount).to.equal(expectedOpenFee);
-    expect(openFeeEvent!.args.policy).to.equal(feePolicy.target);
+    expect(openFeeEvent!.args.policy).to.equal(feePolicy.target.toString());
 
     const positionId = Number(
       findEvent(openReceipt, tradeIface, "PositionOpened")!.args.positionId

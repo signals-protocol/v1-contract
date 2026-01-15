@@ -174,7 +174,7 @@ describe("Escrow Security", () => {
         now + 10100,
         100, // numBins
         WAD, // liquidityParameter
-        feePolicy.target
+        feePolicy.target.toString()
       );
       await core.connect(owner).createMarketUniform(
         0, // minTick
@@ -185,7 +185,7 @@ describe("Escrow Security", () => {
         now + 10100,
         100, // numBins
         WAD, // liquidityParameter
-        feePolicy.target
+        feePolicy.target.toString()
       );
 
       // User2 opens a position
@@ -230,7 +230,7 @@ describe("Escrow Security", () => {
         settlementTs,
         100, // numBins
         WAD, // liquidityParameter
-        feePolicy.target
+        feePolicy.target.toString()
       );
       await core
         .connect(owner)
@@ -243,7 +243,7 @@ describe("Escrow Security", () => {
           settlementTs,
           100,
           WAD,
-          feePolicy.target
+          feePolicy.target.toString()
         );
 
       // User opens position at upper boundary
@@ -295,7 +295,7 @@ describe("Escrow Security", () => {
           settlementTs,
           100,
           WAD,
-          feePolicy.target
+          feePolicy.target.toString()
         );
       await core
         .connect(owner)
@@ -308,7 +308,7 @@ describe("Escrow Security", () => {
           settlementTs,
           100,
           WAD,
-          feePolicy.target
+          feePolicy.target.toString()
         );
 
       await core
@@ -359,11 +359,11 @@ describe("Escrow Security", () => {
           settlementTs,
           50, // numBins
           WAD,
-          feePolicy.target
+          feePolicy.target.toString()
         );
       await core
         .connect(owner)
-        .createMarketUniform(50, 100, 1, now - 100, now + 500, settlementTs, 50, WAD, feePolicy.target);
+        .createMarketUniform(50, 100, 1, now - 100, now + 500, settlementTs, 50, WAD, feePolicy.target.toString());
 
       await core
         .connect(user1)

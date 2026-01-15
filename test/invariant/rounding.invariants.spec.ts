@@ -68,7 +68,7 @@ describe("Rounding Invariants", () => {
       1,
       1,
       owner.address,
-      feePolicy.target
+      feePolicy.target.toString()
     );
 
     const now = (await ethers.provider.getBlock("latest"))!.timestamp;
@@ -91,7 +91,7 @@ describe("Rounding Invariants", () => {
       settlementTick: 0,
       settlementValue: 0,
       liquidityParameter: WAD,
-      feePolicy: feePolicy.target,
+      feePolicy: feePolicy.target.toString(),
       seedData: ethers.ZeroAddress,
       initialRootSum: BigInt(NUM_BINS) * WAD,
       accumulatedFees: 0n,

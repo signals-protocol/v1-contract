@@ -95,7 +95,7 @@ describe("E2E: vault lifecycle", () => {
 
     const currentBatch = await core.getCurrentBatchId();
     const batchId = currentBatch + 1n;
-    await createFailedMarketInBatch(core, batchId, feePolicy.target);
+    await createFailedMarketInBatch(core, batchId, feePolicy.target.toString());
     await advancePastBatchEnd(batchId);
     await core.processDailyBatch(Number(batchId));
     await core.connect(user).claimDeposit(0);
@@ -107,7 +107,7 @@ describe("E2E: vault lifecycle", () => {
     await core.connect(user).requestWithdraw(withdrawShares);
 
     const nextBatchId = batchId + 1n;
-    await createFailedMarketInBatch(core, nextBatchId, feePolicy.target);
+    await createFailedMarketInBatch(core, nextBatchId, feePolicy.target.toString());
     await advancePastBatchEnd(nextBatchId);
     await core.processDailyBatch(Number(nextBatchId));
 

@@ -168,7 +168,7 @@ describe("VaultWithMarkets E2E", () => {
       Number(tSet),
       4,
       WAD,
-      feePolicy.target
+      feePolicy.target.toString()
     );
     await core.createMarketUniform(
       0,
@@ -179,7 +179,7 @@ describe("VaultWithMarkets E2E", () => {
       Number(tSet),
       4,
       WAD,
-      feePolicy.target
+      feePolicy.target.toString()
     );
 
     // Manipulate tree state to create non-zero P&L at settlement
@@ -255,7 +255,7 @@ describe("VaultWithMarkets E2E", () => {
         Number(tSet),
         10,
         WAD,
-        feePolicy.target
+        feePolicy.target.toString()
       );
 
       // Submit oracle and settle
@@ -311,7 +311,7 @@ describe("VaultWithMarkets E2E", () => {
         Number(tSet),
         10,
         ethers.parseEther("100"), // α = 100
-        feePolicy.target,
+        feePolicy.target.toString(),
         await seedData.getAddress()
       );
 
@@ -374,7 +374,7 @@ describe("VaultWithMarkets E2E", () => {
         0, 100, 10,
         Number(seedTime + 100n), Number(tSet - 100n), Number(tSet),
         10, ethers.parseEther("100"),
-        feePolicy.target, await seedData.getAddress()
+        feePolicy.target.toString(), await seedData.getAddress()
       );
 
       // Verify market has deltaEt > 0

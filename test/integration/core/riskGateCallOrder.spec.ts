@@ -138,7 +138,7 @@ describe('Core-first Risk Gate Call Order', () => {
         settle,
         10,     // numBins
         ethers.parseEther('1'), // liquidityParameter (α = 1)
-        feePolicy.target,
+        feePolicy.target.toString(),
         await seedData.getAddress()
       )).to.be.revertedWithCustomError(riskModule, 'AlphaExceedsLimit');
     });
@@ -167,7 +167,7 @@ describe('Core-first Risk Gate Call Order', () => {
         settle,
         10,
         ethers.parseEther('1'), // Small α
-        feePolicy.target,
+        feePolicy.target.toString(),
         await seedData.getAddress()
       );
       
@@ -195,7 +195,7 @@ describe('Core-first Risk Gate Call Order', () => {
       const tx = await core.createMarket(
         0, 100, 10, start, end, settle, 10,
         ethers.parseEther('10'),
-        feePolicy.target,
+        feePolicy.target.toString(),
         await seedData.getAddress()
       );
       
@@ -246,7 +246,7 @@ describe('Core-first Risk Gate Call Order', () => {
       const tx = await core.createMarket(
         0, 100, 10, start, end, settle, 10,
         ethers.parseEther('10'),
-        feePolicy.target,
+        feePolicy.target.toString(),
         await seedData.getAddress()
       );
       
@@ -300,7 +300,7 @@ describe('Core-first Risk Gate Call Order', () => {
       await core.createMarket(
         0, 100, 10, start, end, settle, 10,
         ethers.parseEther('1'),
-        feePolicy.target,
+        feePolicy.target.toString(),
         await seedData.getAddress()
       );
       

@@ -34,7 +34,7 @@ describe("E2E: UUPS upgrades", () => {
       settlement,
       4,
       ethers.parseEther("1"),
-      feePolicy.target,
+      feePolicy.target.toString(),
       await seedData.getAddress()
     );
     await core.createMarket(
@@ -46,7 +46,7 @@ describe("E2E: UUPS upgrades", () => {
       settlement,
       4,
       ethers.parseEther("1"),
-      feePolicy.target,
+      feePolicy.target.toString(),
       await seedData.getAddress()
     );
     await core.seedNextChunks(marketId, 4);

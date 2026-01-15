@@ -186,7 +186,7 @@ describe("Vault Escrow Security", () => {
       const targetBatchId = currentBatchId + 1n;
       
       // Create market that settles in targetBatchId
-      const marketId = await createMarketInBatch(core, targetBatchId, feePolicy.target);
+      const marketId = await createMarketInBatch(core, targetBatchId, feePolicy.target.toString());
       expect(marketId).to.be.gt(0);
       
       // Fast forward to after batch end time (but DON'T finalize market)
@@ -212,7 +212,7 @@ describe("Vault Escrow Security", () => {
       const targetBatchId = currentBatchId + 1n;
       
       // Create market that settles in targetBatchId
-      const marketId = await createMarketInBatch(core, targetBatchId, feePolicy.target);
+      const marketId = await createMarketInBatch(core, targetBatchId, feePolicy.target.toString());
       
       // Fast forward to settlement time
       const market = await core.markets(marketId);
@@ -249,8 +249,8 @@ describe("Vault Escrow Security", () => {
       const currentBatchId = await core.currentBatchId();
       const targetBatchId = currentBatchId + 1n;
 
-      const marketId1 = await createMarketInBatch(core, targetBatchId, feePolicy.target);
-      const marketId2 = await createMarketInBatch(core, targetBatchId, feePolicy.target);
+      const marketId1 = await createMarketInBatch(core, targetBatchId, feePolicy.target.toString());
+      const marketId2 = await createMarketInBatch(core, targetBatchId, feePolicy.target.toString());
 
       const market1 = await core.markets(marketId1);
       const submitWindow = await core.settlementSubmitWindow();
@@ -287,7 +287,7 @@ describe("Vault Escrow Security", () => {
       
       // Now create market for next batch
       const targetBatchId = emptyBatchId + 1n;
-      const marketId = await createMarketInBatch(core, targetBatchId, feePolicy.target);
+      const marketId = await createMarketInBatch(core, targetBatchId, feePolicy.target.toString());
       
       // Complete settlement
       const market = await core.markets(marketId);

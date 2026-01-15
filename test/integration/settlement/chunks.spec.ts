@@ -165,7 +165,7 @@ describe("Settlement chunks and claim totals", () => {
     const settleTs = end + 10n;
     await core.createMarketUniform(
       0, 4, 1, Number(start), Number(end), Number(settleTs),
-      4, WAD, feePolicy.target
+      4, WAD, feePolicy.target.toString()
     );
 
     // Market is active but not settled
@@ -191,7 +191,7 @@ describe("Settlement chunks and claim totals", () => {
       Number(settleTs),
       4,
       WAD,
-      feePolicy.target
+      feePolicy.target.toString()
     );
 
     // open positions: 3 users, 4 positions -> ensure openPositionCount drives multiple chunks
@@ -268,7 +268,7 @@ describe("Settlement chunks and claim totals", () => {
     const settleTs = end + 10n;
     await core.createMarketUniform(
       0, 4, 1, Number(start), Number(end), Number(settleTs),
-      4, WAD, feePolicy.target
+      4, WAD, feePolicy.target.toString()
     );
 
     // Create 4 positions (less than CHUNK_SIZE=512)
@@ -310,7 +310,7 @@ describe("Settlement chunks and claim totals", () => {
     const settleTs = end + 10n;
     await core.createMarketUniform(
       0, 4, 1, Number(start), Number(end), Number(settleTs),
-      4, WAD, feePolicy.target
+      4, WAD, feePolicy.target.toString()
     );
 
     // Position 1: [2,4) - will lose when settlementTick = 1
@@ -344,7 +344,7 @@ describe("Settlement chunks and claim totals", () => {
     const settleTs = end + 10n;
     await core.createMarketUniform(
       0, 4, 1, Number(start), Number(end), Number(settleTs),
-      4, WAD, feePolicy.target
+      4, WAD, feePolicy.target.toString()
     );
 
     // Position [1,3) - winning if settlementTick = 2 (upper - 1)
@@ -378,7 +378,7 @@ describe("Settlement chunks and claim totals", () => {
     const settleTs = end + 10n;
     await core.createMarketUniform(
       0, 4, 1, Number(start), Number(end), Number(settleTs),
-      4, WAD, feePolicy.target
+      4, WAD, feePolicy.target.toString()
     );
 
     // Position [2,4) - winning if settlementTick = 2 (equals lowerTick)
@@ -412,7 +412,7 @@ describe("Settlement chunks and claim totals", () => {
     const settleTs = end + 10n;
     await core.createMarketUniform(
       0, 4, 1, Number(start), Number(end), Number(settleTs),
-      4, WAD, feePolicy.target
+      4, WAD, feePolicy.target.toString()
     );
 
     // Position [0,2) - losing if settlementTick = 2 (equals upperTick)

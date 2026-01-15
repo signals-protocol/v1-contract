@@ -252,7 +252,7 @@ describe("PayoutReserve Spec Tests", () => {
         deployFullSystem
       );
 
-      const { marketId, tSet } = await setupMarketWithPosition(core, seeder, feePolicy.target);
+      const { marketId, tSet } = await setupMarketWithPosition(core, seeder, feePolicy.target.toString());
 
       // Create a position
       const positionId = 1n;
@@ -304,7 +304,7 @@ describe("PayoutReserve Spec Tests", () => {
       const { marketId, tSet, batchId } = await setupMarketWithPosition(
         core,
         seeder,
-        feePolicy.target
+        feePolicy.target.toString()
       );
 
       // Create a winning position
@@ -374,7 +374,7 @@ describe("PayoutReserve Spec Tests", () => {
       const { marketId, tSet, batchId } = await setupMarketWithPosition(
         core,
         seeder,
-        feePolicy.target
+        feePolicy.target.toString()
       );
 
       // Create winning position
@@ -435,7 +435,7 @@ describe("PayoutReserve Spec Tests", () => {
       const { marketId, tSet, batchId } = await setupMarketWithPosition(
         core,
         seeder,
-        feePolicy.target
+        feePolicy.target.toString()
       );
 
       // Create multiple winning positions
@@ -498,7 +498,7 @@ describe("PayoutReserve Spec Tests", () => {
       const { marketId, tSet, batchId } = await setupMarketWithPosition(
         core,
         seeder,
-        feePolicy.target
+        feePolicy.target.toString()
       );
 
       // Create a position that will win
@@ -554,7 +554,7 @@ describe("PayoutReserve Spec Tests", () => {
       const { marketId, tSet, batchId } = await setupMarketWithPosition(
         core,
         seeder,
-        feePolicy.target
+        feePolicy.target.toString()
       );
 
       // Create positions: some winning, some losing
@@ -621,7 +621,7 @@ describe("PayoutReserve Spec Tests", () => {
       const { marketId, tSet, batchId } = await setupMarketWithPosition(
         core,
         seeder,
-        feePolicy.target
+        feePolicy.target.toString()
       );
 
       // Create winning position
@@ -660,7 +660,7 @@ describe("PayoutReserve Spec Tests", () => {
       const { marketId, tSet, batchId } = await setupMarketWithPosition(
         core,
         seeder,
-        feePolicy.target
+        feePolicy.target.toString()
       );
 
       // Create position owned by trader
@@ -691,7 +691,7 @@ describe("PayoutReserve Spec Tests", () => {
         deployFullSystem
       );
 
-      const { marketId } = await setupMarketWithPosition(core, seeder, feePolicy.target);
+      const { marketId } = await setupMarketWithPosition(core, seeder, feePolicy.target.toString());
 
       // Create position but DON'T settle
       const positionId = 1n;
@@ -749,7 +749,7 @@ describe("PayoutReserve Spec Tests", () => {
         Number(tSet),
         10,
         ethers.parseEther("100"),
-        feePolicy.target
+        feePolicy.target.toString()
       );
 
       // Wait for settlement window to expire without oracle submission
@@ -807,7 +807,7 @@ describe("PayoutReserve Spec Tests", () => {
         Number(tSet),
         10,
         ethers.parseEther("100"),
-        feePolicy.target
+        feePolicy.target.toString()
       );
 
       // Submit oracle price
@@ -866,7 +866,7 @@ describe("PayoutReserve Spec Tests", () => {
         Number(tSet),
         10,
         ethers.parseEther("100"),
-        feePolicy.target
+        feePolicy.target.toString()
       );
 
       // Fail and manually settle

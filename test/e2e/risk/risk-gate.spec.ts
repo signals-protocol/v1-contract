@@ -39,7 +39,7 @@ describe("E2E: risk gate enforcement", () => {
         settlement,
         4,
         ethers.parseEther("10"),
-        feePolicy.target,
+        feePolicy.target.toString(),
         await seedData.getAddress()
       )
     ).to.be.revertedWithCustomError(core, "AlphaExceedsLimit");
@@ -53,7 +53,7 @@ describe("E2E: risk gate enforcement", () => {
       settlement + 100,
       4,
       ethers.parseEther("0.1"),
-      feePolicy.target,
+      feePolicy.target.toString(),
       await seedData.getAddress()
     );
     await core.connect(owner).createMarket(
@@ -65,7 +65,7 @@ describe("E2E: risk gate enforcement", () => {
       settlement + 100,
       4,
       ethers.parseEther("0.1"),
-      feePolicy.target,
+      feePolicy.target.toString(),
       await seedData.getAddress()
     );
 

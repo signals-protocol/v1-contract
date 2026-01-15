@@ -38,7 +38,7 @@ describe("E2E: seeding chunks gating", () => {
       settlement,
       numBins,
       ethers.parseEther("1"),
-      feePolicy.target,
+      feePolicy.target.toString(),
       await seedData.getAddress()
     );
     await core.createMarket(
@@ -50,7 +50,7 @@ describe("E2E: seeding chunks gating", () => {
       settlement,
       numBins,
       ethers.parseEther("1"),
-      feePolicy.target,
+      feePolicy.target.toString(),
       await seedData.getAddress()
     );
 

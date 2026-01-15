@@ -166,7 +166,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           settlementTimestamp,
           100, // numBins
           ethers.parseEther("500"), // liquidityParameter (α)
-          feePolicy.target
+          feePolicy.target.toString()
         )
       ).to.not.be.reverted;
     });
@@ -189,7 +189,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           settlementTimestamp,
           100,
           ethers.parseEther("1000"), // Too high α
-          feePolicy.target
+          feePolicy.target.toString()
         )
       ).to.be.revertedWithCustomError(risk, "AlphaExceedsLimit");
     });
@@ -214,7 +214,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         settlementTimestamp,
         100,
         ethers.parseEther("500"), // Valid α at creation
-        feePolicy.target
+        feePolicy.target.toString()
       );
       // marketId starts from 1 (++nextMarketId)
       marketId = 1n;
@@ -308,7 +308,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           now + 3660,
           100,
           ethers.parseEther("500"),
-          feePolicy.target
+          feePolicy.target.toString()
         )
       ).to.not.be.reverted;
 
@@ -335,7 +335,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           now2 + 3660,
           100,
           ethers.parseEther("500"), // Same α, but now exceeds limit
-          feePolicy.target
+          feePolicy.target.toString()
         )
       ).to.be.revertedWithCustomError(risk, "AlphaExceedsLimit");
     });
@@ -367,7 +367,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           now + 3660,
           100,
           ethers.parseEther("300"),
-          feePolicy.target
+          feePolicy.target.toString()
         )
       ).to.not.be.reverted;
     });
@@ -399,7 +399,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           now + 3660,
           100,
           ethers.parseEther("1"), // Tiny α
-          feePolicy.target
+          feePolicy.target.toString()
         )
       ).to.be.revertedWithCustomError(risk, "AlphaExceedsLimit");
     });
@@ -430,7 +430,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           settlementTimestamp,
           100,
           ethers.parseEther("10000"), // Very high α
-          feePolicy.target
+          feePolicy.target.toString()
         )
       ).to.not.be.reverted;
     });
@@ -451,7 +451,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           now + 3660,
           1, // numBins = 1
           ethers.parseEther("100"),
-          feePolicy.target
+          feePolicy.target.toString()
         )
       ).to.be.revertedWithCustomError(risk, "InvalidNumBins");
     });
@@ -470,7 +470,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           now + 3660,
           2, // numBins = 2
           ethers.parseEther("100"),
-          feePolicy.target
+          feePolicy.target.toString()
         )
       ).to.not.be.reverted;
     });
@@ -515,7 +515,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           now + 3660,
           100,
           ethers.parseEther("500"),
-          feePolicy.target
+          feePolicy.target.toString()
         )
       ).to.not.be.reverted;
     });
@@ -542,7 +542,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           now + 3660,
           10,
           ethers.parseEther("100"),
-          feePolicy.target,
+          feePolicy.target.toString(),
           await seedData.getAddress()
         )
       ).to.be.revertedWithCustomError(lifecycle, "InvalidFactor");
@@ -593,7 +593,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           now + 3660,
           10, // numBins = 10
           ethers.parseEther("100"), // α = 100 (lower to pass α limit)
-          feePolicy.target,
+          feePolicy.target.toString(),
           await seedData.getAddress()
         )
       ).to.not.be.reverted;
@@ -622,7 +622,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           now + 3660,
           10, // numBins = 10
           ethers.parseEther("100"), // α = 100
-          feePolicy.target,
+          feePolicy.target.toString(),
           await seedData.getAddress()
         )
       ).to.be.revertedWithCustomError(risk, "PriorNotAdmissible");
@@ -651,7 +651,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           now + 3660,
           10,
           ethers.parseEther("100"), // α = 100
-          feePolicy.target,
+          feePolicy.target.toString(),
           await seedData.getAddress()
         )
       ).to.not.be.reverted;
@@ -680,7 +680,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           now + 3660,
           10,
           ethers.parseEther("100"), // α = 100
-          feePolicy.target,
+          feePolicy.target.toString(),
           await seedData.getAddress()
         )
       ).to.not.be.reverted;
@@ -714,7 +714,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         now + 3660,
         10,
         ethers.parseEther("100"), // α = 100
-        feePolicy.target,
+        feePolicy.target.toString(),
         await seedData.getAddress()
       );
 
@@ -743,7 +743,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         now + 3660,
         10,
         ethers.parseEther("100"),
-        feePolicy.target,
+        feePolicy.target.toString(),
         await seedData.getAddress()
       );
 
@@ -771,7 +771,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         now + 3660,
         10,
         ethers.parseEther("100"),
-        feePolicy.target,
+        feePolicy.target.toString(),
         await seedData.getAddress()
       );
 
@@ -785,7 +785,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         now + 86400 + 3660,
         10,
         ethers.parseEther("200"),
-        feePolicy.target,
+        feePolicy.target.toString(),
         await seedData.getAddress()
       );
 
@@ -823,7 +823,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         now + 3660,
         10,
         ethers.parseEther("100"), // α = 100
-        feePolicy.target,
+        feePolicy.target.toString(),
         await seedData.getAddress()
       );
 
@@ -853,7 +853,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         now + 3660,
         10,
         ethers.parseEther("100"), // α = 100
-        feePolicy.target,
+        feePolicy.target.toString(),
         await skewedSeedData.getAddress()
       );
 
@@ -885,7 +885,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         now + 3660,
         10,
         ethers.parseEther("100"),
-        feePolicy.target,
+        feePolicy.target.toString(),
         await extremeSeedData.getAddress()
       );
 
@@ -917,7 +917,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         now + 3660,
         10,
         ethers.parseEther("100"),
-        feePolicy.target,
+        feePolicy.target.toString(),
         await seedData.getAddress()
       );
 
@@ -955,7 +955,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           now + 3660, // settlementTimestamp = now + 3660
           10,
           ethers.parseEther("100"),
-          feePolicy.target,
+          feePolicy.target.toString(),
           await seedData.getAddress()
         )
       ).to.not.be.reverted;
@@ -982,7 +982,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         settlementTime,
         10,
         ethers.parseEther("100"),
-        feePolicy.target,
+        feePolicy.target.toString(),
         await seedData.getAddress()
       );
 
@@ -998,7 +998,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           settlementTime, // Same settlementTime → same batchId
           10,
           ethers.parseEther("100"),
-          feePolicy.target,
+          feePolicy.target.toString(),
           await seedData.getAddress()
         )
       ).to.not.be.reverted;
@@ -1027,7 +1027,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         settlementTime1,
         10,
         ethers.parseEther("100"),
-        feePolicy.target,
+        feePolicy.target.toString(),
         await seedData.getAddress()
       );
 
@@ -1042,7 +1042,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
           settlementTime2,
           10,
           ethers.parseEther("100"),
-          feePolicy.target,
+          feePolicy.target.toString(),
           await seedData.getAddress()
         )
       ).to.not.be.reverted;
@@ -1079,7 +1079,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         now + 3660,
         10,
         ethers.parseEther("100"), // α = 100
-        feePolicy.target,
+        feePolicy.target.toString(),
         await seedData.getAddress()
       );
 
@@ -1117,7 +1117,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         now + 3660,
         10,
         ethers.parseEther("1000"), // α = 1000, valid since < 1303
-        feePolicy.target,
+        feePolicy.target.toString(),
         await seedData.getAddress()
       );
 
@@ -1171,7 +1171,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         now + 3660,
         10,
         ethers.parseEther("100"),
-        feePolicy.target,
+        feePolicy.target.toString(),
         await seedData.getAddress()
       );
 

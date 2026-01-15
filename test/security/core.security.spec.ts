@@ -70,7 +70,7 @@ describe("Core Security", () => {
       1,
       1,
       owner.address,
-      feePolicy.target
+      feePolicy.target.toString()
     );
 
     // Create active market
@@ -94,7 +94,7 @@ describe("Core Security", () => {
       settlementTick: 0,
       settlementValue: 0,
       liquidityParameter: WAD,
-      feePolicy: feePolicy.target,
+      feePolicy: feePolicy.target.toString(),
       seedData: ethers.ZeroAddress,
       initialRootSum: 100n * WAD,
       accumulatedFees: 0n,
