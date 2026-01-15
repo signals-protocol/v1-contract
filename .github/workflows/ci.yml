@@ -33,10 +33,14 @@ jobs:
           path: |
             cache
             artifacts
+            typechain-types
           key: hardhat-${{ runner.os }}-${{ hashFiles('yarn.lock', 'hardhat.config.ts', 'hardhat.config.js', 'contracts/**') }}
 
       - name: Compile contracts
         run: yarn hardhat compile
+
+      - name: Generate typechain types
+        run: npx hardhat typechain
 
       - name: TypeScript strict check
         run: npx tsc --noEmit --noUnusedLocals --noUnusedParameters
@@ -64,10 +68,14 @@ jobs:
           path: |
             cache
             artifacts
+            typechain-types
           key: hardhat-${{ runner.os }}-${{ hashFiles('yarn.lock', 'hardhat.config.ts', 'hardhat.config.js', 'contracts/**') }}
 
       - name: Compile contracts
         run: yarn hardhat compile
+
+      - name: Generate typechain types
+        run: npx hardhat typechain
 
       - name: Run tests
         run: yarn test
@@ -94,6 +102,7 @@ jobs:
           path: |
             cache
             artifacts
+            typechain-types
           key: hardhat-${{ runner.os }}-${{ hashFiles('yarn.lock', 'hardhat.config.ts', 'hardhat.config.js', 'contracts/**') }}
 
       - name: Compile contracts
