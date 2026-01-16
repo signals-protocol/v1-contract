@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-/// @notice Strategy interface for overlay trade fees applied after core settlement (ported from v0).
+/// @notice Strategy interface for overlay trade fees applied on top of CLMSR cost.
 interface IFeePolicy {
     struct QuoteParams {
         address trader;

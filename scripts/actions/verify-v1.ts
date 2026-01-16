@@ -200,7 +200,7 @@ export async function verifyAction(env: Environment) {
     {
       name: "SignalsUSDToken",
       address: paymentTokenAddress,
-      contract: "contracts/tokens/SignalsUSDToken.sol:SignalsUSDToken",
+      contract: "contracts/testonly/SignalsUSDToken.sol:SignalsUSDToken",
     },
     ...(canVerifyLpShare
       ? [

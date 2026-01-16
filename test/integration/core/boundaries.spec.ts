@@ -88,9 +88,7 @@ describe("Boundaries", () => {
       payment.target,
       await position.getAddress(),
       1,
-      1,
-      owner.address,
-      feePolicy.target.toString()
+      1
     );
 
     const now = (await ethers.provider.getBlock("latest"))!.timestamp;
@@ -381,9 +379,7 @@ describe("Boundaries", () => {
         payment.target,
         await position.getAddress(),
         1,
-        1,
-        owner.address,
-        feePolicy.target.toString()
+        1
       );
 
       await position.connect(owner).setCore(core.target);

@@ -44,6 +44,16 @@ contract SignalsCore is
     event LpShareTokenUpdated(address lpShareToken);
     event ModulesUpdated(address trade, address lifecycle, address risk, address vault, address oracle);
 
+    // ============================================================
+    // Modifiers
+    // ============================================================
+    modifier onlyOwnerOrOperator() {
+        if (msg.sender != owner() && !_operators[msg.sender]) {
+            revert SignalsErrors.UnauthorizedCaller(msg.sender);
+        }
+        _;
+    }
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -81,6 +91,17 @@ contract SignalsCore is
         vaultModule = _vaultModule;
         oracleModule = _oracleModule;
         emit ModulesUpdated(_tradeModule, _lifecycleModule, _riskModule, _vaultModule, _oracleModule);
+    }
+
+    /// @notice Add or remove operator from allowlist
+    function setOperator(address operator, bool allowed) external onlyOwner {
+        if (operator == address(0)) revert SignalsErrors.ZeroAddress();
+        _operators[operator] = allowed;
+        emit OperatorUpdated(operator, allowed);
+    }
+
+    function operators(address operator) external view override returns (bool) {
+        return _operators[operator];
     }
 
     // ============================================================
@@ -310,7 +331,7 @@ contract SignalsCore is
         uint256 liquidityParameter,
         address feePolicy,
         address seedData
-    ) public override onlyOwner whenNotPaused returns (uint256 marketId) {
+    ) public override onlyOwnerOrOperator whenNotPaused returns (uint256 marketId) {
         // Risk gate first: validate α bounds and prior admissibility
         _riskGate(abi.encodeCall(
             IRiskModule.gateCreateMarket,
@@ -334,11 +355,11 @@ contract SignalsCore is
         if (ret.length > 0) marketId = abi.decode(ret, (uint256));
     }
 
-    function finalizePrimarySettlement(uint256 marketId) external override onlyOwner whenNotPaused {
+    function finalizePrimarySettlement(uint256 marketId) external override onlyOwnerOrOperator whenNotPaused {
         _delegate(lifecycleModule, abi.encodeWithSignature("finalizePrimarySettlement(uint256)", marketId));
     }
 
-    function markSettlementFailed(uint256 marketId) external override onlyOwner whenNotPaused {
+    function markSettlementFailed(uint256 marketId) external override onlyOwnerOrOperator whenNotPaused {
         _delegate(lifecycleModule, abi.encodeWithSignature("markSettlementFailed(uint256)", marketId));
     }
 
@@ -365,7 +386,7 @@ contract SignalsCore is
         _delegate(lifecycleModule, abi.encodeWithSignature("reopenMarket(uint256)", marketId));
     }
 
-    function seedNextChunks(uint256 marketId, uint32 count) public override onlyOwner whenNotPaused {
+    function seedNextChunks(uint256 marketId, uint32 count) public override onlyOwnerOrOperator whenNotPaused {
         _delegate(lifecycleModule, abi.encodeWithSignature("seedNextChunks(uint256,uint32)", marketId, count));
     }
 
@@ -466,11 +487,11 @@ contract SignalsCore is
         if (ret.length > 0) (price, priceTimestamp) = abi.decode(ret, (int256, uint64));
     }
 
-    /// @notice Trigger settlement snapshot chunks after market settlement (owner only).
+    /// @notice Trigger settlement snapshot chunks after market settlement (owner/operator).
     function requestSettlementChunks(uint256 marketId, uint32 maxChunksPerTx)
         external
         override
-        onlyOwner
+        onlyOwnerOrOperator
         whenNotPaused
         returns (uint32 emitted)
     {
@@ -508,7 +529,7 @@ contract SignalsCore is
         _delegate(vaultModule, abi.encodeWithSignature("cancelWithdraw(uint64)", requestId));
     }
 
-    function processDailyBatch(uint64 batchId) external onlyOwner whenNotPaused nonReentrant {
+    function processDailyBatch(uint64 batchId) external onlyOwnerOrOperator whenNotPaused nonReentrant {
         _delegate(vaultModule, abi.encodeWithSignature("processDailyBatch(uint64)", batchId));
     }
 
@@ -647,7 +668,8 @@ contract SignalsCore is
         return ret;
     }
 
-    /// @dev Delegate to a module for view paths via staticcall; bubble up reverts.
+    /// @dev Delegate to a module for view-like paths; bubble up reverts.
+    /// @notice Uses delegatecall to access storage in Core's context.
     function _delegateView(address module, bytes memory callData) internal returns (bytes memory) {
         if (module == address(0)) revert SignalsErrors.ModuleNotSet();
         (bool success, bytes memory ret) = module.delegatecall(callData);

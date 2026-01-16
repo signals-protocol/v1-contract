@@ -63,6 +63,12 @@ abstract contract SignalsCoreStorage {
     /// @notice Redstone feed decimals (e.g., 8 for BTC/USD)
     uint8 public redstoneFeedDecimals;
 
+    // ============================================================
+    // Operator Access Control
+    // ============================================================
+    /// @notice Operator allowlist for automation.
+    mapping(address => bool) internal _operators;
+
     IERC20 public paymentToken;
     ISignalsPosition public positionContract;
     
@@ -79,12 +85,8 @@ abstract contract SignalsCoreStorage {
     }
 
     mapping(uint256 => SettlementOracleState) internal settlementOracleState;
-    address public settlementOracleSigner;
 
     mapping(uint256 => bool) public positionSettledEmitted;
-
-    address public feeRecipient;
-    address public defaultFeePolicy;
 
     // ============================================================
     // LP Vault State
@@ -249,7 +251,7 @@ abstract contract SignalsCoreStorage {
     ///      - pointQuery(bin): O(n) - prefix sum over [0..bin]
     ///      Index is 0-based: diff[0..numBins-1]
     ///      Signed int256 to support both positive and negative deltas
-    mapping(uint256 => mapping(uint32 => int256)) internal _exposureFenwick;
+    mapping(uint256 => mapping(uint32 => int256)) internal _exposureDiff;
 
     /// @notice Market ID → payout reserve (escrow) for settled markets
     /// @dev Set at settleMarket time, equals Q_{τ_t} (exposure at settlement tick)
@@ -273,7 +275,7 @@ abstract contract SignalsCoreStorage {
     ///      Incremented at settlement, decremented on claimPayout
     uint256 internal _totalPayoutReserve6;
 
-    /// @notice Total pending withdrawals in 6-decimal token units (HIGH-01 fix)
+    /// @notice Total pending withdrawals in 6-decimal token units
     /// @dev Incremented at processDailyBatch when withdrawals are processed,
     ///      decremented on claimWithdraw. Ensures withdrawal funds are reserved
     ///      and cannot be used for other payments (payout claims, transfers, etc.)
@@ -306,5 +308,5 @@ abstract contract SignalsCoreStorage {
     mapping(uint256 => bool) internal _marketBatchResolved;
 
     // Reserve ample slots for future upgrades; do not change after first deployment.
-    uint256[13] internal __gap;
+    uint256[12] internal __gap;
 }

@@ -190,9 +190,4 @@ interface SignalsErrors {
     error ExposureDiffInvalidRange(int256 start, int256 end);
     error ExposureDiffBinOutOfBounds(int256 bin, uint32 numBins);
     error ExposureDiffNegativeExposure(int256 bin, int256 exposure);
-
-    // ============================================================
-    // Test Harness
-    // ============================================================
-    error EmptyFactors();
 }

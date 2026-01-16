@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 interface ISignalsCore {
+    event OperatorUpdated(address indexed operator, bool allowed);
     struct Market {
         // status flags (packable)
         bool isSeeded;
@@ -49,7 +50,7 @@ interface ISignalsCore {
         uint256 deltaEt;
     }
 
-    // Trade / lifecycle entrypoints (signatures preserved for parity)
+    // Trade / lifecycle entrypoints
     function openPosition(
         uint256 marketId,
         int256 lowerTick,
@@ -77,7 +78,7 @@ interface ISignalsCore {
 
     function claimPayout(uint256 positionId) external;
 
-    // View helpers (v0 parity)
+    // View helpers for cost/proceeds calculation
     function calculateOpenCost(
         uint256 marketId,
         int256 lowerTick,
@@ -98,6 +99,10 @@ interface ISignalsCore {
     function calculateCloseProceeds(uint256 positionId) external returns (uint256 proceeds);
 
     function calculatePositionValue(uint256 positionId) external returns (uint256 value);
+
+    // Operator allowlist
+    function setOperator(address operator, bool allowed) external;
+    function operators(address operator) external view returns (bool);
 
     // Lifecycle: settlement snapshot trigger
     function requestSettlementChunks(uint256 marketId, uint32 maxChunksPerTx) external returns (uint32 emitted);
@@ -176,11 +181,11 @@ interface ISignalsCore {
     function getBatchMarketState(uint64 batchId) external view returns (uint64 total, uint64 resolved);
 
     /// @notice Mark a market's settlement as failed due to oracle issue
-    /// @dev Operations can call during PendingOps window
+    /// @dev Owner or operator can call during PendingOps window
     function markSettlementFailed(uint256 marketId) external;
 
     /// @notice Finalize secondary settlement for a failed market
-    /// @dev Can only be called by ops on a market marked as failed
+    /// @dev Owner-only on a market marked as failed
     function finalizeSecondarySettlement(
         uint256 marketId,
         int256 settlementValue

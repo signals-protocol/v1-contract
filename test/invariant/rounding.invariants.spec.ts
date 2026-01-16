@@ -66,9 +66,7 @@ describe("Rounding Invariants", () => {
       payment.target,
       await position.getAddress(),
       1,
-      1,
-      owner.address,
-      feePolicy.target.toString()
+      1
     );
 
     const now = (await ethers.provider.getBlock("latest"))!.timestamp;

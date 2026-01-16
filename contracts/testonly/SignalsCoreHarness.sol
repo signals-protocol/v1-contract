@@ -11,6 +11,13 @@ import "../utils/SeedData.sol";
 contract SignalsCoreHarness is SignalsCore {
     using LazyMulSegmentTree for LazyMulSegmentTree.Tree;
 
+    /// @dev Internal helper for raw prefix sum (test-only, not in production lib)
+    function _rawPrefixSum(mapping(uint32 => int256) storage diff, uint32 bin) internal view returns (int256 sum) {
+        for (uint32 i = 0; i <= bin; i++) {
+            sum += diff[i];
+        }
+    }
+
     function harnessSetMarket(uint256 marketId, ISignalsCore.Market calldata market) external onlyOwner {
         markets[marketId] = market;
     }
@@ -65,14 +72,14 @@ contract SignalsCoreHarness is SignalsCore {
         ISignalsCore.Market storage market = markets[marketId];
         uint32 bin = TickBinLib.tickToBin(market.minTick, market.tickSpacing, market.numBins, tick);
         
-        // Get current exposure via Fenwick point query
-        int256 current = ExposureDiffLib.rawPrefixSum(_exposureFenwick[marketId], bin);
+        // Get current exposure via prefix sum
+        int256 current = _rawPrefixSum(_exposureDiff[marketId], bin);
         int256 delta = int256(exposure) - current;
         
         // Apply delta to single bin [bin, bin]
         if (delta != 0) {
             ExposureDiffLib.rangeAdd(
-                _exposureFenwick[marketId],
+                _exposureDiff[marketId],
                 bin,
                 bin,
                 delta,
@@ -101,7 +108,7 @@ contract SignalsCoreHarness is SignalsCore {
         );
         
         ExposureDiffLib.rangeAdd(
-            _exposureFenwick[marketId],
+            _exposureDiff[marketId],
             loBin,
             hiBin,
             int256(quantity),
@@ -118,12 +125,12 @@ contract SignalsCoreHarness is SignalsCore {
         ISignalsCore.Market storage market = markets[marketId];
         uint32 bin = TickBinLib.tickToBin(market.minTick, market.tickSpacing, market.numBins, tick);
         
-        int256 current = ExposureDiffLib.rawPrefixSum(_exposureFenwick[marketId], bin);
+        int256 current = _rawPrefixSum(_exposureDiff[marketId], bin);
         int256 delta = int256(quantity) - current;
         
         if (delta != 0) {
             ExposureDiffLib.rangeAdd(
-                _exposureFenwick[marketId],
+                _exposureDiff[marketId],
                 bin,
                 bin,
                 delta,
@@ -132,7 +139,7 @@ contract SignalsCoreHarness is SignalsCore {
         }
     }
 
-    /// @notice Set payout reserve for a market (testing)
+    /// @notice Set payout reserve for a market (for testing)
     function harnessSetPayoutReserve(
         uint256 marketId,
         uint256 amount
@@ -150,7 +157,7 @@ contract SignalsCoreHarness is SignalsCore {
     function harnessGetExposure(uint256 marketId, int256 tick) external view returns (uint256 exposure) {
         ISignalsCore.Market storage market = markets[marketId];
         uint32 bin = TickBinLib.tickToBin(market.minTick, market.tickSpacing, market.numBins, tick);
-        return ExposureDiffLib.pointQuery(_exposureFenwick[marketId], bin);
+        return ExposureDiffLib.pointQuery(_exposureDiff[marketId], bin);
     }
 
     /**

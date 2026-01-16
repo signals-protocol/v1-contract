@@ -17,7 +17,7 @@ import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
  *   - Queries are rare (only at settlement, once per market)
  *
  * Storage layout:
- *   - Uses existing _exposureFenwick mapping as diff array
+ *   - Uses existing _exposureDiff mapping as diff array
  *   - diff[bin] stores the delta at that bin boundary
  *   - Exposure at bin b = sum(diff[0..b])
  */
@@ -72,22 +72,6 @@ library ExposureDiffLib {
         if (sum < 0) revert SE.ExposureDiffNegativeExposure(int256(uint256(bin)), sum);
         
         return uint256(sum);
-    }
-
-    /**
-     * @notice Query raw prefix sum at a bin (for testing/debugging)
-     * @dev Returns signed value without non-negative check
-     * @param diff The diff array storage
-     * @param bin Bin index to query
-     * @return sum Raw prefix sum (may be negative)
-     */
-    function rawPrefixSum(
-        mapping(uint32 => int256) storage diff,
-        uint32 bin
-    ) internal view returns (int256 sum) {
-        for (uint32 i = 0; i <= bin; i++) {
-            sum += diff[i];
-        }
     }
 }
 

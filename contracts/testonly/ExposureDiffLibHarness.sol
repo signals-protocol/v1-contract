@@ -18,9 +18,11 @@ contract ExposureDiffLibHarness {
         return ExposureDiffLib.pointQuery(diff, bin);
     }
 
-    /// @notice Query raw prefix sum at a bin
-    function rawPrefixSum(uint32 bin) external view returns (int256) {
-        return ExposureDiffLib.rawPrefixSum(diff, bin);
+    /// @notice Query raw prefix sum at a bin (for testing)
+    function rawPrefixSum(uint32 bin) external view returns (int256 sum) {
+        for (uint32 i = 0; i <= bin; i++) {
+            sum += diff[i];
+        }
     }
 
     /// @notice Get diff value at specific bin (for testing)

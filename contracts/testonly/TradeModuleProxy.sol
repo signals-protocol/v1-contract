@@ -22,16 +22,12 @@ contract TradeModuleProxy is SignalsCoreStorage {
         address payment,
         address position,
         uint64 submitWindow,
-        uint64 finalizeDeadline,
-        address _feeRecipient,
-        address _defaultFeePolicy
+        uint64 finalizeDeadline
     ) external {
         paymentToken = IERC20(payment);
         positionContract = ISignalsPosition(position);
         settlementSubmitWindow = submitWindow;
         claimDelaySeconds = finalizeDeadline;
-        feeRecipient = _feeRecipient;
-        defaultFeePolicy = _defaultFeePolicy;
     }
 
     function setMarket(uint256 marketId, ISignalsCore.Market calldata market) external {

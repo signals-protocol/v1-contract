@@ -482,7 +482,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         return tick;
     }
 
-    /// @dev Get payout exposure at a specific tick using Fenwick point query
+    /// @dev Get payout exposure at a specific tick using diff-array point query
     /// @param marketId Market identifier
     /// @param market Market struct
     /// @param tick Settlement tick (must be aligned to tickSpacing)
@@ -493,7 +493,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         int256 tick
     ) internal view returns (uint256 exposure) {
         uint32 bin = TickBinLib.tickToBin(market.minTick, market.tickSpacing, market.numBins, tick);
-        return ExposureDiffLib.pointQuery(_exposureFenwick[marketId], bin);
+        return ExposureDiffLib.pointQuery(_exposureDiff[marketId], bin);
     }
 
     function _calculateTotalChunks(uint32 openPositionCount) internal pure returns (uint32) {
@@ -604,7 +604,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         }
         
         // Payout_t := Q_{t,τ_t} (WP v2 Eq. 3.11)
-        // Get payout exposure at settlement tick using Fenwick point query
+        // Get payout exposure at settlement tick using diff-array point query
         payoutReserve = _getExposureAtTick(marketId, market, settlementTick);
         
         // L_t := ΔC_t - Payout_t (WP v2 Eq. 3.12)

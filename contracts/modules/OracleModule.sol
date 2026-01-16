@@ -8,7 +8,7 @@ import "@redstone-finance/evm-connector/contracts/data-services/PrimaryProdDataS
 /// @title OracleModule
 /// @notice Delegate-only oracle module with Redstone signed-pull oracle
 /// @dev Implements:
-///      - Redstone signed-pull oracle verification (v0 compatible)
+///      - Redstone signed-pull oracle verification
 ///      - Closest-sample selection: |priceTimestamp - Tset| minimum, tie-break to past
 ///      - Δmax validation: reject samples too far from Tset
 ///      - δfuture validation: reject future-dated samples

@@ -68,9 +68,7 @@ describe("Core Security", () => {
       payment.target,
       await position.getAddress(),
       1,
-      1,
-      owner.address,
-      feePolicy.target.toString()
+      1
     );
 
     // Create active market

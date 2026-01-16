@@ -3,12 +3,13 @@ pragma solidity ^0.8.28;
 
 import {LazyMulSegmentTree} from "../lib/LazyMulSegmentTree.sol";
 import {FixedPointMathU} from "../lib/FixedPointMathU.sol";
-import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
 
 /// @notice Test harness for LazyMulSegmentTree library.
 /// @dev Exposes all tree operations for unit testing.
 contract LazyMulSegmentTreeHarness {
     using LazyMulSegmentTree for LazyMulSegmentTree.Tree;
+
+    error EmptyFactors();
 
     LazyMulSegmentTree.Tree private tree;
 
@@ -50,7 +51,7 @@ contract LazyMulSegmentTreeHarness {
 
     /// @notice Initialize and seed in one call.
     function initAndSeed(uint256[] calldata factors) external {
-        if (factors.length == 0) revert SE.EmptyFactors();
+        if (factors.length == 0) revert EmptyFactors();
         // Reset entire tree struct (dense version)
         delete tree;
         tree.init(uint32(factors.length));

@@ -12,11 +12,12 @@ import { USDC_DECIMALS, batchEndTimestamp } from "../helpers/constants";
  */
 describe("Batch Processing Security", () => {
   async function deployBatchFixture() {
-    const [owner, user1] = await ethers.getSigners();
+    const [owner, user1, user2] = await ethers.getSigners();
 
     const payment = await (await ethers.getContractFactory("SignalsUSDToken")).deploy();
     const fundAmount = ethers.parseUnits("1000000", USDC_DECIMALS);
     await payment.transfer(user1.address, fundAmount);
+    await payment.transfer(user2.address, fundAmount);
 
     const positionImpl = await (await ethers.getContractFactory("SignalsPosition")).deploy();
     const positionInit = positionImpl.interface.encodeFunctionData("initialize", [owner.address]);
@@ -95,12 +96,13 @@ describe("Batch Processing Security", () => {
     await position.setCore(core.target);
 
     await payment.connect(user1).approve(core.target, ethers.MaxUint256);
+    await payment.connect(user2).approve(core.target, ethers.MaxUint256);
     await payment.connect(owner).approve(core.target, ethers.MaxUint256);
 
     // Seed vault
     await core.connect(owner).seedVault(ethers.parseUnits("100000", USDC_DECIMALS));
 
-    return { core, payment, owner, user1, lpVaultModule };
+    return { core, payment, owner, user1, user2, lpVaultModule };
   }
 
   async function seedBatchForProcessing(core: any, batchId: bigint) {
@@ -136,8 +138,8 @@ describe("Batch Processing Security", () => {
         .withArgs(nextBatchId);
     });
     
-    it("prevents non-owner from processing batch", async () => {
-      const { core, owner, user1 } = await loadFixture(deployBatchFixture);
+    it("allows owner or operator, rejects non-operator", async () => {
+      const { core, owner, user1, user2 } = await loadFixture(deployBatchFixture);
       
       const currentBatchId = await core.currentBatchId();
       const nextBatchId = currentBatchId + 1n;
@@ -145,11 +147,13 @@ describe("Batch Processing Security", () => {
       await seedBatchForProcessing(core, nextBatchId);
       
       await expect(
-        core.connect(user1).processDailyBatch(nextBatchId)
-      ).to.be.revertedWithCustomError(core, "OwnableUnauthorizedAccount");
-      
+        core.connect(user2).processDailyBatch(nextBatchId)
+      ).to.be.revertedWithCustomError(core, "UnauthorizedCaller").withArgs(user2.address);
+
+      await core.connect(owner).setOperator(user1.address, true);
+
       await expect(
-        core.connect(owner).processDailyBatch(nextBatchId)
+        core.connect(user1).processDailyBatch(nextBatchId)
       ).to.not.be.reverted;
     });
   });

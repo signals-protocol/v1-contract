@@ -71,9 +71,7 @@ async function deploySystem(
     payment.target,
     await position.getAddress(),
     300,
-    60,
-    owner.address,
-    feePolicy.target.toString()
+    60
   );
 
   const now = (await ethers.provider.getBlock("latest"))!.timestamp;

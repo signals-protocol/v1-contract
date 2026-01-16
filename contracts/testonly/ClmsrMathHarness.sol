@@ -3,7 +3,6 @@ pragma solidity ^0.8.28;
 
 import "../lib/LazyMulSegmentTree.sol";
 import "../lib/ClmsrMath.sol";
-import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
 
 /// @notice Harness for CLMSR math: initializes a tree from bins and exposes quote helpers.
 /// @dev Uses the same LazyMulSegmentTree/ClmsrMath stack that backs TradeModule,
@@ -11,11 +10,13 @@ import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
 contract ClmsrMathHarness {
     using LazyMulSegmentTree for LazyMulSegmentTree.Tree;
 
+    error EmptyFactors();
+
     LazyMulSegmentTree.Tree private tree;
 
     /// @notice Seed the tree with explicit bin factors.
     function seed(uint256[] memory factors) external {
-        if (factors.length == 0) revert SE.EmptyFactors();
+        if (factors.length == 0) revert EmptyFactors();
         // Reset entire tree struct for re-use (dense version)
         delete tree;
         tree.init(uint32(factors.length));

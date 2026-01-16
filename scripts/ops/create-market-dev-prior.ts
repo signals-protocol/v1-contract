@@ -42,8 +42,8 @@ const CONFIG: CreateMarketConfig = {
     anchorPrice: 94_000,
     numBins: 60,
     tickSpacing: 200,
-    startDelaySec: -24 * 3600,
-    durationSec: 48 * 3600,
+    startDelaySec: -60,
+    durationSec: 3 * 24 * 3600,
     settlementDelaySec: 0,
     seedChunkSize: 50,
     liquidity: {

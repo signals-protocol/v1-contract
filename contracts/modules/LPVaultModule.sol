@@ -117,7 +117,7 @@ contract LPVaultModule is SignalsCoreStorage {
         lpVault.lastBatchTimestamp = uint64(block.timestamp);
         lpVault.isSeeded = true;
 
-        // HIGH-02: Mint dead shares to prevent shares=0 brick
+        // Mint dead shares to prevent shares=0 brick
         // These shares are locked forever in DEAD_ADDRESS and can never be withdrawn
         // This ensures totalShares > MIN_DEAD_SHARES always after seeding
         uint256 seederShares = seedAmountWad - MIN_DEAD_SHARES;
@@ -225,7 +225,7 @@ contract LPVaultModule is SignalsCoreStorage {
         uint256 amountWad = req.amount;  // Stored as WAD
         uint64 eligibleBatchId = req.eligibleBatchId;
 
-        // CRITICAL-01: Prevent cancel after batch processed (too-late check)
+        // Prevent cancel after batch processed (too-late check)
         // Once batch is processed, deposit is already reflected in NAV/shares
         // Allowing cancel would enable double-spending of funds
         if (_batchAggregations[eligibleBatchId].processed) revert SE.CancelTooLate(requestId, eligibleBatchId);
@@ -257,7 +257,7 @@ contract LPVaultModule is SignalsCoreStorage {
         uint256 shares = req.shares;
         uint64 eligibleBatchId = req.eligibleBatchId;
 
-        // CRITICAL-03: Prevent cancel after batch processed (too-late check)
+        // Prevent cancel after batch processed (too-late check)
         // Once batch is processed, withdrawal is reserved in vault accounting
         if (_batchAggregations[eligibleBatchId].processed) revert SE.CancelTooLate(requestId, eligibleBatchId);
 
@@ -346,11 +346,11 @@ contract LPVaultModule is SignalsCoreStorage {
                 totalWithdraws
             );
             
-            // HIGH-02: Prevent shares from dropping below MIN_DEAD_SHARES
+            // Prevent shares from dropping below MIN_DEAD_SHARES
             // This ensures the vault can never brick due to zero shares
             if (currentShares < MIN_DEAD_SHARES) revert SE.WithdrawalWouldBrickVault(currentShares, MIN_DEAD_SHARES);
             
-            // HIGH-01: Reserve withdrawal funds (conservative floor rounding)
+            // Reserve withdrawal funds (conservative floor rounding)
             // Use floor to ensure we never over-reserve
             uint256 withdrawAssets6 = withdrawAssetsWad.fromWad();
             _totalPendingWithdrawals6 += withdrawAssets6;
@@ -448,7 +448,7 @@ contract LPVaultModule is SignalsCoreStorage {
     /**
      * @notice Calculate free balance available for payouts (excludes withdrawals)
      * @dev Free balance = token balance - pending deposits - payout reserves - pending withdrawals
-     *      HIGH-01 fix: Includes _totalPendingWithdrawals6 to ensure withdrawal funds are reserved
+     *      Includes _totalPendingWithdrawals6 to ensure withdrawal funds are reserved
      *      and cannot be used for payout claims, transfers, or other payments
      * @return Free balance in 6-decimal token units
      */
@@ -540,7 +540,7 @@ contract LPVaultModule is SignalsCoreStorage {
         // Convert WAD to 6 decimals for token transfer (dust stays in vault)
         uint256 assets6 = assets.fromWad();
         
-        // HIGH-01: Draw from withdrawal reserve (reserved at batch processing time)
+        // Draw from withdrawal reserve (reserved at batch processing time)
         // Withdrawal funds were reserved in _totalPendingWithdrawals6, now release them
         // Note: No _requireFreeBalance check needed as funds are already reserved
         _totalPendingWithdrawals6 -= assets6;

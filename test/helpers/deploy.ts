@@ -125,9 +125,7 @@ export async function deployTradeModuleSystem(
     payment.target,
     await position.getAddress(),
     opts.submitWindow ?? 300,
-    opts.settlementWindow ?? 60,
-    owner.address,
-    feePolicy.target.toString()
+    opts.settlementWindow ?? 60
   );
 
   // Set up markets

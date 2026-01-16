@@ -1,0 +1,332 @@
+import { expect } from "chai";
+import { ethers } from "hardhat";
+import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
+import { USDC_DECIMALS, WAD, uniformFactors } from "../helpers/constants";
+import { deploySeedData } from "../helpers";
+
+describe("Operator Access Control", () => {
+  async function deployOperatorFixture() {
+    const [owner, operator, outsider] = await ethers.getSigners();
+
+    const payment = await (await ethers.getContractFactory("SignalsUSDToken")).deploy();
+    const fundAmount = ethers.parseUnits("1000000", USDC_DECIMALS);
+    await payment.transfer(operator.address, fundAmount);
+    await payment.transfer(outsider.address, fundAmount);
+
+    const positionImpl = await (await ethers.getContractFactory("SignalsPosition")).deploy();
+    const positionInit = positionImpl.interface.encodeFunctionData("initialize", [owner.address]);
+    const positionProxy = await (await ethers.getContractFactory("TestERC1967Proxy")).deploy(
+      positionImpl.target,
+      positionInit
+    );
+    const position = await ethers.getContractAt("SignalsPosition", positionProxy.target);
+
+    const feePolicy = await (await ethers.getContractFactory("MockFeePolicy")).deploy(0);
+    const lazyLib = await (await ethers.getContractFactory("LazyMulSegmentTree")).deploy();
+
+    const oracleModule = await (await ethers.getContractFactory("OracleModuleHarness")).deploy();
+    const tradeModule = await (await ethers.getContractFactory("TradeModule", {
+      libraries: { LazyMulSegmentTree: lazyLib.target },
+    })).deploy();
+    const lifecycleModule = await (await ethers.getContractFactory("MarketLifecycleModule", {
+      libraries: { LazyMulSegmentTree: lazyLib.target },
+    })).deploy();
+    const lpVaultModule = await (await ethers.getContractFactory("LPVaultModule")).deploy();
+    const riskModule = await (await ethers.getContractFactory("RiskModule")).deploy();
+
+    const coreImpl = await (await ethers.getContractFactory("SignalsCoreHarness", {
+      libraries: { LazyMulSegmentTree: lazyLib.target },
+    })).deploy();
+    const coreInit = coreImpl.interface.encodeFunctionData("initialize", [
+      payment.target,
+      position.target,
+      3600,
+      3600,
+    ]);
+    const coreProxy = await (await ethers.getContractFactory("TestERC1967Proxy")).deploy(
+      coreImpl.target,
+      coreInit
+    );
+    const core = await ethers.getContractAt("SignalsCoreHarness", coreProxy.target);
+
+    const lpShare = await (await ethers.getContractFactory("SignalsLPShare")).deploy(
+      "Signals LP Share",
+      "sLP",
+      core.target,
+      payment.target
+    );
+
+    await core.setModules(
+      tradeModule.target,
+      lifecycleModule.target,
+      riskModule.target,
+      lpVaultModule.target,
+      oracleModule.target
+    );
+    await core.setLpShareToken(lpShare.target);
+
+    const feedId = ethers.encodeBytes32String("BTC");
+    await core.setRedstoneConfig(feedId, 8, 600, 60);
+
+    await core.setRiskConfig(
+      ethers.parseEther("0.2"),
+      ethers.parseEther("1"),
+      false
+    );
+    await core.setFeeWaterfallConfig(
+      0n,
+      ethers.parseEther("0.8"),
+      ethers.parseEther("0.1"),
+      ethers.parseEther("0.1")
+    );
+    await core.setMinSeedAmount(1);
+
+    await position.setCore(core.target);
+    await payment.connect(owner).approve(core.target, ethers.MaxUint256);
+    await payment.connect(operator).approve(core.target, ethers.MaxUint256);
+    await payment.connect(outsider).approve(core.target, ethers.MaxUint256);
+    await core.connect(owner).seedVault(ethers.parseUnits("100000", USDC_DECIMALS));
+
+    return { core, owner, operator, outsider, feePolicy, lifecycleModule };
+  }
+
+  function buildMarketParams(now: number, feePolicyAddress: string, seedData: string) {
+    return {
+      minTick: 0,
+      maxTick: 4,
+      tickSpacing: 1,
+      start: now - 100,
+      end: now + 10000,
+      settlement: now + 10100,
+      numBins: 4,
+      liquidityParameter: WAD,
+      feePolicyAddress,
+      seedData,
+    };
+  }
+
+  it("owner manages operator allowlist; zero address rejected", async () => {
+    const { core, owner, operator, outsider } = await loadFixture(deployOperatorFixture);
+
+    await expect(core.connect(outsider).setOperator(operator.address, true))
+      .to.be.revertedWithCustomError(core, "OwnableUnauthorizedAccount");
+
+    await expect(core.connect(owner).setOperator(ethers.ZeroAddress, true))
+      .to.be.revertedWithCustomError(core, "ZeroAddress");
+
+    await expect(core.connect(owner).setOperator(operator.address, true))
+      .to.emit(core, "OperatorUpdated")
+      .withArgs(operator.address, true);
+
+    expect(await core.operators(operator.address)).to.equal(true);
+
+    await expect(core.connect(owner).setOperator(operator.address, false))
+      .to.emit(core, "OperatorUpdated")
+      .withArgs(operator.address, false);
+
+    expect(await core.operators(operator.address)).to.equal(false);
+  });
+
+  it("gates createMarket to owner/operator", async () => {
+    const { core, owner, operator, outsider, feePolicy } = await loadFixture(
+      deployOperatorFixture
+    );
+
+    const now = (await ethers.provider.getBlock("latest"))!.timestamp;
+    const seedData = await deploySeedData(uniformFactors(4));
+    const params = buildMarketParams(now, feePolicy.target.toString(), await seedData.getAddress());
+
+    await expect(
+      core.connect(outsider).createMarket(
+        params.minTick,
+        params.maxTick,
+        params.tickSpacing,
+        params.start,
+        params.end,
+        params.settlement,
+        params.numBins,
+        params.liquidityParameter,
+        params.feePolicyAddress,
+        params.seedData
+      )
+    ).to.be.revertedWithCustomError(core, "UnauthorizedCaller").withArgs(outsider.address);
+
+    await expect(
+      core.connect(owner).createMarket(
+        params.minTick,
+        params.maxTick,
+        params.tickSpacing,
+        params.start,
+        params.end,
+        params.settlement,
+        params.numBins,
+        params.liquidityParameter,
+        params.feePolicyAddress,
+        params.seedData
+      )
+    ).to.not.be.reverted;
+
+    await core.connect(owner).setOperator(operator.address, true);
+    const operatorSeed = await deploySeedData(uniformFactors(4));
+    const operatorParams = buildMarketParams(
+      now + 1,
+      feePolicy.target.toString(),
+      await operatorSeed.getAddress()
+    );
+
+    await expect(
+      core.connect(operator).createMarket(
+        operatorParams.minTick,
+        operatorParams.maxTick,
+        operatorParams.tickSpacing,
+        operatorParams.start,
+        operatorParams.end,
+        operatorParams.settlement,
+        operatorParams.numBins,
+        operatorParams.liquidityParameter,
+        operatorParams.feePolicyAddress,
+        operatorParams.seedData
+      )
+    ).to.not.be.reverted;
+  });
+
+  it("gates seedNextChunks to owner/operator", async () => {
+    const { core, owner, operator, outsider, feePolicy, lifecycleModule } = await loadFixture(
+      deployOperatorFixture
+    );
+
+    const now = (await ethers.provider.getBlock("latest"))!.timestamp;
+    const seedData = await deploySeedData(uniformFactors(4));
+    const params = buildMarketParams(now, feePolicy.target.toString(), await seedData.getAddress());
+
+    const marketId = await core.createMarket.staticCall(
+      params.minTick,
+      params.maxTick,
+      params.tickSpacing,
+      params.start,
+      params.end,
+      params.settlement,
+      params.numBins,
+      params.liquidityParameter,
+      params.feePolicyAddress,
+      params.seedData
+    );
+    await core.createMarket(
+      params.minTick,
+      params.maxTick,
+      params.tickSpacing,
+      params.start,
+      params.end,
+      params.settlement,
+      params.numBins,
+      params.liquidityParameter,
+      params.feePolicyAddress,
+      params.seedData
+    );
+
+    await expect(
+      core.connect(outsider).seedNextChunks(marketId, 1)
+    ).to.be.revertedWithCustomError(core, "UnauthorizedCaller").withArgs(outsider.address);
+
+    await core.connect(owner).setOperator(operator.address, true);
+    const lifecycleEvents = lifecycleModule.attach(await core.getAddress());
+
+    await expect(core.connect(operator).seedNextChunks(marketId, 1))
+      .to.emit(lifecycleEvents, "MarketSeedingProgress");
+
+    await expect(core.connect(owner).seedNextChunks(marketId, 3))
+      .to.emit(lifecycleEvents, "MarketSeeded");
+  });
+
+  it("gates settlement ops to owner/operator", async () => {
+    const { core, owner, operator, outsider, lifecycleModule } = await loadFixture(
+      deployOperatorFixture
+    );
+
+    await core.connect(owner).setOperator(operator.address, true);
+
+    await expect(core.connect(outsider).finalizePrimarySettlement(999))
+      .to.be.revertedWithCustomError(core, "UnauthorizedCaller")
+      .withArgs(outsider.address);
+    await expect(core.connect(operator).finalizePrimarySettlement(999))
+      .to.be.revertedWithCustomError(lifecycleModule, "MarketNotFound")
+      .withArgs(999);
+    await expect(core.connect(owner).finalizePrimarySettlement(999))
+      .to.be.revertedWithCustomError(lifecycleModule, "MarketNotFound")
+      .withArgs(999);
+
+    await expect(core.connect(outsider).markSettlementFailed(999))
+      .to.be.revertedWithCustomError(core, "UnauthorizedCaller")
+      .withArgs(outsider.address);
+    await expect(core.connect(operator).markSettlementFailed(999))
+      .to.be.revertedWithCustomError(lifecycleModule, "MarketNotFound")
+      .withArgs(999);
+    await expect(core.connect(owner).markSettlementFailed(999))
+      .to.be.revertedWithCustomError(lifecycleModule, "MarketNotFound")
+      .withArgs(999);
+
+    await expect(core.connect(outsider).requestSettlementChunks(999, 1))
+      .to.be.revertedWithCustomError(core, "UnauthorizedCaller")
+      .withArgs(outsider.address);
+    await expect(core.connect(operator).requestSettlementChunks(999, 1))
+      .to.be.revertedWithCustomError(lifecycleModule, "MarketNotFound")
+      .withArgs(999);
+    await expect(core.connect(owner).requestSettlementChunks(999, 1))
+      .to.be.revertedWithCustomError(lifecycleModule, "MarketNotFound")
+      .withArgs(999);
+  });
+
+  it("finalizeSecondarySettlement is owner-only, rejects operator", async () => {
+    const { core, owner, operator, lifecycleModule } = await loadFixture(
+      deployOperatorFixture
+    );
+
+    await core.connect(owner).setOperator(operator.address, true);
+
+    // operator is rejected with OwnableUnauthorizedAccount
+    await expect(core.connect(operator).finalizeSecondarySettlement(999, 100n))
+      .to.be.revertedWithCustomError(core, "OwnableUnauthorizedAccount")
+      .withArgs(operator.address);
+
+    // owner passes access control but fails on MarketNotFound
+    await expect(core.connect(owner).finalizeSecondarySettlement(999, 100n))
+      .to.be.revertedWithCustomError(lifecycleModule, "MarketNotFound")
+      .withArgs(999);
+  });
+
+  it("reopenMarket is owner-only, rejects operator", async () => {
+    const { core, owner, operator, lifecycleModule } = await loadFixture(
+      deployOperatorFixture
+    );
+
+    await core.connect(owner).setOperator(operator.address, true);
+
+    // operator is rejected with OwnableUnauthorizedAccount
+    await expect(core.connect(operator).reopenMarket(999))
+      .to.be.revertedWithCustomError(core, "OwnableUnauthorizedAccount")
+      .withArgs(operator.address);
+
+    // owner passes access control but fails on MarketNotFound
+    await expect(core.connect(owner).reopenMarket(999))
+      .to.be.revertedWithCustomError(lifecycleModule, "MarketNotFound")
+      .withArgs(999);
+  });
+
+  it("updateMarketTiming is owner-only, rejects operator", async () => {
+    const { core, owner, operator, lifecycleModule } = await loadFixture(
+      deployOperatorFixture
+    );
+
+    await core.connect(owner).setOperator(operator.address, true);
+
+    // operator is rejected with OwnableUnauthorizedAccount
+    await expect(core.connect(operator).updateMarketTiming(999, 100, 200, 300))
+      .to.be.revertedWithCustomError(core, "OwnableUnauthorizedAccount")
+      .withArgs(operator.address);
+
+    // owner passes access control but fails on MarketNotFound
+    await expect(core.connect(owner).updateMarketTiming(999, 100, 200, 300))
+      .to.be.revertedWithCustomError(lifecycleModule, "MarketNotFound")
+      .withArgs(999);
+  });
+});

@@ -20,7 +20,6 @@ contract TradeModule is SignalsCoreStorage {
     uint256 internal constant WAD = 1e18;
     uint256 internal constant MAX_CHUNKS_PER_TX = 100;
 
-    // Events mirrored from v0 for parity
     event PositionOpened(
         uint256 indexed positionId,
         address indexed trader,
@@ -459,7 +458,7 @@ contract TradeModule is SignalsCoreStorage {
 
     /**
      * @notice Get free balance (total balance minus reserved amounts)
-     * @dev HIGH-01: Includes _totalPendingWithdrawals6 to protect withdrawal funds
+     * @dev Includes _totalPendingWithdrawals6 to protect withdrawal funds
      */
     function _getFreeBalance() internal view returns (uint256) {
         uint256 balance = paymentToken.balanceOf(address(this));
@@ -538,7 +537,7 @@ contract TradeModule is SignalsCoreStorage {
         if (!market.settled) return 0;
         bool winning = position.lowerTick <= market.settlementTick && position.upperTick > market.settlementTick;
         if (!winning) return 0;
-        // v0 semantics: payout is position quantity (6-dec) when in-range
+        // Payout is position quantity (6-dec) when in winning range
         return uint256(position.quantity);
     }
 
@@ -556,7 +555,7 @@ contract TradeModule is SignalsCoreStorage {
             lowerTick, upperTick
         );
         ExposureDiffLib.rangeAdd(
-            _exposureFenwick[marketId],
+            _exposureDiff[marketId],
             loBin,
             hiBin,
             int256(uint256(quantity)),
@@ -576,7 +575,7 @@ contract TradeModule is SignalsCoreStorage {
             lowerTick, upperTick
         );
         ExposureDiffLib.rangeAdd(
-            _exposureFenwick[marketId],
+            _exposureDiff[marketId],
             loBin,
             hiBin,
             -int256(uint256(quantity)),
@@ -597,6 +596,6 @@ contract TradeModule is SignalsCoreStorage {
     ) internal view returns (uint256 exposure) {
         ISignalsCore.Market storage market = markets[marketId];
         uint32 bin = TickBinLib.tickToBin(market.minTick, market.tickSpacing, market.numBins, tick);
-        return ExposureDiffLib.pointQuery(_exposureFenwick[marketId], bin);
+        return ExposureDiffLib.pointQuery(_exposureDiff[marketId], bin);
     }
 }

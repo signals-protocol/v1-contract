@@ -15,7 +15,8 @@ async function main() {
 
   for (const log of receipt.logs) {
     try {
-      const parsed = iface.parseLog({ topics: log.topics, data: log.data });
+      const parsed = iface.parseLog({ topics: log.topics as string[], data: log.data });
+      if (!parsed) continue;
       if (parsed.name === "MarketPnlRecorded") {
         decoded.push({
           name: parsed.name,
