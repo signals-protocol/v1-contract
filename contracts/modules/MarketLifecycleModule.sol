@@ -294,7 +294,6 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         state.candidatePriceTimestamp = 0;
 
         market.failed = true;
-        _markMarketResolved(marketId, _getBatchIdForMarket(marketId));
 
         emit MarketFailed(marketId, nowTs);
     }
@@ -339,9 +338,10 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         _totalPayoutReserve6 += payoutReserve;
         
         _recordPnlToBatch(batchId, lt, ftot, market.deltaEt);
-        _markMarketResolved(marketId, batchId);
-
         emit MarketPnlRecorded(marketId, batchId, lt, ftot);
+
+        _markMarketResolved(marketId, batchId);
+        market.failed = false;
         emit MarketSettledSecondary(marketId, settlementValue, settlementTick, market.settlementFinalizedAt);
     }
 
