@@ -1,4 +1,8 @@
-export type Environment = "localhost" | "citrea-dev" | "citrea-prod";
+export type Environment =
+  | "local"
+  | "dev"
+  | "testnet"
+  | "prod";
 
 export interface DeploymentRecord {
   version: number;
@@ -38,7 +42,8 @@ export interface EnvironmentFile {
 }
 
 export const ENV_PATHS: Record<Environment, string> = {
-  "localhost": "scripts/environments/localhost.json",
-  "citrea-dev": "scripts/environments/citrea-dev.json",
-  "citrea-prod": "scripts/environments/citrea-prod.json",
+  "local": "scripts/environments/local.json",
+  "dev": "scripts/environments/dev.json",
+  "testnet": "scripts/environments/testnet.json",
+  "prod": "scripts/environments/prod.json",
 };

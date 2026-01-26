@@ -39,7 +39,6 @@ contract SignalsCore is
     // ============================================================
     event RiskConfigUpdated(uint256 lambda, uint256 kDrawdown, bool enforceAlpha);
     event FeeWaterfallConfigUpdated(uint256 rhoBS, int256 pdd, uint256 phiLP, uint256 phiBS, uint256 phiTR);
-    event CapitalStackUpdated(uint256 backstopNav, uint256 treasuryNav);
     event WithdrawalLagUpdated(uint64 lag);
     event LpShareTokenUpdated(address lpShareToken);
     event ModulesUpdated(address trade, address lifecycle, address risk, address vault, address oracle);
@@ -143,10 +142,24 @@ contract SignalsCore is
         emit FeeWaterfallConfigUpdated(rhoBS, feeWaterfallConfig.pdd, phiLP, phiBS, phiTR);
     }
 
-    function setCapitalStack(uint256 backstopNav, uint256 treasuryNav) external onlyOwner whenNotPaused {
-        capitalStack.backstopNav = backstopNav;
-        capitalStack.treasuryNav = treasuryNav;
-        emit CapitalStackUpdated(backstopNav, treasuryNav);
+    // ============================================================
+    // Capital Stack Funding
+    // ============================================================
+
+    function fundBackstop(uint256 amount6) external whenNotPaused nonReentrant {
+        _delegate(vaultModule, abi.encodeWithSignature("fundBackstop(uint256)", amount6));
+    }
+
+    function withdrawBackstop(uint256 amount6) external onlyOwner whenNotPaused nonReentrant {
+        _delegate(vaultModule, abi.encodeWithSignature("withdrawBackstop(uint256,address)", amount6, owner()));
+    }
+
+    function fundTreasury(uint256 amount6) external whenNotPaused nonReentrant {
+        _delegate(vaultModule, abi.encodeWithSignature("fundTreasury(uint256)", amount6));
+    }
+
+    function withdrawTreasury(uint256 amount6) external onlyOwner whenNotPaused nonReentrant {
+        _delegate(vaultModule, abi.encodeWithSignature("withdrawTreasury(uint256,address)", amount6, owner()));
     }
 
     /// @notice Configure risk parameters for α Safety Bounds

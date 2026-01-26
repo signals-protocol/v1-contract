@@ -7,6 +7,14 @@ import "../interfaces/ISignalsPosition.sol";
 import "../lib/LazyMulSegmentTree.sol";
 
 abstract contract SignalsCoreStorage {
+    // ============================================================
+    // Events (Capital Stack Funding)
+    // ============================================================
+    event BackstopFunded(address indexed from, uint256 amount6, uint256 backstopNav);
+    event BackstopWithdrawn(address indexed to, uint256 amount6, uint256 backstopNav);
+    event TreasuryFunded(address indexed from, uint256 amount6, uint256 treasuryNav);
+    event TreasuryWithdrawn(address indexed to, uint256 amount6, uint256 treasuryNav);
+
     /// @dev Batch/day granularity for daily accounting. Used to derive batchId as day-key.
     uint64 internal constant BATCH_SECONDS = 86_400;
     /// @dev PST (UTC-8) day boundary offset in seconds.

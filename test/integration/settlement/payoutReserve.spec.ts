@@ -159,13 +159,13 @@ describe("PayoutReserve Spec Tests", () => {
       ethers.parseEther("0.1"), // phiBS (WAD ratio)
       ethers.parseEther("0.1") // phiTR (WAD ratio)
     );
-    await core.setCapitalStack(ethers.parseEther("500"), 0n); // WAD amounts
 
     // Fund accounts with 6-decimal token amounts
     await payment.mint(seeder.address, usdc("10000"));
     await payment.mint(trader.address, usdc("10000"));
     await payment.connect(seeder).approve(core.target, ethers.MaxUint256);
     await payment.connect(trader).approve(core.target, ethers.MaxUint256);
+    await core.connect(seeder).fundBackstop(usdc("500"));
 
     return {
       owner,

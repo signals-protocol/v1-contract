@@ -89,9 +89,9 @@ export function recordDeployment(
 
 export function normalizeEnvironment(env: string): Environment {
   if (env.includes(":")) {
-    const [base, stage] = env.split(":");
-    if (base === "citrea") return (`${base}-${stage}` as Environment);
+    const [, stage] = env.split(":");
     return stage as Environment;
   }
+  if (env === "localhost") return "local";
   return env as Environment;
 }

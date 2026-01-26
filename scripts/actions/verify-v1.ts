@@ -11,7 +11,7 @@ type VerifyTarget = {
 };
 
 function isStrict(env: Environment): boolean {
-  return env === "citrea-prod" || process.env.STRICT_VERIFY === "1";
+  return env === "prod" || process.env.STRICT_VERIFY === "1";
 }
 
 function parseNumber(value?: number | string): number | undefined {

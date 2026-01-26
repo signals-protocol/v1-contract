@@ -148,6 +148,17 @@ contract SignalsCoreHarness is SignalsCore {
         _payoutReserveRemaining[marketId] = amount;
     }
 
+    /// @notice Set reserved balances for free-balance checks (test-only)
+    function harnessSetReserves(
+        uint256 pendingDeposits6,
+        uint256 pendingWithdrawals6,
+        uint256 payoutReserve6
+    ) external onlyOwner {
+        _totalPendingDeposits6 = pendingDeposits6;
+        _totalPendingWithdrawals6 = pendingWithdrawals6;
+        _totalPayoutReserve6 = payoutReserve6;
+    }
+
     /**
      * @notice Get exposure at a specific tick (Fenwick-based)
      * @param marketId Market identifier

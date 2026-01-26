@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Signer } from "ethers";
-import { SignalsCoreHarness } from "../../../typechain-types";
+import { MockERC20, SignalsCoreHarness } from "../../../typechain-types";
 
 /**
  * Core View Getters Tests
@@ -11,13 +11,16 @@ import { SignalsCoreHarness } from "../../../typechain-types";
 describe("Core View Getters", () => {
   let owner: Signer;
   let core: SignalsCoreHarness;
+  let paymentToken: MockERC20;
+
+  const usdc = (value: string) => ethers.parseUnits(value, 6);
 
   beforeEach(async () => {
     [owner] = await ethers.getSigners();
 
     // Deploy mock payment token
     const MockERC20 = await ethers.getContractFactory("MockERC20");
-    const paymentToken = await MockERC20.deploy("USDC", "USDC", 6);
+    paymentToken = await MockERC20.deploy("USDC", "USDC", 6);
 
     // Deploy position with proxy
     const positionImplFactory = await ethers.getContractFactory(
@@ -103,6 +106,12 @@ describe("Core View Getters", () => {
       await vaultModule.getAddress(),
       await oracleModule.getAddress()
     );
+
+    // Fund owner for capital stack operations
+    await paymentToken.mint(await owner.getAddress(), usdc("100000"));
+    await paymentToken
+      .connect(owner)
+      .approve(await core.getAddress(), ethers.MaxUint256);
   });
 
   describe("Vault view getters", () => {
@@ -209,10 +218,8 @@ describe("Core View Getters", () => {
 
   describe("Capital stack getter", () => {
     beforeEach(async () => {
-      await core.setCapitalStack(
-        ethers.parseEther("5000"), // backstopNav
-        ethers.parseEther("2000") // treasuryNav
-      );
+      await core.fundBackstop(usdc("5000"));
+      await core.fundTreasury(usdc("2000"));
     });
 
     it("getCapitalStack returns both values", async () => {
@@ -243,15 +250,16 @@ describe("Core View Getters", () => {
         .withArgs(ethers.parseEther("0.3"), ethers.parseEther("1"), true);
     });
 
-    it("emits CapitalStackUpdated on setCapitalStack", async () => {
-      await expect(
-        core.setCapitalStack(
-          ethers.parseEther("1000"),
-          ethers.parseEther("500")
-        )
-      )
-        .to.emit(core, "CapitalStackUpdated")
-        .withArgs(ethers.parseEther("1000"), ethers.parseEther("500"));
+    it("emits BackstopFunded on fundBackstop", async () => {
+      await expect(core.fundBackstop(usdc("1000")))
+        .to.emit(core, "BackstopFunded")
+        .withArgs(await owner.getAddress(), usdc("1000"), ethers.parseEther("1000"));
+    });
+
+    it("emits TreasuryFunded on fundTreasury", async () => {
+      await expect(core.fundTreasury(usdc("500")))
+        .to.emit(core, "TreasuryFunded")
+        .withArgs(await owner.getAddress(), usdc("500"), ethers.parseEther("500"));
     });
 
     it("emits WithdrawalLagUpdated on setWithdrawalLagBatches", async () => {

@@ -57,18 +57,16 @@ describe("LP Vault Scenarios", () => {
       ethers.parseEther("0.1")
     );
 
-    // Initialize capital stack with backstop (WAD amounts)
-    await proxy.setCapitalStack(
-      ethers.parseEther("500"), // backstopNav (WAD)
-      ethers.parseEther("100") // treasuryNav (WAD)
-    );
-
     // Fund with 6-decimal token amounts
     const fundAmount = usdc("1000000");
     for (const user of [userA, userB, userC, userD, userE]) {
       await payment.mint(user.address, fundAmount);
       await payment.connect(user).approve(proxy.target, ethers.MaxUint256);
     }
+
+    // Initialize capital stack with actual funds
+    await proxy.connect(userA).fundBackstop(usdc("500"));
+    await proxy.connect(userA).fundTreasury(usdc("100"));
 
     return { owner, userA, userB, userC, userD, userE, payment, proxy, module };
   }

@@ -60,9 +60,28 @@ contract LPVaultModuleProxy is SignalsCoreStorage {
         feeWaterfallConfig.phiTR = phiTR;
     }
 
-    function setCapitalStack(uint256 backstopNav, uint256 treasuryNav) external {
-        capitalStack.backstopNav = backstopNav;
-        capitalStack.treasuryNav = treasuryNav;
+    function fundBackstop(uint256 amount6) external {
+        _delegate(abi.encodeWithSelector(LPVaultModule.fundBackstop.selector, amount6));
+    }
+
+    function withdrawBackstop(uint256 amount6, address to) external {
+        _delegate(abi.encodeWithSelector(
+            LPVaultModule.withdrawBackstop.selector,
+            amount6,
+            to
+        ));
+    }
+
+    function fundTreasury(uint256 amount6) external {
+        _delegate(abi.encodeWithSelector(LPVaultModule.fundTreasury.selector, amount6));
+    }
+
+    function withdrawTreasury(uint256 amount6, address to) external {
+        _delegate(abi.encodeWithSelector(
+            LPVaultModule.withdrawTreasury.selector,
+            amount6,
+            to
+        ));
     }
 
     // ============================================================

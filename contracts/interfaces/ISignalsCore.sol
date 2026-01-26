@@ -163,6 +163,12 @@ interface ISignalsCore {
         uint64 claimDelay
     ) external;
 
+    // Capital stack funding
+    function fundBackstop(uint256 amount6) external;
+    function withdrawBackstop(uint256 amount6) external;
+    function fundTreasury(uint256 amount6) external;
+    function withdrawTreasury(uint256 amount6) external;
+
     /// @notice Get market state (derived from timestamps)
     function getMarketState(uint256 marketId) external returns (uint8 state);
 

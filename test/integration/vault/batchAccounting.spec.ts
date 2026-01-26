@@ -77,8 +77,7 @@ describe("BatchAccounting Spec Tests", () => {
     await fixture.proxy.connect(fixture.owner).seedVault(usdc("1000"));
     // Set backstop and deltaEt for testing grant mechanics
     // Production V1 uses deltaEt = 0 (uniform prior), but tests need to verify grant flow
-    const backstopNav = ethers.parseEther("500"); // 500 WAD backstop
-    await fixture.proxy.setCapitalStack(backstopNav, 0n);
+    await fixture.proxy.connect(fixture.owner).fundBackstop(usdc("500"));
     // NOTE: deltaEt is now per-market (Market.deltaEt) and summed per-batch (DeltaEtSum)
     // Global config deltaEt field removed - grants use batch DeltaEtSum
     const currentBatchId = await fixture.proxy.getCurrentBatchId();
@@ -254,7 +253,7 @@ describe("BatchAccounting Spec Tests", () => {
   // ================================================================
   describe("SPEC-2: Pre-batch NAV equation (INV-NAV)", () => {
     it("N^pre_t - N_{t-1} = L_t + F_t + G_t (positive P&L)", async () => {
-      const { proxy, currentBatchId } = await loadFixture(
+      const { proxy, currentBatchId, owner } = await loadFixture(
         deploySeededVaultFixture
       );
 
@@ -278,12 +277,12 @@ describe("BatchAccounting Spec Tests", () => {
     });
 
     it("N^pre_t - N_{t-1} = L_t + F_t + G_t (negative P&L with grant)", async () => {
-      const { proxy, currentBatchId } = await loadFixture(
+      const { proxy, currentBatchId, owner } = await loadFixture(
         deploySeededVaultFixture
       );
 
       // Initialize backstop for grant capability
-      await proxy.setCapitalStack(ethers.parseEther("500"), 0n);
+      await proxy.connect(owner).fundBackstop(usdc("500"));
 
       const N_prev = await proxy.getVaultNav();
       const batchId = currentBatchId + 1n;
@@ -305,7 +304,7 @@ describe("BatchAccounting Spec Tests", () => {
     });
 
     it("N^pre_t - N_{t-1} = L_t + F_t + G_t (zero P&L)", async () => {
-      const { proxy, currentBatchId } = await loadFixture(
+      const { proxy, currentBatchId, owner } = await loadFixture(
         deploySeededVaultFixture
       );
 
@@ -640,12 +639,12 @@ describe("BatchAccounting Spec Tests", () => {
     });
 
     it("handles large negative Lt without underflow", async () => {
-      const { proxy, currentBatchId } = await loadFixture(
+      const { proxy, currentBatchId, owner } = await loadFixture(
         deploySeededVaultFixture
       );
 
       // Set high backstop for grant capability
-      await proxy.setCapitalStack(ethers.parseEther("10000"), 0n);
+      await proxy.connect(owner).fundBackstop(usdc("10000"));
 
       const batchId = currentBatchId + 1n;
       const navBefore = await proxy.getVaultNav();

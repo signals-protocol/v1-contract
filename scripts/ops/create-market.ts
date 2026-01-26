@@ -271,8 +271,8 @@ async function main() {
   const phiLP = wad(CONFIG.feeWaterfall.phiLP);
   const phiBS = wad(CONFIG.feeWaterfall.phiBS);
   const phiTR = wad(CONFIG.feeWaterfall.phiTR);
-  const backstopNavWad = wad(CONFIG.capitalStack.backstopNavUsd);
-  const treasuryNavWad = wad(CONFIG.capitalStack.treasuryNavUsd);
+  const backstopAmount6 = usd6(CONFIG.capitalStack.backstopNavUsd);
+  const treasuryAmount6 = usd6(CONFIG.capitalStack.treasuryNavUsd);
 
   console.log(`[create-market] core=${coreAddress} deployer=${deployer.address}`);
 
@@ -280,7 +280,6 @@ async function main() {
   await (await core.setWithdrawalLagBatches(CONFIG.vault.withdrawalLagBatches)).wait();
   await (await core.setRiskConfig(lambdaWad, kDrawdownWad, CONFIG.risk.enforceAlpha)).wait();
   await (await core.setFeeWaterfallConfig(rhoBS, phiLP, phiBS, phiTR)).wait();
-  await (await core.setCapitalStack(backstopNavWad, treasuryNavWad)).wait();
   await (await core.setSettlementTimeline(
     CONFIG.settlement.submitWindowSec,
     CONFIG.settlement.pendingOpsWindowSec,
@@ -304,11 +303,23 @@ async function main() {
   });
 
   const seeded = await core.isVaultSeeded();
-  if (!seeded) {
+  const requiredAllowance = seedAmount6 + backstopAmount6 + treasuryAmount6;
+  if (requiredAllowance > 0n) {
     const allowance = await payment.allowance(deployer.address, coreAddress);
-    if (allowance < seedAmount6) {
-      await (await payment.approve(coreAddress, seedAmount6)).wait();
+    if (allowance < requiredAllowance) {
+      await (await payment.approve(coreAddress, requiredAllowance)).wait();
     }
+  }
+
+  if (backstopAmount6 > 0n) {
+    await (await core.fundBackstop(backstopAmount6)).wait();
+  }
+
+  if (treasuryAmount6 > 0n) {
+    await (await core.fundTreasury(treasuryAmount6)).wait();
+  }
+
+  if (!seeded) {
     await (await core.seedVault(seedAmount6)).wait();
   } else {
     console.log("[create-market] vault already seeded (skip seed)");

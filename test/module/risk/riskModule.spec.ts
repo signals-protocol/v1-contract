@@ -121,10 +121,8 @@ describe("RiskModule", () => {
     await core.seedVault(ethers.parseUnits("10000", 6));
 
     // Setup Backstop and Treasury NAV for testing
-    await core.setCapitalStack(
-      ethers.parseEther("2000"), // backstopNav = 2000
-      ethers.parseEther("500") // treasuryNav = 500
-    );
+    await core.fundBackstop(ethers.parseUnits("2000", 6));
+    await core.fundTreasury(ethers.parseUnits("500", 6));
   }
 
   beforeEach(async () => {

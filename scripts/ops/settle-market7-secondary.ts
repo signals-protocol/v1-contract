@@ -2,7 +2,7 @@ import hre from "hardhat";
 import fs from "fs";
 import path from "path";
 
-const envPath = path.resolve(__dirname, "../environments/citrea-prod.json");
+const envPath = path.resolve(__dirname, "../environments/testnet.json");
 const env = JSON.parse(fs.readFileSync(envPath, "utf8"));
 
 const MARKET_ID = 7n;

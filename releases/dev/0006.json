@@ -1,5 +1,5 @@
 {
-  "network": "citrea-dev",
+  "network": "dev",
   "version": 6,
   "contracts": {
     "SignalsCoreProxy": "0xa4B12635f964091e2f8C4FAD330797281fdDE9dF",

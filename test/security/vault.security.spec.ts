@@ -69,7 +69,7 @@ describe("Vault Security", () => {
     const { proxy, userA } = fixture;
     
     await proxy.connect(userA).seedVault(usdc("1000"));
-    await proxy.setCapitalStack(ethers.parseEther("500"), 0n);
+    await proxy.connect(userA).fundBackstop(usdc("500"));
     
     const currentBatchId = await proxy.getCurrentBatchId();
     const firstBatchId = currentBatchId + 1n;
@@ -334,4 +334,3 @@ function wDiv(a: bigint, b: bigint): bigint {
 function wMul(a: bigint, b: bigint): bigint {
   return (a * b) / WAD;
 }
-

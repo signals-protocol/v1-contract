@@ -80,8 +80,7 @@ describe("VaultBatchFlow Integration", () => {
     await proxy.connect(userA).seedVault(usdc("1000"));
     // Initialize backstopNav for deltaEt calculation.
     // This ensures FeeWaterfall doesn't revert on grantNeed > deltaEt.
-    const backstopNav = ethers.parseEther("500"); // 500 WAD backstop
-    await proxy.setCapitalStack(backstopNav, 0n);
+    await proxy.connect(userA).fundBackstop(usdc("500"));
     // deltaEt is now set per-batch via harnessRecordPnl, not globally
     const currentBatchId = await proxy.getCurrentBatchId();
     const firstBatchId = currentBatchId + 1n;

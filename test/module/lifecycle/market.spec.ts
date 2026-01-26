@@ -2,6 +2,7 @@ import { ethers } from "hardhat";
 import { expect } from "chai";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import {
+  LPVaultModule,
   MarketLifecycleModule,
   OracleModule,
   SignalsCoreHarness,
@@ -84,6 +85,9 @@ describe("MarketLifecycleModule", () => {
     const oracleModule = (await (
       await ethers.getContractFactory("OracleModuleHarness")
     ).deploy()) as OracleModule;
+    const vaultModule = (await (
+      await ethers.getContractFactory("LPVaultModule")
+    ).deploy()) as LPVaultModule;
     const riskModule = await (
       await ethers.getContractFactory("RiskModule")
     ).deploy();
@@ -116,9 +120,11 @@ describe("MarketLifecycleModule", () => {
       ethers.ZeroAddress,
       lifecycleImpl.target,
       riskModule.target,
-      ethers.ZeroAddress,
+      vaultModule.target,
       oracleModule.target
     );
+
+    await payment.approve(core.target, ethers.MaxUint256);
     
     // Configure Redstone oracle params
     await core.setRedstoneConfig(FEED_ID, FEED_DECIMALS, MAX_SAMPLE_DISTANCE, FUTURE_TOLERANCE);
@@ -128,6 +134,7 @@ describe("MarketLifecycleModule", () => {
       core,
       lifecycle: lifecycleImpl,
       oracleModule,
+      vaultModule,
       lazyLib,
       feePolicy,
     };
@@ -238,7 +245,7 @@ describe("MarketLifecycleModule", () => {
     const end = start + 100n;
     const settlementTs = end + 50n;
 
-    await core.setCapitalStack(ethers.parseEther("1000000"), 0);
+    await core.fundBackstop(ethers.parseUnits("1000000", 6));
 
     const lifecycleEvents = lifecycle.attach(await core.getAddress());
 

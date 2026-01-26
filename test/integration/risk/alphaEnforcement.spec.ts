@@ -121,11 +121,8 @@ describe("α Safety Bound Enforcement (Integration)", () => {
     await payment.approve(core.target, ethers.MaxUint256);
     await core.seedVault(ethers.parseUnits("10000", 6));
 
-    // Setup Backstop
-    await core.setCapitalStack(
-      ethers.parseEther("2000"), // backstopNav
-      ethers.parseEther("500") // treasuryNav
-    );
+    // Setup Backstop (permissionless funding, 6 decimals)
+    await core.fundBackstop(ethers.parseUnits("2000", 6));
 
     // Configure risk parameters
     // λ = 0.3 (30%), k = 1.0
@@ -143,6 +140,26 @@ describe("α Safety Bound Enforcement (Integration)", () => {
   beforeEach(async () => {
     await deployFixture();
   });
+
+  const WAD_TO_USDC = 10n ** 12n;
+
+  async function setBackstopNav(targetWad: bigint) {
+    const [current] = await core.getCapitalStack();
+    if (current === targetWad) return;
+
+    if (current < targetWad) {
+      const diff6 = (targetWad - current) / WAD_TO_USDC;
+      if (diff6 > 0n) {
+        await core.fundBackstop(diff6);
+      }
+      return;
+    }
+
+    const diff6 = (current - targetWad) / WAD_TO_USDC;
+    if (diff6 > 0n) {
+      await core.connect(owner).withdrawBackstop(diff6);
+    }
+  }
 
   describe("Market Creation with α Enforcement", () => {
     it("allows market creation when α ≤ αlimit", async () => {
@@ -529,7 +546,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       factorsWithZero[5] = 0n;
       const seedData = await deploySeedData(factorsWithZero);
 
-      await core.setCapitalStack(ethers.parseEther("1000"), 0n);
+      await setBackstopNav(ethers.parseEther("1000"));
 
       // Should revert since zero factor is not allowed
       await expect(
@@ -580,7 +597,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       const seedData = await deploySeedData(factors);
 
       // Set backstopNav = 100 WAD (> 9.53, so admissible)
-      await core.setCapitalStack(ethers.parseEther("100"), 0n);
+      await setBackstopNav(ethers.parseEther("100"));
 
       // Should succeed: ΔEₜ ≈ 9.53 < 100
       await expect(
@@ -609,7 +626,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       const seedData = await deploySeedData(factors);
 
       // Set backstopNav = 50 WAD (< 64.2, so inadmissible)
-      await core.setCapitalStack(ethers.parseEther("50"), 0n);
+      await setBackstopNav(ethers.parseEther("50"));
 
       // Should revert: ΔEₜ ≈ 64.2 > 50
       await expect(
@@ -638,7 +655,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       const seedData = await deploySeedData(factors);
 
       // Set backstopNav to exactly 10 WAD (slightly above 9.53)
-      await core.setCapitalStack(ethers.parseEther("10"), 0n);
+      await setBackstopNav(ethers.parseEther("10"));
 
       // Should succeed: ΔEₜ ≈ 9.53 ≤ 10
       await expect(
@@ -668,7 +685,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
 
       // Even with backstopNav = 0, uniform prior should pass
       // (because ΔEₜ = 0 ≤ 0)
-      await core.setCapitalStack(0n, 0n);
+      await setBackstopNav(0n);
 
       await expect(
         core.createMarket(
@@ -703,7 +720,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       concentratedFactors[0] = 2n * WAD;
       const seedData = await deploySeedData(concentratedFactors);
 
-      await core.setCapitalStack(ethers.parseEther("1000"), 0n);
+      await setBackstopNav(ethers.parseEther("1000"));
 
       await core.createMarket(
         0,
@@ -732,7 +749,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       const uniformFactors = Array(10).fill(WAD);
       const seedData = await deploySeedData(uniformFactors);
 
-      await core.setCapitalStack(ethers.parseEther("1000"), 0n);
+      await setBackstopNav(ethers.parseEther("1000"));
 
       await core.createMarket(
         0,
@@ -759,7 +776,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       concentratedFactors[0] = 2n * WAD;
       const seedData = await deploySeedData(concentratedFactors);
 
-      await core.setCapitalStack(ethers.parseEther("10000"), 0n);
+      await setBackstopNav(ethers.parseEther("10000"));
 
       // Market 1: α = 100
       await core.createMarket(
@@ -812,7 +829,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       const uniformFactors = Array(10).fill(WAD);
       const seedData = await deploySeedData(uniformFactors);
 
-      await core.setCapitalStack(ethers.parseEther("1000"), 0n);
+      await setBackstopNav(ethers.parseEther("1000"));
 
       await core.createMarket(
         0,
@@ -842,7 +859,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       skewedFactors[0] = 2n * WAD;
       const skewedSeedData = await deploySeedData(skewedFactors);
 
-      await core.setCapitalStack(ethers.parseEther("1000"), 0n);
+      await setBackstopNav(ethers.parseEther("1000"));
 
       await core.createMarket(
         0,
@@ -874,7 +891,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       extremeFactors[0] = 10n * WAD;
       const extremeSeedData = await deploySeedData(extremeFactors);
 
-      await core.setCapitalStack(ethers.parseEther("10000"), 0n);
+      await setBackstopNav(ethers.parseEther("10000"));
 
       await core.createMarket(
         0,
@@ -906,7 +923,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       factors[5] = WAD / 2n; // minFactor = 0.5 WAD
       const seedData = await deploySeedData(factors);
 
-      await core.setCapitalStack(ethers.parseEther("10000"), 0n);
+      await setBackstopNav(ethers.parseEther("10000"));
 
       await core.createMarket(
         0,
@@ -942,7 +959,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       const uniformFactors = Array(10).fill(WAD);
       const seedData = await deploySeedData(uniformFactors);
 
-      await core.setCapitalStack(ethers.parseEther("1000"), 0n);
+      await setBackstopNav(ethers.parseEther("1000"));
 
       // First market for this settlement timestamp should succeed
       await expect(
@@ -967,7 +984,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       const uniformFactors = Array(10).fill(WAD);
       const seedData = await deploySeedData(uniformFactors);
 
-      await core.setCapitalStack(ethers.parseEther("1000"), 0n);
+      await setBackstopNav(ethers.parseEther("1000"));
 
       // settlementTimestamp determines batchId (settlementTimestamp / 86400)
       const settlementTime = BigInt(now) + 3660n;
@@ -1010,7 +1027,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       const uniformFactors = Array(10).fill(WAD);
       const seedData = await deploySeedData(uniformFactors);
 
-      await core.setCapitalStack(ethers.parseEther("1000"), 0n);
+      await setBackstopNav(ethers.parseEther("1000"));
 
       const BATCH_SECONDS = 86400n;
       const settlementTime1 = BigInt(now) + 3660n;
@@ -1067,7 +1084,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         ethers.parseEther("10"), // pricePeak
         true
       );
-      await core.setCapitalStack(ethers.parseEther("1000"), 0n);
+      await setBackstopNav(ethers.parseEther("1000"));
 
       // Create market with valid α
       await core.createMarket(
@@ -1104,7 +1121,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         ethers.parseEther("10"), // pricePeak
         true
       );
-      await core.setCapitalStack(ethers.parseEther("1000"), 0n);
+      await setBackstopNav(ethers.parseEther("1000"));
 
       // Create market with α that's valid at current αlimit
       // αbase = λ * NAV / ln(n) = 0.3 * 10000 / ln(10) ≈ 1303
@@ -1159,7 +1176,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         ethers.parseEther("10"),
         true
       );
-      await core.setCapitalStack(ethers.parseEther("1000"), 0n);
+      await setBackstopNav(ethers.parseEther("1000"));
 
       // Create market with skewed prior (ΔEₜ ≈ 9.53 WAD with α=100)
       await core.createMarket(
@@ -1179,7 +1196,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       await core.harnessSetMarketFailed(1n, true);
 
       // Reduce backstopNav below ΔEₜ
-      await core.setCapitalStack(ethers.parseEther("1"), 0n); // backstopNav = 1 WAD < ΔEₜ
+      await setBackstopNav(ethers.parseEther("1")); // backstopNav = 1 WAD < ΔEₜ
 
       // Reopen should revert due to ΔEₜ > backstopNav
       await expect(core.reopenMarket(1n)).to.be.revertedWithCustomError(

@@ -3,14 +3,15 @@ import { normalizeEnvironment } from "./utils/environment";
 import type { Environment } from "./types/environment";
 
 const MANIFEST_DIRS: Partial<Record<Environment, string>> = {
-  "citrea-dev": ".openzeppelin/dev",
-  "citrea-prod": ".openzeppelin/prod",
+  "dev": ".openzeppelin/dev",
+  "testnet": ".openzeppelin/testnet",
+  "prod": ".openzeppelin/prod",
 };
 
 function usage() {
   console.error("Usage: COMMAND=<action:env> hardhat run scripts/dispatcher.ts --network <network>");
   console.error(
-    "Actions: deploy, upgrade, update-modules, deploy-fee-policies, safety-check, verify. Envs: localhost, citrea:dev, citrea:prod"
+    "Actions: deploy, upgrade, update-modules, deploy-fee-policies, safety-check, verify. Envs: local, dev, testnet, prod"
   );
   process.exit(1);
 }
@@ -43,7 +44,7 @@ async function main() {
     return;
   }
   const [action, ...envParts] = command.split(":");
-  const env = normalizeEnvironment(envParts.join(":") || "localhost") as Environment;
+  const env = normalizeEnvironment(envParts.join(":") || "local") as Environment;
   enforceNetworkMatch(env);
   enforceManifestDir(env);
 

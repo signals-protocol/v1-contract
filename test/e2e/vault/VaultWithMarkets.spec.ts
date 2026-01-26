@@ -127,7 +127,7 @@ describe("VaultWithMarkets E2E", () => {
       ethers.parseEther("0.1"), // phiBS
       ethers.parseEther("0.1") // phiTR
     );
-    await core.setCapitalStack(0n, 0n);
+    // Capital stack starts at zero by default
 
     return { owner, seeder, core, payment, feePolicy };
   }
@@ -294,7 +294,9 @@ describe("VaultWithMarkets E2E", () => {
       await core.connect(seeder).seedVault(seedAmount);
 
       // Increase backstopNav for prior admissibility
-      await core.setCapitalStack(ethers.parseEther("10000"), 0n);
+      const backstopAmount = ethers.parseUnits("10000", 6);
+      await payment.mint(seeder.address, backstopAmount);
+      await core.connect(seeder).fundBackstop(backstopAmount);
 
       // Create market with concentrated prior → ΔEₜ > 0
       const tSet = seedTime + 500n;
@@ -361,7 +363,9 @@ describe("VaultWithMarkets E2E", () => {
       await core.connect(seeder).seedVault(seedAmount);
 
       // Increase backstopNav for prior admissibility
-      await core.setCapitalStack(ethers.parseEther("10000"), 0n);
+      const backstopAmount = ethers.parseUnits("10000", 6);
+      await payment.mint(seeder.address, backstopAmount);
+      await core.connect(seeder).fundBackstop(backstopAmount);
 
       // Create market with concentrated prior (ΔEₜ > 0)
       const tSet = seedTime + 500n;

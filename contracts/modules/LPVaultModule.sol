@@ -141,6 +141,50 @@ contract LPVaultModule is SignalsCoreStorage {
     }
 
     // ============================================================
+    // Capital Stack Funding (permissionless fund, owner-only withdraw via Core)
+    // ============================================================
+
+    function fundBackstop(uint256 amount6) external onlyDelegated {
+        if (amount6 == 0) revert SE.ZeroAmount();
+        paymentToken.safeTransferFrom(msg.sender, address(this), amount6);
+        uint256 amountWad = amount6.toWad();
+        capitalStack.backstopNav += amountWad;
+        emit BackstopFunded(msg.sender, amount6, capitalStack.backstopNav);
+    }
+
+    function withdrawBackstop(uint256 amount6, address to) external onlyDelegated {
+        if (amount6 == 0) revert SE.ZeroAmount();
+        if (to == address(0)) revert SE.ZeroAddress();
+        uint256 amountWad = amount6.toWad();
+        uint256 current = capitalStack.backstopNav;
+        if (amountWad > current) revert SE.InsufficientBackstopBalance(amountWad, current);
+        _requireFreeBalance(amount6);
+        capitalStack.backstopNav = current - amountWad;
+        paymentToken.safeTransfer(to, amount6);
+        emit BackstopWithdrawn(to, amount6, capitalStack.backstopNav);
+    }
+
+    function fundTreasury(uint256 amount6) external onlyDelegated {
+        if (amount6 == 0) revert SE.ZeroAmount();
+        paymentToken.safeTransferFrom(msg.sender, address(this), amount6);
+        uint256 amountWad = amount6.toWad();
+        capitalStack.treasuryNav += amountWad;
+        emit TreasuryFunded(msg.sender, amount6, capitalStack.treasuryNav);
+    }
+
+    function withdrawTreasury(uint256 amount6, address to) external onlyDelegated {
+        if (amount6 == 0) revert SE.ZeroAmount();
+        if (to == address(0)) revert SE.ZeroAddress();
+        uint256 amountWad = amount6.toWad();
+        uint256 current = capitalStack.treasuryNav;
+        if (amountWad > current) revert SE.InsufficientTreasuryBalance(amountWad, current);
+        _requireFreeBalance(amount6);
+        capitalStack.treasuryNav = current - amountWad;
+        paymentToken.safeTransfer(to, amount6);
+        emit TreasuryWithdrawn(to, amount6, capitalStack.treasuryNav);
+    }
+
+    // ============================================================
     // Request Queue (Request ID Model)
     // ============================================================
 

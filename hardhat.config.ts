@@ -12,8 +12,13 @@ const hardhatAccountCount = Number.parseInt(
   process.env.HARDHAT_ACCOUNTS || "30",
   10
 );
-const CITREA_RPC =
-  process.env.CITREA_RPC_URL || "https://rpc.testnet.citrea.xyz";
+const defaultTestnetRpc = "https://rpc.testnet.citrea.xyz";
+const devRpc =
+  process.env.DEV_RPC_URL ||
+  process.env.TESTNET_RPC_URL ||
+  defaultTestnetRpc;
+const testnetRpc = process.env.TESTNET_RPC_URL || defaultTestnetRpc;
+const prodRpc = process.env.PROD_RPC_URL || "https://rpc.mainnet.citrea.xyz";
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -36,28 +41,35 @@ const config: HardhatUserConfig = {
           : 30,
       },
     },
-    localhost: {
+    local: {
       chainId: 31337,
+      url: process.env.LOCAL_RPC_URL || "http://127.0.0.1:8545",
     },
-    "citrea-dev": {
-      url: process.env.CITREA_DEV_RPC_URL || CITREA_RPC,
+    dev: {
+      url: devRpc,
       chainId: 5115,
       accounts: defaultAccounts,
     },
-    "citrea-prod": {
-      url: process.env.CITREA_PROD_RPC_URL || CITREA_RPC,
+    testnet: {
+      url: testnetRpc,
       chainId: 5115,
+      accounts: defaultAccounts,
+    },
+    prod: {
+      url: prodRpc,
+      chainId: 4114,
       accounts: defaultAccounts,
     },
   },
   etherscan: {
     apiKey: {
-      "citrea-dev": process.env.BLOCKSCOUT_API_KEY || "placeholder",
-      "citrea-prod": process.env.BLOCKSCOUT_API_KEY || "placeholder",
+      "dev": process.env.BLOCKSCOUT_API_KEY || "placeholder",
+      "testnet": process.env.BLOCKSCOUT_API_KEY || "placeholder",
+      "prod": process.env.BLOCKSCOUT_API_KEY || "placeholder",
     },
     customChains: [
       {
-        network: "citrea-dev",
+        network: "dev",
         chainId: 5115,
         urls: {
           apiURL: "https://explorer.testnet.citrea.xyz/api",
@@ -65,11 +77,19 @@ const config: HardhatUserConfig = {
         },
       },
       {
-        network: "citrea-prod",
+        network: "testnet",
         chainId: 5115,
         urls: {
           apiURL: "https://explorer.testnet.citrea.xyz/api",
           browserURL: "https://explorer.testnet.citrea.xyz",
+        },
+      },
+      {
+        network: "prod",
+        chainId: 4114,
+        urls: {
+          apiURL: "https://explorer.mainnet.citrea.xyz/api",
+          browserURL: "https://explorer.mainnet.citrea.xyz",
         },
       },
     ],
