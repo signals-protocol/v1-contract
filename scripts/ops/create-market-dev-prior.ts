@@ -37,7 +37,7 @@ interface CreateMarketConfig {
 
 const CONFIG: CreateMarketConfig = {
   skipStaticCall: false,
-  feePolicyAddress: "",
+  feePolicyAddress: "", // required
   market: {
     anchorPrice: 94_000,
     numBins: 60,
@@ -311,10 +311,9 @@ async function main() {
   const coreAddress = envData.contracts.SignalsCoreProxy;
   if (!coreAddress) throw new Error("Missing SignalsCoreProxy in environment file");
 
-  const feePolicyAddress =
-    CONFIG.feePolicyAddress || envData.contracts.FeePolicy100bps || envData.contracts.FeePolicy;
+  const feePolicyAddress = CONFIG.feePolicyAddress;
   if (!feePolicyAddress) {
-    throw new Error("Fee policy address not set (feePolicyAddress or env FeePolicy100bps)");
+    throw new Error("feePolicyAddress is required in CONFIG");
   }
 
   const [deployer] = await ethers.getSigners();

@@ -9,8 +9,6 @@
     "TradeModule": "0x9594Fa00df80Bc38a9e3602F891D275abbe9caA6",
     "MarketLifecycleModule": "0x92850Ffd3717b8FE494971026A5a5ea4E237F82B",
     "OracleModule": "0x6AeD367d3097d9A5e6c3dc2E4775C8C4AA389F34",
-    "FeePolicy": "0xA311cA96b8d5BF7aD0236cB39e3d309B2ff5D612",
-    "SignalsUSDToken": "0xaC57cf391cE6e60c61fa0ca8B6b4819f452A1Cb4",
     "LazyMulSegmentTree": "0xdcB06B8BBC120530F3EfB6F82482D8Ab5F4a60F1",
     "RiskModule": "0x96a7Ac2d169BDb52f0749c5B79560619c62391ad",
     "LPVaultModule": "0x0F1A36F6f7eaA5f670f0934F496BEB4fa02Fa08b",
@@ -19,12 +17,12 @@
     "FeePolicy10bps": "0x68dAdCBbF6a272B475be05315130c0c8Fb3cF6DB",
     "FeePolicy50bps": "0xf9D36b54346e1CdF171d989bE53C5029B1E3552A",
     "FeePolicy100bps": "0x3edA6418CeFE91F4e170d35e90556FADa4d18bE8",
-    "FeePolicy200bps": "0x97953483F56Dc2e5450AD081bf4Dd6bcD6659a8d"
+    "FeePolicy200bps": "0x97953483F56Dc2e5450AD081bf4Dd6bcD6659a8d",
+    "PaymentToken": "0xaC57cf391cE6e60c61fa0ca8B6b4819f452A1Cb4"
   },
   "config": {
     "settlementSubmitWindow": "600",
     "settlementFinalizeDeadline": "3600",
-    "defaultFeeBps": 0,
     "owners": {
       "core": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
       "position": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD"

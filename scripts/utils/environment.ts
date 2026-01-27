@@ -37,6 +37,12 @@ export function loadEnvironment(env: Environment): EnvironmentFile {
   const raw = fs.readFileSync(envPath, "utf8");
   const parsed = JSON.parse(raw) as EnvironmentFile;
   if (!parsed.config) parsed.config = {};
+  if (parsed.contracts?.SignalsUSDToken && !parsed.contracts.PaymentToken) {
+    parsed.contracts.PaymentToken = parsed.contracts.SignalsUSDToken;
+  }
+  if (parsed.contracts?.SignalsUSDToken) {
+    delete parsed.contracts.SignalsUSDToken;
+  }
   return parsed;
 }
 
@@ -48,10 +54,14 @@ export function saveEnvironment(env: Environment, data: EnvironmentFile) {
 
 export function updateContracts(env: Environment, contracts: EnvironmentContracts) {
   const data = loadEnvironment(env);
-  data.contracts = { ...data.contracts, ...contracts };
-  if (contracts.SignalsUSDToken) {
-    delete data.contracts.PaymentToken;
+  const nextContracts = { ...data.contracts, ...contracts };
+  if (nextContracts.SignalsUSDToken && !nextContracts.PaymentToken) {
+    nextContracts.PaymentToken = nextContracts.SignalsUSDToken;
   }
+  if (nextContracts.SignalsUSDToken) {
+    delete nextContracts.SignalsUSDToken;
+  }
+  data.contracts = nextContracts;
   saveEnvironment(env, data);
 }
 

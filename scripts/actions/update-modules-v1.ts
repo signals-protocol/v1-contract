@@ -1,6 +1,6 @@
 import hre from "hardhat";
 import { loadEnvironment, recordDeployment, updateContracts } from "../utils/environment";
-import { buildReleaseMetaFromEnv, writeReleaseSnapshot } from "../utils/release";
+import { writeReleaseSnapshot } from "../utils/release";
 import type { Environment } from "../types/environment";
 
 type ModuleKey = "TradeModule" | "MarketLifecycleModule" | "OracleModule" | "RiskModule" | "LPVaultModule";
@@ -137,13 +137,11 @@ export async function updateModulesAction(env: Environment) {
   };
   updateContracts(env, updatedContracts);
 
-  const releaseMeta = buildReleaseMetaFromEnv();
   const { data: updatedEnv, record } = recordDeployment(env, {
     action: "update-modules",
     deployer: deployer.address,
-    meta: releaseMeta,
   });
-  writeReleaseSnapshot(env, updatedEnv, releaseMeta);
+  writeReleaseSnapshot(env, updatedEnv);
 
   console.log(`[update-modules] completed (version=${record.version})`);
 }

@@ -11,21 +11,19 @@
     "OracleModule": "0xCd2a719D77ecBBe82F296AB257943734cB937Ab5",
     "RiskModule": "0xd4B286F2072005c960095CF205eE6d8cF3332622",
     "LPVaultModule": "0x40d676DB70580D8eB9B62bC5694696D8c8999f1b",
-    "FeePolicy": "0x4BACc02BA058E8063F965020eF982f06227b2E9b",
     "FeePolicyNull": "0x02a7C9102870077e3F90Bd322E60Adc5253eC7D7",
     "FeePolicy10bps": "0xcE1435DE6A430a4EeFEa772b98Ea120f0A52653A",
     "FeePolicy50bps": "0x79498E3ef2c6F56B3e6b6227a956D51e3E195085",
     "FeePolicy100bps": "0xf697D1214a9D1F7f7Ed7E19fE9711f389Df6BAEF",
     "FeePolicy200bps": "0x3D4479266fFB2dad2d64e9a96aFea56F265fFf1b",
-    "SignalsUSDToken": "0xaC57cf391cE6e60c61fa0ca8B6b4819f452A1Cb4",
     "SignalsLPShare": "0x4940D11127f65Dc6cd41434D9F92faFE95B4DAF9",
-    "LazyMulSegmentTree": "0x568799e9964dc0a6eeADCA1F9C0440beb7b7fb89"
+    "LazyMulSegmentTree": "0x568799e9964dc0a6eeADCA1F9C0440beb7b7fb89",
+    "PaymentToken": "0xaC57cf391cE6e60c61fa0ca8B6b4819f452A1Cb4"
   },
   "config": {
     "settlementSubmitWindow": "600",
     "settlementFinalizeDeadline": "900",
     "pendingOpsWindow": "300",
-    "defaultFeeBps": 0,
     "redstoneFeedId": "BTC",
     "redstoneFeedDecimals": 8,
     "redstoneMaxSampleDistance": "600",

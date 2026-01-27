@@ -1,0 +1,46 @@
+{
+  "network": "prod",
+  "chainId": 4114,
+  "release": "v1",
+  "deployerEOA": "0x448Fc066C5B13c4365FBbcfbE3718B83cc2e0458",
+  "create2Factory": "0x17925299E7E2E044672F8a889F5c35C762a2065e",
+  "contracts": {
+    "SignalsCreate2Factory": "0x17925299E7E2E044672F8a889F5c35C762a2065e",
+    "SignalsDeployer": "0x795B4ed8869Fb2172c2c68eA21cCb5FdE6ad7AB4",
+    "SignalsCoreProxy": "0x516312275875932ec2B53A41df4De02743131729",
+    "SignalsPositionProxy": "0x3fbD02f3F5Cf2C1e8d6b94e6F1AD30058972D004",
+    "SignalsLPShareProxy": "0x7e27CAaCf3Af6b2e092cFf25D9ac20432162CE18",
+    "SignalsLPShare": "0x7e27CAaCf3Af6b2e092cFf25D9ac20432162CE18",
+    "SignalsCoreImplementation": "0x0feb4a8A313e24D70bfC8BA58fdF1D80d098B774",
+    "SignalsPositionImplementation": "0x63AA48a8a450782643A319a2a4C52B7dF8a07D3F",
+    "SignalsLPShareImplementation": "0x323D7C3d15a483Dc59463807123421f10F7162a4"
+  },
+  "create2": {
+    "vanityPrefix": "0x516",
+    "maxNonce": 1000000,
+    "salts": {
+      "DEPLOYER": {
+        "nonce": 0,
+        "salt": "0x8c06a8a080edfac99ae92f1efbb6f78cf56e49095219a33ce3219ee0120e1da4"
+      },
+      "CORE_PROXY": {
+        "nonce": 843,
+        "salt": "0x2b39dbf8968b53f92c1b5466dfb16d3d175f6004e0031c1ddcc1f00d6eda35bd"
+      },
+      "POSITION_PROXY": {
+        "nonce": 0,
+        "salt": "0x5a07498a4f3bbaa372535d787365bad16fd26856b87558f89c2bcd357ca89087"
+      },
+      "LPSHARE_PROXY": {
+        "nonce": 0,
+        "salt": "0x9c88cd38f50507b244f7ca3872930626625ca88aff9ec74dc33518255a6452b2"
+      }
+    },
+    "initCodeHash": {
+      "DEPLOYER": "0x3726c75511c0eb4c0e66ad37e31ef6dbf8216af128f020be704e285e2cccac2c",
+      "CORE_PROXY": "0xa742a7a72917b56c61d608690ca5a12266edaefe25e305e73130d2a81265a39e",
+      "POSITION_PROXY": "0x9d332ab80982f441569df487d1ddac882a0148ac818c6cd958fe8d5b88484fed",
+      "LPSHARE_PROXY": "0x2d6b0ccaf37ce6e9aec6c7d992a4527adf4e05564351bc24d8d44c967e6b7918"
+    }
+  }
+}

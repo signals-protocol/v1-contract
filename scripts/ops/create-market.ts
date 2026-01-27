@@ -9,7 +9,6 @@ interface CreateMarketConfig {
   skipStaticCall: boolean;
   feePolicyAddress: string;
   vault: {
-    minSeedAmountUsd: string;
     seedAmountUsd: string;
     withdrawalLagBatches: number;
   };
@@ -62,9 +61,8 @@ interface CreateMarketConfig {
 // === Editable config (top-level) ============================================
 const CONFIG: CreateMarketConfig = {
   skipStaticCall: true,
-  feePolicyAddress: "", // leave empty to use env FeePolicy100bps
+  feePolicyAddress: "", // required
   vault: {
-    minSeedAmountUsd: "100", // 6 decimals
     seedAmountUsd: "100000", // 6 decimals
     withdrawalLagBatches: 0,
   },
@@ -204,7 +202,7 @@ async function resolveAlphaWad(params: {
   const safetyFactorWad = hre.ethers.parseUnits(CONFIG.market.liquidity.safetyFactor, WAD_DECIMALS);
   const alphaSafe = (alphaLimit * safetyFactorWad) / WAD;
   console.log(
-    `[create-market] alphaBase=${alphaBaseDiv.toString()} alphaLimit=${alphaLimit.toString()} drawdown=${params.drawdownWad.toString()}`
+    `[create-market] alphaBase=${alphaBaseDiv.toString()} alphaLimit=${alphaLimit.toString()} peakDrawdown=${params.drawdownWad.toString()}`
   );
   if (alphaSafe === 0n) {
     throw new Error("alphaWad computed as zero; adjust safetyFactor or risk config");
@@ -219,19 +217,30 @@ async function main() {
 
   const envData = loadEnvironment(env);
   const coreAddress = envData.contracts.SignalsCoreProxy;
-  const paymentTokenAddress = envData.contracts.SignalsUSDToken ?? envData.contracts.PaymentToken;
+  const paymentTokenAddress = envData.contracts.PaymentToken;
   if (!coreAddress) throw new Error("Missing SignalsCoreProxy in environment file");
-  if (!paymentTokenAddress) throw new Error("Missing SignalsUSDToken in environment file");
+  if (!paymentTokenAddress) throw new Error("Missing PaymentToken in environment file");
 
-  const feePolicyAddress =
-    CONFIG.feePolicyAddress || envData.contracts.FeePolicy100bps || envData.contracts.FeePolicy;
+  const feePolicyAddress = CONFIG.feePolicyAddress;
   if (!feePolicyAddress) {
-    throw new Error("Fee policy address not set (feePolicyAddress or env FeePolicy100bps)");
+    throw new Error("feePolicyAddress is required in CONFIG");
   }
 
   const [deployer] = await ethers.getSigners();
   const core = await ethers.getContractAt("SignalsCore", coreAddress);
-  const payment = await ethers.getContractAt("SignalsUSDToken", paymentTokenAddress);
+  const payment = new ethers.Contract(
+    paymentTokenAddress,
+    [
+      "function decimals() view returns (uint8)",
+      "function allowance(address,address) view returns (uint256)",
+      "function approve(address,uint256) returns (bool)",
+    ],
+    deployer
+  );
+  const paymentDecimals = Number(await payment.decimals());
+  if (paymentDecimals !== 6) {
+    throw new Error(`paymentToken.decimals must be 6 (got ${paymentDecimals})`);
+  }
   const owner = await core.owner();
   const paused = await core.paused();
   const lifecycleModule = await core.lifecycleModule();
@@ -263,7 +272,6 @@ async function main() {
     );
   }
 
-  const minSeedAmount6 = usd6(CONFIG.vault.minSeedAmountUsd);
   const seedAmount6 = usd6(CONFIG.vault.seedAmountUsd);
   const lambdaWad = wad(CONFIG.risk.lambda);
   const kDrawdownWad = wad(CONFIG.risk.kDrawdown);
@@ -276,7 +284,6 @@ async function main() {
 
   console.log(`[create-market] core=${coreAddress} deployer=${deployer.address}`);
 
-  await (await core.setMinSeedAmount(minSeedAmount6)).wait();
   await (await core.setWithdrawalLagBatches(CONFIG.vault.withdrawalLagBatches)).wait();
   await (await core.setRiskConfig(lambdaWad, kDrawdownWad, CONFIG.risk.enforceAlpha)).wait();
   await (await core.setFeeWaterfallConfig(rhoBS, phiLP, phiBS, phiTR)).wait();

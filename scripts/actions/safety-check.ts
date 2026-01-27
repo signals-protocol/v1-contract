@@ -19,17 +19,19 @@ export async function safetyCheckAction(env: Environment) {
   const envData = loadEnvironment(env);
 
   const required = [
+    "SignalsCreate2Factory",
+    "SignalsDeployer",
     "SignalsCoreProxy",
     "SignalsCoreImplementation",
     "SignalsPositionProxy",
     "SignalsPositionImplementation",
+    "SignalsLPShareProxy",
+    "SignalsLPShareImplementation",
     "TradeModule",
     "MarketLifecycleModule",
     "RiskModule",
     "LPVaultModule",
     "OracleModule",
-    "FeePolicy",
-    "SignalsLPShare",
   ];
   for (const key of required) {
     if (!envData.contracts[key]) {
@@ -39,9 +41,11 @@ export async function safetyCheckAction(env: Environment) {
 
   const coreProxy = envData.contracts.SignalsCoreProxy;
   const positionProxy = envData.contracts.SignalsPositionProxy;
+  const lpShareProxy = envData.contracts.SignalsLPShareProxy ?? envData.contracts.SignalsLPShare;
 
   const coreImpl = await upgrades.erc1967.getImplementationAddress(coreProxy);
   const positionImpl = await upgrades.erc1967.getImplementationAddress(positionProxy);
+  const lpShareImpl = await upgrades.erc1967.getImplementationAddress(lpShareProxy);
 
   if (coreImpl.toLowerCase() !== envData.contracts.SignalsCoreImplementation.toLowerCase()) {
     throw new Error(`Core impl mismatch: manifest=${coreImpl} env=${envData.contracts.SignalsCoreImplementation}`);
@@ -51,12 +55,19 @@ export async function safetyCheckAction(env: Environment) {
       `Position impl mismatch: manifest=${positionImpl} env=${envData.contracts.SignalsPositionImplementation}`
     );
   }
+  if (lpShareImpl.toLowerCase() !== envData.contracts.SignalsLPShareImplementation.toLowerCase()) {
+    throw new Error(
+      `LPShare impl mismatch: manifest=${lpShareImpl} env=${envData.contracts.SignalsLPShareImplementation}`
+    );
+  }
 
   const core = await ethers.getContractAt("SignalsCore", coreProxy);
   const position = await ethers.getContractAt("SignalsPosition", positionProxy);
+  const lpShare = await ethers.getContractAt("SignalsLPShare", lpShareProxy);
 
   const expectedCoreOwner = envData.config?.owners?.core;
   const expectedPositionOwner = envData.config?.owners?.position;
+  const expectedLpShareOwner = envData.config?.owners?.lpShare ?? expectedCoreOwner;
   if (expectedCoreOwner) {
     const actual = await core.owner();
     assertAddressMatch("Core owner", actual, expectedCoreOwner);
@@ -68,6 +79,12 @@ export async function safetyCheckAction(env: Environment) {
     assertAddressMatch("Position owner", actual, expectedPositionOwner);
   } else {
     console.warn("[safety-check] expected position owner not set in environment config");
+  }
+  if (expectedLpShareOwner) {
+    const actual = await lpShare.owner();
+    assertAddressMatch("LPShare owner", actual, expectedLpShareOwner);
+  } else {
+    console.warn("[safety-check] expected lpShare owner not set in environment config");
   }
 
   const moduleChecks = [
@@ -114,14 +131,16 @@ export async function safetyCheckAction(env: Environment) {
   assertAddressMatch("Core positionContract", corePosition, positionProxy);
 
   const paymentToken = await core.paymentToken();
-  const expectedPaymentToken = envData.contracts.SignalsUSDToken ?? envData.contracts.PaymentToken;
+  const expectedPaymentToken = envData.contracts.PaymentToken;
   if (!expectedPaymentToken) {
-    throw new Error("Missing SignalsUSDToken (payment token) in environment file");
+    throw new Error("Missing PaymentToken (payment token) in environment file");
   }
   assertAddressMatch("Payment token", paymentToken, expectedPaymentToken);
 
   const lpShareToken = await core.lpShareToken();
-  assertAddressMatch("LP share token", lpShareToken, envData.contracts.SignalsLPShare);
+  assertAddressMatch("LP share token", lpShareToken, lpShareProxy);
+  const lpShareCore = await lpShare.core();
+  assertAddressMatch("LPShare core", lpShareCore, coreProxy);
 
   const submitWindow = envData.config?.settlementSubmitWindow;
   if (submitWindow) {
@@ -188,26 +207,32 @@ export async function safetyCheckAction(env: Environment) {
     }
   }
 
+  const operatorAllowlist = envData.config?.operatorAllowlist ?? [];
+  for (const operator of operatorAllowlist) {
+    const allowed = await core.operators(operator);
+    if (!allowed) {
+      throw new Error(`operator not allowlisted: ${operator}`);
+    }
+  }
+
   const codeChecks = [
+    "SignalsCreate2Factory",
+    "SignalsDeployer",
     "TradeModule",
     "MarketLifecycleModule",
     "RiskModule",
     "LPVaultModule",
     "OracleModule",
-    "FeePolicy",
     "FeePolicyNull",
     "FeePolicy10bps",
     "FeePolicy50bps",
     "FeePolicy100bps",
     "FeePolicy200bps",
-    "FeePolicyThetaTime",
-    "SignalsUSDToken",
-    "SignalsLPShare",
+    "PaymentToken",
+    "SignalsLPShareProxy",
+    "SignalsLPShareImplementation",
     "LazyMulSegmentTree",
   ];
-  if (!envData.contracts.SignalsUSDToken && envData.contracts.PaymentToken) {
-    codeChecks.push("PaymentToken");
-  }
   for (const name of codeChecks) {
     const addr = envData.contracts[name];
     if (!addr) continue;

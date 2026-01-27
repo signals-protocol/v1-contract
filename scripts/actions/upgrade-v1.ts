@@ -1,6 +1,6 @@
 import hre from "hardhat";
 import { loadEnvironment, recordDeployment, updateContracts } from "../utils/environment";
-import { buildReleaseMetaFromEnv, writeReleaseSnapshot } from "../utils/release";
+import { writeReleaseSnapshot } from "../utils/release";
 import type { Environment } from "../types/environment";
 
 export async function upgradeAction(env: Environment) {
@@ -11,6 +11,7 @@ export async function upgradeAction(env: Environment) {
 
   const coreProxyAddr = envData.contracts.SignalsCoreProxy;
   const positionProxyAddr = envData.contracts.SignalsPositionProxy;
+  const lpShareProxyAddr = envData.contracts.SignalsLPShareProxy ?? envData.contracts.SignalsLPShare;
   if (!coreProxyAddr || !positionProxyAddr) {
     throw new Error("Missing proxy addresses in environment file");
   }
@@ -28,18 +29,25 @@ export async function upgradeAction(env: Environment) {
   await upgradedPosition.waitForDeployment();
   const newPositionImpl = await upgrades.erc1967.getImplementationAddress(await upgradedPosition.getAddress());
 
+  let newLpShareImpl: string | undefined;
+  if (lpShareProxyAddr) {
+    const lpShareFactory = await ethers.getContractFactory("SignalsLPShare");
+    const upgradedLpShare = await upgrades.upgradeProxy(lpShareProxyAddr, lpShareFactory, { kind: "uups" });
+    await upgradedLpShare.waitForDeployment();
+    newLpShareImpl = await upgrades.erc1967.getImplementationAddress(await upgradedLpShare.getAddress());
+  }
+
   updateContracts(env, {
     SignalsCoreImplementation: newCoreImpl,
     SignalsPositionImplementation: newPositionImpl,
+    ...(newLpShareImpl ? { SignalsLPShareImplementation: newLpShareImpl } : {}),
   });
 
-  const releaseMeta = buildReleaseMetaFromEnv();
   const { data: updatedEnv, record } = recordDeployment(env, {
     action: "upgrade",
     deployer: deployer.address,
-    meta: releaseMeta,
   });
-  writeReleaseSnapshot(env, updatedEnv, releaseMeta);
+  writeReleaseSnapshot(env, updatedEnv);
 
   console.log(`[upgrade] completed (version=${record.version})`);
 }

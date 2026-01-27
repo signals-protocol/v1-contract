@@ -14,12 +14,6 @@ function isStrict(env: Environment): boolean {
   return env === "prod" || process.env.STRICT_VERIFY === "1";
 }
 
-function parseNumber(value?: number | string): number | undefined {
-  if (value === undefined || value === null) return undefined;
-  const parsed = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
 export async function verifyAction(env: Environment) {
   const { network } = hre;
   const strict = isStrict(env);
@@ -33,57 +27,101 @@ export async function verifyAction(env: Environment) {
   const moduleLibraries = lazyAddress ? { LazyMulSegmentTree: lazyAddress } : undefined;
   const canVerifyLinkedModules = Boolean(moduleLibraries);
 
-  const defaultFeeBps = parseNumber(envData.config?.defaultFeeBps ?? process.env.DEFAULT_FEE_BPS);
-  const thetaBaseBps = parseNumber(process.env.THETA_BASE_BPS);
-  const thetaMaxBps = parseNumber(process.env.THETA_MAX_BPS);
-  const thetaWindowSec = parseNumber(process.env.THETA_WINDOW_SEC);
-  const thetaBeta = parseNumber(process.env.THETA_BETA);
-  if (envData.contracts.FeePolicy && defaultFeeBps === undefined) {
-    missing.push("MockFeePolicy constructor args (defaultFeeBps)");
-  }
-  if (envData.contracts.FeePolicyThetaTime) {
-    if (envData.contracts.SignalsCoreProxy === undefined) {
-      missing.push("ThetaTimeFeePolicy constructor args (core)");
-    }
-    if (thetaBaseBps === undefined || thetaMaxBps === undefined || thetaWindowSec === undefined || thetaBeta === undefined) {
-      missing.push("ThetaTimeFeePolicy constructor args (base/max/window/beta)");
-    }
-  }
-  if (!lazyAddress && (envData.contracts.TradeModule || envData.contracts.MarketLifecycleModule)) {
-    missing.push("LazyMulSegmentTree library address");
-  }
-
-  const paymentTokenAddress = envData.contracts.SignalsUSDToken ?? envData.contracts.PaymentToken;
-  const lpShareName = envData.config?.lpShareTokenName ?? process.env.LP_SHARE_NAME ?? "Signals LP";
-  const lpShareSymbol = envData.config?.lpShareTokenSymbol ?? process.env.LP_SHARE_SYMBOL ?? "SIGLP";
-  const canVerifyLpShare = Boolean(
-    envData.contracts.SignalsLPShare && envData.contracts.SignalsCoreProxy && paymentTokenAddress
-  );
+  const paymentTokenAddress = envData.contracts.PaymentToken;
+  const paymentTokenVerifyContract =
+    envData.config?.paymentTokenVerifyContract ?? process.env.PAYMENT_TOKEN_VERIFY_CONTRACT;
   if (!paymentTokenAddress && (envData.contracts.SignalsCoreImplementation || envData.contracts.SignalsCoreProxy)) {
-    missing.push("SignalsUSDToken (payment token) address");
+    missing.push("PaymentToken address");
   }
-
-  if (envData.contracts.SignalsLPShare && !canVerifyLpShare) {
-    if (!envData.contracts.SignalsCoreProxy) missing.push("SignalsCoreProxy address for LP share");
-    if (!paymentTokenAddress) missing.push("SignalsUSDToken (payment token) address for LP share");
+  const deployerEOA = envData.config?.deployerEOA ?? process.env.DEPLOYER_EOA;
+  if (!deployerEOA && (envData.contracts.SignalsCreate2Factory || envData.contracts.SignalsDeployer)) {
+    missing.push("deployerEOA (for SignalsCreate2Factory / SignalsDeployer)");
+  }
+  const coreImpl = envData.contracts.SignalsCoreImplementation;
+  const positionImpl = envData.contracts.SignalsPositionImplementation;
+  const lpShareImpl = envData.contracts.SignalsLPShareImplementation;
+  const proxyContract = "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy";
+  if (envData.contracts.SignalsCoreProxy && !coreImpl) {
+    missing.push("SignalsCoreImplementation (for SignalsCoreProxy)");
+  }
+  if (envData.contracts.SignalsPositionProxy && !positionImpl) {
+    missing.push("SignalsPositionImplementation (for SignalsPositionProxy)");
+  }
+  if (envData.contracts.SignalsLPShareProxy && !lpShareImpl) {
+    missing.push("SignalsLPShareImplementation (for SignalsLPShareProxy)");
   }
 
   const targets: VerifyTarget[] = [
     {
       name: "SignalsCoreImplementation",
-      address: envData.contracts.SignalsCoreImplementation,
+      address: coreImpl,
       contract: "contracts/core/SignalsCore.sol:SignalsCore",
     },
     {
       name: "SignalsPositionImplementation",
-      address: envData.contracts.SignalsPositionImplementation,
+      address: positionImpl,
       contract: "contracts/position/SignalsPosition.sol:SignalsPosition",
     },
+    {
+      name: "SignalsLPShareImplementation",
+      address: lpShareImpl,
+      contract: "contracts/tokens/SignalsLPShare.sol:SignalsLPShare",
+    },
+    ...(envData.contracts.SignalsCoreProxy
+      ? [
+          {
+            name: "SignalsCoreProxy",
+            address: envData.contracts.SignalsCoreProxy,
+            contract: proxyContract,
+            constructorArguments: coreImpl ? [coreImpl, "0x"] : undefined,
+          },
+        ]
+      : []),
+    ...(envData.contracts.SignalsPositionProxy
+      ? [
+          {
+            name: "SignalsPositionProxy",
+            address: envData.contracts.SignalsPositionProxy,
+            contract: proxyContract,
+            constructorArguments: positionImpl ? [positionImpl, "0x"] : undefined,
+          },
+        ]
+      : []),
+    ...(envData.contracts.SignalsLPShareProxy
+      ? [
+          {
+            name: "SignalsLPShareProxy",
+            address: envData.contracts.SignalsLPShareProxy,
+            contract: proxyContract,
+            constructorArguments: lpShareImpl ? [lpShareImpl, "0x"] : undefined,
+          },
+        ]
+      : []),
     {
       name: "LazyMulSegmentTree",
       address: envData.contracts.LazyMulSegmentTree,
       contract: "contracts/lib/LazyMulSegmentTree.sol:LazyMulSegmentTree",
     },
+    ...(envData.contracts.SignalsCreate2Factory && deployerEOA
+      ? [
+          {
+            name: "SignalsCreate2Factory",
+            address: envData.contracts.SignalsCreate2Factory,
+            contract: "contracts/deploy/SignalsCreate2Factory.sol:SignalsCreate2Factory",
+            constructorArguments: [deployerEOA],
+          },
+        ]
+      : []),
+    ...(envData.contracts.SignalsDeployer && deployerEOA
+      ? [
+          {
+            name: "SignalsDeployer",
+            address: envData.contracts.SignalsDeployer,
+            contract: "contracts/deploy/SignalsDeployer.sol:SignalsDeployer",
+            constructorArguments: [deployerEOA],
+          },
+        ]
+      : []),
     ...(canVerifyLinkedModules
       ? [
           {
@@ -123,12 +161,6 @@ export async function verifyAction(env: Environment) {
           },
         ]
       : []),
-    {
-      name: "MockFeePolicy",
-      address: envData.contracts.FeePolicy,
-      contract: "contracts/testonly/MockFeePolicy.sol:MockFeePolicy",
-      constructorArguments: defaultFeeBps === undefined ? undefined : [defaultFeeBps],
-    },
     ...(envData.contracts.FeePolicyNull
       ? [
           {
@@ -174,46 +206,12 @@ export async function verifyAction(env: Environment) {
           },
         ]
       : []),
-    ...(envData.contracts.FeePolicyThetaTime
+    ...(paymentTokenAddress && paymentTokenVerifyContract
       ? [
           {
-            name: "ThetaTimeFeePolicy",
-            address: envData.contracts.FeePolicyThetaTime,
-            contract: "contracts/fees/ThetaTimeFeePolicy.sol:ThetaTimeFeePolicy",
-            constructorArguments:
-              thetaBaseBps === undefined ||
-              thetaMaxBps === undefined ||
-              thetaWindowSec === undefined ||
-              thetaBeta === undefined ||
-              !envData.contracts.SignalsCoreProxy
-                ? undefined
-                : [
-                    envData.contracts.SignalsCoreProxy,
-                    thetaBaseBps,
-                    thetaMaxBps,
-                    thetaWindowSec,
-                    thetaBeta,
-                  ],
-          },
-        ]
-      : []),
-    {
-      name: "SignalsUSDToken",
-      address: paymentTokenAddress,
-      contract: "contracts/testonly/SignalsUSDToken.sol:SignalsUSDToken",
-    },
-    ...(canVerifyLpShare
-      ? [
-          {
-            name: "SignalsLPShare",
-            address: envData.contracts.SignalsLPShare,
-            contract: "contracts/tokens/SignalsLPShare.sol:SignalsLPShare",
-            constructorArguments: [
-              lpShareName,
-              lpShareSymbol,
-              envData.contracts.SignalsCoreProxy,
-              paymentTokenAddress,
-            ],
+            name: "PaymentToken",
+            address: paymentTokenAddress,
+            contract: paymentTokenVerifyContract,
           },
         ]
       : []),

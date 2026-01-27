@@ -20,16 +20,19 @@ export interface EnvironmentConfig {
   settlementSubmitWindow?: string;
   settlementFinalizeDeadline?: string;
   pendingOpsWindow?: string;
-  defaultFeeBps?: number;
   redstoneFeedId?: string;
   redstoneFeedDecimals?: number;
   redstoneMaxSampleDistance?: string;
   redstoneFutureTolerance?: string;
   lpShareTokenName?: string;
   lpShareTokenSymbol?: string;
+  paymentTokenVerifyContract?: string;
+  operatorAllowlist?: string[];
+  deployerEOA?: string;
   owners?: {
     core?: string;
     position?: string;
+    lpShare?: string;
   };
 }
 

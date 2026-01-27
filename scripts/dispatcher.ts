@@ -11,7 +11,7 @@ const MANIFEST_DIRS: Partial<Record<Environment, string>> = {
 function usage() {
   console.error("Usage: COMMAND=<action:env> hardhat run scripts/dispatcher.ts --network <network>");
   console.error(
-    "Actions: deploy, upgrade, update-modules, deploy-fee-policies, safety-check, verify. Envs: local, dev, testnet, prod"
+    "Actions: deploy, deploy-impls, upgrade, update-modules, deploy-fee-policies, predict-create2, seed-vault, fund-backstop, post-fund-check, safety-check, verify. Envs: local, dev, testnet, prod"
   );
   process.exit(1);
 }
@@ -54,6 +54,11 @@ async function main() {
       await deployAction(env);
       break;
     }
+    case "deploy-impls": {
+      const { deployImplsAction } = await import("./actions/deploy-impls");
+      await deployImplsAction(env);
+      break;
+    }
     case "upgrade": {
       const { upgradeAction } = await import("./actions/upgrade-v1");
       await upgradeAction(env);
@@ -67,6 +72,26 @@ async function main() {
     case "deploy-fee-policies": {
       const { deployFeePoliciesAction } = await import("./actions/deploy-fee-policies");
       await deployFeePoliciesAction(env);
+      break;
+    }
+    case "predict-create2": {
+      const { predictCreate2Action } = await import("./actions/predict-create2");
+      await predictCreate2Action(env);
+      break;
+    }
+    case "seed-vault": {
+      const { seedVaultAction } = await import("./actions/seed-vault");
+      await seedVaultAction(env);
+      break;
+    }
+    case "fund-backstop": {
+      const { fundBackstopAction } = await import("./actions/fund-backstop");
+      await fundBackstopAction(env);
+      break;
+    }
+    case "post-fund-check": {
+      const { postFundCheckAction } = await import("./actions/post-fund-check");
+      await postFundCheckAction(env);
       break;
     }
     case "safety-check": {
