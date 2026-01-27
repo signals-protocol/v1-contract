@@ -1,7 +1,23 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-import { SignalsPosition } from "../../../typechain-types";
+import { Signer } from "ethers";
+import { SignalsPosition, SignalsUSDToken } from "../../../typechain-types";
+
+async function deployCoreSigner(): Promise<{ address: string; signer: Signer }> {
+  const token = (await (
+    await ethers.getContractFactory("SignalsUSDToken")
+  ).deploy()) as SignalsUSDToken;
+  await token.waitForDeployment();
+  const address = await token.getAddress();
+  await ethers.provider.send("hardhat_impersonateAccount", [address]);
+  await ethers.provider.send("hardhat_setBalance", [
+    address,
+    ethers.toBeHex(ethers.parseEther("10")),
+  ]);
+  const signer = await ethers.getSigner(address);
+  return { address, signer };
+}
 
 /**
  * Position Storage Tests
@@ -15,7 +31,8 @@ import { SignalsPosition } from "../../../typechain-types";
 
 describe("SignalsPosition Storage", () => {
   async function deployPositionFixture() {
-    const [owner, core, alice, bob, charlie] = await ethers.getSigners();
+    const [owner, alice, bob, charlie] = await ethers.getSigners();
+    const core = await deployCoreSigner();
 
     const implFactory = await ethers.getContractFactory("SignalsPosition");
     const impl = await implFactory.deploy();
@@ -23,6 +40,7 @@ describe("SignalsPosition Storage", () => {
 
     const initData = implFactory.interface.encodeFunctionData("initialize", [
       core.address,
+      owner.address,
     ]);
     const proxy = await (
       await ethers.getContractFactory("TestERC1967Proxy")
@@ -33,7 +51,7 @@ describe("SignalsPosition Storage", () => {
       await proxy.getAddress()
     )) as SignalsPosition;
 
-    return { owner, core, alice, bob, charlie, position };
+    return { owner, core: core.signer, alice, bob, charlie, position };
   }
 
   describe("Position Data Storage", () => {
@@ -289,6 +307,4 @@ describe("SignalsPosition Storage", () => {
     });
   });
 });
-
-
 

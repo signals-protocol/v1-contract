@@ -15,7 +15,6 @@ describe("E2E: failure path", () => {
     const [trader] = users;
     const coreAddress = await core.getAddress();
 
-    await core.connect(owner).setMinSeedAmount(1);
     const seedAmount = 20_000_000n;
     await payment.connect(owner).approve(coreAddress, seedAmount);
     await core.connect(owner).seedVault(seedAmount);

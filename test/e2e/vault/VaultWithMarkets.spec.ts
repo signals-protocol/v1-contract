@@ -1,16 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { time, loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import {
-  LazyMulSegmentTree,
-  LPVaultModule,
-  MarketLifecycleModule,
-  MockERC20,
-  MockSignalsPosition,
-  OracleModule,
-  SignalsCoreHarness,
-  TestERC1967Proxy,
-} from "../../../typechain-types";
+import { LazyMulSegmentTree, LPVaultModule, MarketLifecycleModule, MockERC20, MockSignalsPosition, TradeModule, OracleModule, SignalsCoreHarness, SignalsCore, TestERC1967Proxy } from '../../../typechain-types';
 import {
   DATA_FEED_ID,
   FEED_DECIMALS,
@@ -60,6 +51,11 @@ describe("VaultWithMarkets E2E", () => {
         libraries: { LazyMulSegmentTree: lazy.target },
       })
     ).deploy()) as MarketLifecycleModule;
+    const trade = (await (
+      await ethers.getContractFactory("TradeModule", {
+        libraries: { LazyMulSegmentTree: lazy.target },
+      })
+    ).deploy()) as TradeModule;
 
     // Use OracleModuleHarness to allow Hardhat local signers for Redstone verification
     const oracle = (await (
@@ -76,56 +72,69 @@ describe("VaultWithMarkets E2E", () => {
       })
     ).deploy()) as SignalsCoreHarness;
 
-    const submitWindow = 300;
-    const opsWindow = 60;
-    const claimDelay = submitWindow + opsWindow;
-    const initData = coreImpl.interface.encodeFunctionData("initialize", [
-      payment.target,
-      position.target,
-      submitWindow,
-      claimDelay,
-    ]);
-
-    const proxy = (await (
-      await ethers.getContractFactory("TestERC1967Proxy")
-    ).deploy(coreImpl.target, initData)) as TestERC1967Proxy;
-
-    const core = (await ethers.getContractAt(
-      "SignalsCoreHarness",
-      await proxy.getAddress()
-    )) as SignalsCoreHarness;
-
     const feePolicy = await (
       await ethers.getContractFactory("MockFeePolicy")
     ).deploy(0);
 
-    await core.setModules(
-      ethers.ZeroAddress,
-      lifecycle.target,
-      risk.target,
-      vault.target,
-      oracle.target
-    );
-    await core.setSettlementTimeline(submitWindow, opsWindow, claimDelay);
-    
-    // Configure Redstone oracle params
-    await core.setRedstoneConfig(FEED_ID, FEED_DECIMALS, MAX_SAMPLE_DISTANCE, FUTURE_TOLERANCE);
+    const lpShareImpl = await (
+      await ethers.getContractFactory("SignalsLPShare")
+    ).deploy();
+    const proxyFactory = await ethers.getContractFactory("TestERC1967Proxy");
+    const lpShareProxy = (await proxyFactory.deploy(
+      await lpShareImpl.getAddress(),
+      "0x"
+    )) as TestERC1967Proxy;
+    const coreProxy = (await proxyFactory.deploy(
+      coreImpl.target,
+      "0x"
+    )) as TestERC1967Proxy;
 
-    // Vault config needed for batch processing
-    await core.setMinSeedAmount(ethers.parseEther("100"));
-    await core.setWithdrawalLagBatches(0);
-    // Configure Risk (sets pdd := -λ)
-    await core.setRiskConfig(
-      ethers.parseEther("0.2"), // lambda = 0.2
-      ethers.parseEther("1"), // kDrawdown
-      false // enforceAlpha
+    const core = (await ethers.getContractAt(
+      "SignalsCoreHarness",
+      await coreProxy.getAddress()
+    )) as SignalsCoreHarness;
+    const lpShare = await ethers.getContractAt(
+      "SignalsLPShare",
+      await lpShareProxy.getAddress()
     );
-    // Configure FeeWaterfall (pdd is already set via setRiskConfig)
-    await core.setFeeWaterfallConfig(
-      0n, // rhoBS
-      ethers.parseEther("0.8"), // phiLP
-      ethers.parseEther("0.1"), // phiBS
-      ethers.parseEther("0.1") // phiTR
+
+    const submitWindow = 300;
+    const opsWindow = 60;
+    const claimDelay = submitWindow + opsWindow;
+    const coreParams: SignalsCore.InitParamsStruct = {
+      paymentToken: payment.target.toString(),
+      positionContract: position.target.toString(),
+      lpShareToken: await lpShare.getAddress(),
+      tradeModule: trade.target.toString(),
+      lifecycleModule: lifecycle.target.toString(),
+      riskModule: risk.target.toString(),
+      vaultModule: vault.target.toString(),
+      oracleModule: oracle.target.toString(),
+      ownerSafe: owner.address,
+      settlementSubmitWindow: submitWindow,
+      pendingOpsWindow: opsWindow,
+      claimDelaySeconds: claimDelay,
+      redstoneFeedId: FEED_ID,
+      redstoneFeedDecimals: FEED_DECIMALS,
+      maxSampleDistance: MAX_SAMPLE_DISTANCE,
+      futureTolerance: FUTURE_TOLERANCE,
+      lambda: ethers.parseEther("0.2"),
+      kDrawdown: ethers.parseEther("1"),
+      enforceAlpha: false,
+      rhoBS: 0n,
+      phiLP: ethers.parseEther("0.8"),
+      phiBS: ethers.parseEther("0.1"),
+      phiTR: ethers.parseEther("0.1"),
+      withdrawalLagBatches: 0,
+      operatorAllowlist: [owner.address],
+    };
+    await core.initialize(coreParams);
+    await lpShare.initialize(
+      await core.getAddress(),
+      payment.target.toString(),
+      "Signals LP",
+      "SIGLP",
+      owner.address
     );
     // Capital stack starts at zero by default
 

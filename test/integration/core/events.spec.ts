@@ -48,21 +48,6 @@ describe("Events & Position Lifecycle", () => {
       await ethers.getContractFactory("SignalsUSDToken")
     ).deploy();
 
-    const positionImplFactory = await ethers.getContractFactory("SignalsPosition");
-    const positionImpl = await positionImplFactory.deploy();
-    await positionImpl.waitForDeployment();
-    const positionInit = positionImplFactory.interface.encodeFunctionData(
-      "initialize",
-      [owner.address]
-    );
-    const positionProxy = await (
-      await ethers.getContractFactory("TestERC1967Proxy")
-    ).deploy(positionImpl.target, positionInit);
-    const position = (await ethers.getContractAt(
-      "SignalsPosition",
-      await positionProxy.getAddress()
-    )) as SignalsPosition;
-
     const feePolicy = await (
       await ethers.getContractFactory("MockFeePolicy")
     ).deploy(0);
@@ -81,6 +66,21 @@ describe("Events & Position Lifecycle", () => {
         libraries: { LazyMulSegmentTree: lazyLib.target },
       })
     ).deploy(tradeModuleImpl.target);
+
+    const positionImplFactory = await ethers.getContractFactory("SignalsPosition");
+    const positionImpl = await positionImplFactory.deploy();
+    await positionImpl.waitForDeployment();
+    const positionInit = positionImplFactory.interface.encodeFunctionData(
+      "initialize",
+      [core.target, owner.address]
+    );
+    const positionProxy = await (
+      await ethers.getContractFactory("TestERC1967Proxy")
+    ).deploy(positionImpl.target, positionInit);
+    const position = (await ethers.getContractAt(
+      "SignalsPosition",
+      await positionProxy.getAddress()
+    )) as SignalsPosition;
 
     await core.setAddresses(
       payment.target,
@@ -120,8 +120,6 @@ describe("Events & Position Lifecycle", () => {
 
     const factors = Array(NUM_BINS).fill(WAD);
     await core.seedTree(MARKET_ID, factors);
-
-    await position.connect(owner).setCore(core.target);
 
     const fundAmount = ethers.parseUnits("100000", USDC_DECIMALS);
     await payment.transfer(user.address, fundAmount);

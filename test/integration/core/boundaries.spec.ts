@@ -48,23 +48,6 @@ describe("Boundaries", () => {
       await ethers.getContractFactory("SignalsUSDToken")
     ).deploy();
 
-    const positionImplFactory = await ethers.getContractFactory(
-      "SignalsPosition"
-    );
-    const positionImpl = await positionImplFactory.deploy();
-    await positionImpl.waitForDeployment();
-    const positionInit = positionImplFactory.interface.encodeFunctionData(
-      "initialize",
-      [owner.address]
-    );
-    const positionProxy = await (
-      await ethers.getContractFactory("TestERC1967Proxy")
-    ).deploy(positionImpl.target, positionInit);
-    const position = (await ethers.getContractAt(
-      "SignalsPosition",
-      await positionProxy.getAddress()
-    )) as SignalsPosition;
-
     const feePolicy = await (
       await ethers.getContractFactory("MockFeePolicy")
     ).deploy(0);
@@ -83,6 +66,23 @@ describe("Boundaries", () => {
         libraries: { LazyMulSegmentTree: lazyLib.target },
       })
     ).deploy(tradeModule.target);
+
+    const positionImplFactory = await ethers.getContractFactory(
+      "SignalsPosition"
+    );
+    const positionImpl = await positionImplFactory.deploy();
+    await positionImpl.waitForDeployment();
+    const positionInit = positionImplFactory.interface.encodeFunctionData(
+      "initialize",
+      [core.target, owner.address]
+    );
+    const positionProxy = await (
+      await ethers.getContractFactory("TestERC1967Proxy")
+    ).deploy(positionImpl.target, positionInit);
+    const position = (await ethers.getContractAt(
+      "SignalsPosition",
+      await positionProxy.getAddress()
+    )) as SignalsPosition;
 
     await core.setAddresses(
       payment.target,
@@ -122,8 +122,6 @@ describe("Boundaries", () => {
 
     const factors = Array(NUM_BINS).fill(WAD);
     await core.seedTree(MARKET_ID, factors);
-
-    await position.connect(owner).setCore(core.target);
 
     const fundAmount = ethers.parseUnits("100000", USDC_DECIMALS);
     await payment.transfer(user.address, fundAmount);
@@ -339,23 +337,6 @@ describe("Boundaries", () => {
         await ethers.getContractFactory("SignalsUSDToken")
       ).deploy();
 
-      const positionImplFactory = await ethers.getContractFactory(
-        "SignalsPosition"
-      );
-      const positionImpl = await positionImplFactory.deploy();
-      await positionImpl.waitForDeployment();
-      const positionInit = positionImplFactory.interface.encodeFunctionData(
-        "initialize",
-        [owner.address]
-      );
-      const positionProxy = await (
-        await ethers.getContractFactory("TestERC1967Proxy")
-      ).deploy(positionImpl.target, positionInit);
-      const position = (await ethers.getContractAt(
-        "SignalsPosition",
-        await positionProxy.getAddress()
-      )) as SignalsPosition;
-
       const feePolicy = await (
         await ethers.getContractFactory("MockFeePolicy")
       ).deploy(0);
@@ -375,14 +356,29 @@ describe("Boundaries", () => {
         })
       ).deploy(tradeModule.target);
 
+      const positionImplFactory = await ethers.getContractFactory(
+        "SignalsPosition"
+      );
+      const positionImpl = await positionImplFactory.deploy();
+      await positionImpl.waitForDeployment();
+      const positionInit = positionImplFactory.interface.encodeFunctionData(
+        "initialize",
+        [core.target, owner.address]
+      );
+      const positionProxy = await (
+        await ethers.getContractFactory("TestERC1967Proxy")
+      ).deploy(positionImpl.target, positionInit);
+      const position = (await ethers.getContractAt(
+        "SignalsPosition",
+        await positionProxy.getAddress()
+      )) as SignalsPosition;
+
       await core.setAddresses(
         payment.target,
         await position.getAddress(),
         1,
         1
       );
-
-      await position.connect(owner).setCore(core.target);
 
       const fundAmount = ethers.parseUnits("100000", USDC_DECIMALS);
       await payment.transfer(user.address, fundAmount);

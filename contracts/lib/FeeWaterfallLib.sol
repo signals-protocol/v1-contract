@@ -24,7 +24,7 @@ library FeeWaterfallLib {
         uint256 Bprev;       // Previous Backstop NAV (WAD)
         uint256 Tprev;       // Previous Treasury NAV (WAD)
         uint256 deltaEt;     // Available backstop support limit (WAD)
-        int256 pdd;          // Drawdown floor (negative, WAD, e.g., -0.3e18)
+        int256 pdd;          // NAV loss floor (negative WAD, pdd := -lambda, e.g., -0.3e18)
         uint256 rhoBS;       // Backstop coverage ratio (WAD)
         uint256 phiLP;       // LP fee share (WAD)
         uint256 phiBS;       // Backstop fee share (WAD)
@@ -57,7 +57,7 @@ library FeeWaterfallLib {
     /// @return r Output result
     function calculate(Params memory p) internal pure returns (Result memory r) {
         // Validate inputs
-        // pdd must be in range (-WAD, 0) - i.e., max 100% drawdown
+        // pdd must be in range (-WAD, 0) - i.e., max 100% NAV loss floor
         if (p.pdd >= 0 || p.pdd < -int256(WAD)) revert SE.InvalidDrawdownFloor(p.pdd);
         
         uint256 phiSum = p.phiLP + p.phiBS + p.phiTR;
@@ -96,9 +96,10 @@ library FeeWaterfallLib {
         }
 
         // ========================================
-        // Step 2: Drawdown Floor & Grant
+        // Step 2: NAV Floor & Grant
         // ========================================
         // Nfloor = Nprev × (1 + pdd)
+        // Note: this is the NAV floor (loss limit), not peak drawdown.
         // Since pdd is negative, (WAD + pdd) < WAD
         // G^need_t := max{0, ⌈G^min_t⌉} requires ceil semantics
         // We use wMulUp for Nfloor to ensure conservative (higher) floor calculation
@@ -190,4 +191,3 @@ library FeeWaterfallLib {
         r.Tnext = p.Tprev + FcoreTR;
     }
 }
-

@@ -4,11 +4,19 @@ import { expect } from "chai";
 describe("Access / Upgrade guards", () => {
   it("prevents re-initialization of SignalsPosition proxy", async () => {
     const [owner] = await ethers.getSigners();
+    const coreStub = await (await ethers.getContractFactory("SignalsUSDToken")).deploy();
+    await coreStub.waitForDeployment();
     const positionFactory = await ethers.getContractFactory("SignalsPosition");
-    const proxy = await upgrades.deployProxy(positionFactory, [owner.address], { kind: "uups" });
+    const proxy = await upgrades.deployProxy(
+      positionFactory,
+      [await coreStub.getAddress(), owner.address],
+      { kind: "uups" }
+    );
     await proxy.waitForDeployment();
 
-    await expect(proxy.initialize(owner.address)).to.be.revertedWithCustomError(proxy, "InvalidInitialization");
+    await expect(
+      proxy.initialize(owner.address, owner.address)
+    ).to.be.revertedWithCustomError(proxy, "InvalidInitialization");
   });
 
   describe("blocks direct module calls (onlyDelegated)", () => {
@@ -75,8 +83,14 @@ describe("Access / Upgrade guards", () => {
 
   it("rejects upgrade from non-owner", async () => {
     const [owner, attacker] = await ethers.getSigners();
+    const coreStub = await (await ethers.getContractFactory("SignalsUSDToken")).deploy();
+    await coreStub.waitForDeployment();
     const posFactory = await ethers.getContractFactory("SignalsPosition");
-    const proxy = await upgrades.deployProxy(posFactory, [owner.address], { kind: "uups" });
+    const proxy = await upgrades.deployProxy(
+      posFactory,
+      [await coreStub.getAddress(), owner.address],
+      { kind: "uups" }
+    );
     await proxy.waitForDeployment();
 
     const newImpl = await posFactory.deploy();

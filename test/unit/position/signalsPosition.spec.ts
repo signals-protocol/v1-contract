@@ -1,13 +1,33 @@
 import { ethers } from "hardhat";
 import { expect } from "chai";
-import { SignalsPosition, TestERC1967Proxy } from "../../../typechain-types";
+import { Signer } from "ethers";
+import { SignalsPosition, SignalsUSDToken, TestERC1967Proxy } from "../../../typechain-types";
 
-async function deployPosition(initialCore: string): Promise<SignalsPosition> {
+async function deployCoreSigner(): Promise<{ address: string; signer: Signer }> {
+  const token = (await (
+    await ethers.getContractFactory("SignalsUSDToken")
+  ).deploy()) as SignalsUSDToken;
+  await token.waitForDeployment();
+  const address = await token.getAddress();
+  await ethers.provider.send("hardhat_impersonateAccount", [address]);
+  await ethers.provider.send("hardhat_setBalance", [
+    address,
+    ethers.toBeHex(ethers.parseEther("10")),
+  ]);
+  const signer = await ethers.getSigner(address);
+  return { address, signer };
+}
+
+async function deployPosition(
+  initialCore: string,
+  ownerSafe: string
+): Promise<SignalsPosition> {
   const implFactory = await ethers.getContractFactory("SignalsPosition");
   const impl = await implFactory.deploy();
   await impl.waitForDeployment();
   const initData = implFactory.interface.encodeFunctionData("initialize", [
     initialCore,
+    ownerSafe,
   ]);
   const proxy = (await (
     await ethers.getContractFactory("TestERC1967Proxy")
@@ -18,10 +38,16 @@ async function deployPosition(initialCore: string): Promise<SignalsPosition> {
   )) as SignalsPosition;
 }
 
+async function deployPositionFixture() {
+  const [owner, user, alice, bob, carol] = await ethers.getSigners();
+  const core = await deployCoreSigner();
+  const position = await deployPosition(core.address, owner.address);
+  return { position, core: core.signer, owner, user, alice, bob, carol };
+}
+
 describe("SignalsPosition", () => {
   it("enforces core-only mint/burn/update", async () => {
-    const [core, user] = await ethers.getSigners();
-    const position = await deployPosition(core.address);
+    const { position, core, user } = await deployPositionFixture();
 
     await expect(
       position.connect(user).mintPosition(user.address, 1, 0, 1, 1_000)
@@ -51,16 +77,14 @@ describe("SignalsPosition", () => {
   // ============================================================
   describe("Edge Cases: Range Validation", () => {
     it("reverts burn on non-existent position", async () => {
-      const [core] = await ethers.getSigners();
-      const position = await deployPosition(core.address);
+      const { position, core } = await deployPositionFixture();
 
       // Burn non-existent position (ID 999)
       await expect(position.connect(core).burn(999)).to.be.reverted;
     });
 
     it("reverts double burn", async () => {
-      const [core, user] = await ethers.getSigners();
-      const position = await deployPosition(core.address);
+      const { position, core, user } = await deployPositionFixture();
 
       await position.connect(core).mintPosition(user.address, 1, 0, 1, 1_000);
       await position.connect(core).burn(1);
@@ -70,8 +94,7 @@ describe("SignalsPosition", () => {
     });
 
     it("handles maximum quantity value", async () => {
-      const [core, user] = await ethers.getSigners();
-      const position = await deployPosition(core.address);
+      const { position, core, user } = await deployPositionFixture();
 
       // Max uint128 quantity
       const maxQty = 2n ** 128n - 1n;
@@ -82,8 +105,7 @@ describe("SignalsPosition", () => {
     });
 
     it("handles zero-based tick ranges", async () => {
-      const [core, user] = await ethers.getSigners();
-      const position = await deployPosition(core.address);
+      const { position, core, user } = await deployPositionFixture();
 
       // Mint at [0, 1) range
       await position.connect(core).mintPosition(user.address, 1, 0, 1, 1_000);
@@ -94,8 +116,7 @@ describe("SignalsPosition", () => {
   });
 
   it("tracks owner indices across mint/transfer/burn", async () => {
-    const [core, alice, bob] = await ethers.getSigners();
-    const position = await deployPosition(core.address);
+    const { position, core, alice, bob } = await deployPositionFixture();
     await position.connect(core).mintPosition(alice.address, 1, 0, 2, 1_000);
     await position.connect(core).mintPosition(alice.address, 1, 2, 4, 1_000);
 
@@ -121,8 +142,7 @@ describe("SignalsPosition", () => {
   });
 
   it("provides market indexing with hole markers", async () => {
-    const [core, alice] = await ethers.getSigners();
-    const position = await deployPosition(core.address);
+    const { position, core, alice } = await deployPositionFixture();
     await position.connect(core).mintPosition(alice.address, 7, 0, 1, 1_000);
     await position.connect(core).mintPosition(alice.address, 7, 1, 2, 1_000);
     await position.connect(core).mintPosition(alice.address, 7, 2, 3, 1_000);
@@ -135,8 +155,7 @@ describe("SignalsPosition", () => {
   });
 
   it("filters user positions per market", async () => {
-    const [core, alice, bob] = await ethers.getSigners();
-    const position = await deployPosition(core.address);
+    const { position, core, alice, bob } = await deployPositionFixture();
     await position.connect(core).mintPosition(alice.address, 5, 0, 1, 1_000);
     await position.connect(core).mintPosition(bob.address, 5, 1, 2, 1_000);
     await position.connect(core).mintPosition(alice.address, 6, 0, 1, 1_000);
@@ -153,8 +172,7 @@ describe("SignalsPosition", () => {
   });
 
   it("keeps owner/market indices consistent across multi-market transfer and burn", async () => {
-    const [core, alice, bob] = await ethers.getSigners();
-    const position = await deployPosition(core.address);
+    const { position, core, alice, bob } = await deployPositionFixture();
 
     await position.connect(core).mintPosition(alice.address, 1, 0, 1, 1_000); // id 1
     await position.connect(core).mintPosition(alice.address, 1, 1, 2, 1_000); // id 2
@@ -215,8 +233,7 @@ describe("SignalsPosition", () => {
   });
 
   it("mirrors JS state across random mint/transfer/burn sequence", async () => {
-    const [core, alice, bob, carol] = await ethers.getSigners();
-    const position = await deployPosition(core.address);
+    const { position, core, alice, bob, carol } = await deployPositionFixture();
 
     type PosState = {
       owner: string;

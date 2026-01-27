@@ -75,7 +75,6 @@ describe("E2E: vault lifecycle", () => {
     const [user] = users;
     const coreAddress = await core.getAddress();
 
-    await core.connect(owner).setMinSeedAmount(1);
     await core
       .connect(owner)
       .setRiskConfig(ethers.parseEther("0.3"), ethers.parseEther("1"), false);
@@ -107,10 +106,14 @@ describe("E2E: vault lifecycle", () => {
     const withdrawShares = shares / 2n;
     await core.connect(user).requestWithdraw(withdrawShares);
 
-    const nextBatchId = batchId + 1n;
-    await createFailedMarketInBatch(core, nextBatchId, feePolicy.target.toString());
-    await advancePastBatchEnd(nextBatchId);
-    await core.processDailyBatch(Number(nextBatchId));
+    const lag = await core.getWithdrawalLagBatches();
+    const currentBatchAfterWithdraw = await core.getCurrentBatchId();
+    const eligibleBatchId = currentBatchAfterWithdraw + BigInt(lag) + 1n;
+    for (let batch = currentBatchAfterWithdraw + 1n; batch <= eligibleBatchId; batch++) {
+      await createFailedMarketInBatch(core, batch, feePolicy.target.toString());
+      await advancePastBatchEnd(batch);
+      await core.processDailyBatch(Number(batch));
+    }
 
     const balanceBefore = await payment.balanceOf(user.address);
     await core.connect(user).claimWithdraw(0);

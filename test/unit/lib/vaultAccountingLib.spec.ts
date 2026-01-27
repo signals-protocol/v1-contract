@@ -411,10 +411,10 @@ describe("VaultAccountingLib", () => {
   });
 
   // ============================================================
-  // INV-V8: Drawdown range [0, 1e18]
+  // INV-V8: Peak drawdown range [0, 1e18]
   // DD_t = 1 - P_t / P_peak,t
   // ============================================================
-  describe("INV-V8: Drawdown calculation", () => {
+  describe("INV-V8: Peak drawdown calculation", () => {
     it("returns 0 when price equals peak", async () => {
       const price = ethers.parseEther("1");
       const peak = ethers.parseEther("1");
@@ -424,7 +424,7 @@ describe("VaultAccountingLib", () => {
       expect(dd).to.equal(0n);
     });
 
-    it("calculates 20% drawdown correctly", async () => {
+    it("calculates 20% peak drawdown correctly", async () => {
       const price = ethers.parseEther("0.8");
       const peak = ethers.parseEther("1");
 
@@ -434,7 +434,7 @@ describe("VaultAccountingLib", () => {
       expect(dd).to.equal(ethers.parseEther("0.2"));
     });
 
-    it("returns 100% drawdown when price is 0", async () => {
+    it("returns 100% peak drawdown when price is 0", async () => {
       const price = 0n;
       const peak = ethers.parseEther("1");
 
@@ -457,9 +457,9 @@ describe("VaultAccountingLib", () => {
       expect(dd).to.equal(0n);
     });
 
-    it("handles small drawdown precision", async () => {
+    it("handles small peak drawdown precision", async () => {
       const peak = ethers.parseEther("1");
-      const price = ethers.parseEther("0.999"); // 0.1% drawdown
+      const price = ethers.parseEther("0.999"); // 0.1% peak drawdown
 
       const dd = await lib.computeDrawdown(price, peak);
 
@@ -515,10 +515,10 @@ describe("VaultAccountingLib", () => {
       expect(sharesOut).to.equal(shares);
       expect(price).to.equal(ethers.parseEther("1.1"));
       expect(pricePeak).to.equal(ethers.parseEther("1.1")); // New peak
-      expect(drawdown).to.equal(0n); // At peak, no drawdown
+      expect(drawdown).to.equal(0n); // At peak, no peak drawdown
     });
 
-    it("tracks drawdown from previous peak", async () => {
+    it("tracks peak drawdown from previous peak", async () => {
       const nav = ethers.parseEther("900");
       const shares = ethers.parseEther("1000");
       const previousPeak = ethers.parseEther("1.2");

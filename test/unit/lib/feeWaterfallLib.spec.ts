@@ -12,7 +12,7 @@ describe("FeeWaterfallLib", () => {
     Bprev: ethers.parseEther("200"),      // 200 Backstop
     Tprev: ethers.parseEther("50"),       // 50 Treasury
     deltaEt: ethers.parseEther("100"),    // 100 available support
-    pdd: ethers.parseEther("-0.3"),       // -30% drawdown floor
+    pdd: ethers.parseEther("-0.3"),       // -30% NAV loss floor
     rhoBS: ethers.parseEther("0.2"),      // 20% backstop coverage
     phiLP: ethers.parseEther("0.7"),      // 70% to LP
     phiBS: ethers.parseEther("0.2"),      // 20% to Backstop
@@ -123,7 +123,7 @@ describe("FeeWaterfallLib", () => {
       expect(result.Bnext).to.be.lte(ethers.parseEther("200")); // Backstop decreased
     });
 
-    it("case 4: reverts when grant exceeds deltaEt (drawdown floor invariant)", async () => {
+    it("case 4: reverts when grant exceeds deltaEt (NAV loss floor invariant)", async () => {
       // Safety invariant: if G^need_t > ΔE_t, batch must revert
       await expect(
         calculate({
@@ -175,9 +175,9 @@ describe("FeeWaterfallLib", () => {
       expect(result.Gt).to.equal(ethers.parseEther("50"));
     });
 
-    it("reverts when grantNeed exceeds deltaEt (drawdown floor invariant)", async () => {
+    it("reverts when grantNeed exceeds deltaEt (NAV loss floor invariant)", async () => {
       // If G^need_t > ΔE_t, batch must revert.
-      // This is the Safety Layer invariant - drawdown floor cannot be violated.
+      // This is the Safety Layer invariant - NAV loss floor cannot be violated.
       await expect(
         calculate({
           Lt: ethers.parseEther("-500"),
@@ -399,7 +399,7 @@ describe("FeeWaterfallLib", () => {
       expect(result.Nraw).to.equal(defaultParams.Nprev);
     });
 
-    it("reverts on positive drawdown floor", async () => {
+    it("reverts on positive NAV loss floor", async () => {
       await expect(
         calculate({
           Lt: 0n,
@@ -409,7 +409,7 @@ describe("FeeWaterfallLib", () => {
       ).to.be.revertedWithCustomError(harness, "InvalidDrawdownFloor");
     });
 
-    it("reverts on pdd < -WAD (over 100% drawdown)", async () => {
+    it("reverts on pdd < -WAD (over 100% NAV loss floor)", async () => {
       await expect(
         calculate({
           Lt: 0n,
@@ -476,7 +476,7 @@ describe("FeeWaterfallLib", () => {
       // = ceil(700.0000000000000000007) = 700000000000000000001
       // Without it (wMul), Nfloor = 700000000000000000000
       
-      // The key invariant: drawdown floor is maintained conservatively
+      // The key invariant: NAV loss floor is maintained conservatively
       // Npre should be >= Nfloor
       
       // Nraw = 1000e18+1 - 301e18 + 1e18 = 700e18 + 1
@@ -506,7 +506,7 @@ describe("FeeWaterfallLib", () => {
       expect(navDelta).to.equal(expected);
     });
 
-    it("maintains drawdown floor invariant with ceil rounding", async () => {
+    it("maintains NAV loss floor invariant with ceil rounding", async () => {
       // Test multiple Nprev values with small fractional components
       const testCases = [
         ethers.parseEther("1000") + 1n,
@@ -528,9 +528,9 @@ describe("FeeWaterfallLib", () => {
         const product = Nprev * wadPlusPdd;
         const expectedNfloorCeil = product === 0n ? 0n : (product - 1n) / ethers.parseEther("1") + 1n;
         
-        // Npre should be >= Nfloor (drawdown floor maintained)
+        // Npre should be >= Nfloor (NAV loss floor maintained)
         expect(result.Npre).to.be.gte(expectedNfloorCeil, 
-          `Drawdown floor violated for Nprev=${Nprev}`);
+          `NAV loss floor violated for Nprev=${Nprev}`);
       }
     });
   });
@@ -740,7 +740,7 @@ describe("FeeWaterfallLib", () => {
           const wadPlusPdd = WAD + params.pdd;
           const Nfloor = wadPlusPdd > 0n ? (params.Nprev * wadPlusPdd) / WAD : 0n;
           const grantNeed = Nfloor > Nraw ? Nfloor - Nraw : 0n;
-          // grantNeed > deltaEt causes revert (drawdown floor invariant)
+          // grantNeed > deltaEt causes revert (NAV loss floor invariant)
           if (grantNeed > params.deltaEt) continue;
           // Also skip if grant exceeds backstop
           if (grantNeed > params.Bprev) continue;
@@ -780,4 +780,3 @@ describe("FeeWaterfallLib", () => {
     }).timeout(60000);
   });
 });
-

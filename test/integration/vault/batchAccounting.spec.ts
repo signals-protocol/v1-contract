@@ -42,10 +42,9 @@ describe("BatchAccounting Spec Tests", () => {
     )) as LPVaultModuleProxy;
 
     await proxy.setPaymentToken(payment.target);
-    await proxy.setMinSeedAmount(usdc("100"));
     await proxy.setWithdrawalLagBatches(0);
     // Configure Risk (sets pdd := -λ)
-    // λ = 0.3 → pdd = -0.3 (30% drawdown floor)
+    // λ = 0.3 → pdd = -0.3 (30% NAV loss floor)
     await proxy.setRiskConfig(
       ethers.parseEther("0.3"), // lambda = 0.3
       ethers.parseEther("1"), // kDrawdown
@@ -253,7 +252,7 @@ describe("BatchAccounting Spec Tests", () => {
   // ================================================================
   describe("SPEC-2: Pre-batch NAV equation (INV-NAV)", () => {
     it("N^pre_t - N_{t-1} = L_t + F_t + G_t (positive P&L)", async () => {
-      const { proxy, currentBatchId, owner } = await loadFixture(
+      const { proxy, currentBatchId } = await loadFixture(
         deploySeededVaultFixture
       );
 
@@ -287,7 +286,7 @@ describe("BatchAccounting Spec Tests", () => {
       const N_prev = await proxy.getVaultNav();
       const batchId = currentBatchId + 1n;
 
-      // Large negative P&L that triggers drawdown floor
+      // Large negative P&L that triggers NAV loss floor
       const Lt = ethers.parseEther("-400"); // -40% of NAV
       const Ftot = ethers.parseEther("20");
 
@@ -304,7 +303,7 @@ describe("BatchAccounting Spec Tests", () => {
     });
 
     it("N^pre_t - N_{t-1} = L_t + F_t + G_t (zero P&L)", async () => {
-      const { proxy, currentBatchId, owner } = await loadFixture(
+      const { proxy, currentBatchId } = await loadFixture(
         deploySeededVaultFixture
       );
 
@@ -330,7 +329,7 @@ describe("BatchAccounting Spec Tests", () => {
       const N_prev = await proxy.getVaultNav();
       const batchId = currentBatchId + 1n;
 
-      // Small negative P&L that stays above drawdown floor (pdd = -30%)
+      // Small negative P&L that stays above NAV loss floor (pdd = -30%)
       // -10% loss doesn't trigger grant because Nraw > Nfloor
       const Lt = ethers.parseEther("-100"); // -10% of 1000 WAD
       const Ftot = ethers.parseEther("10");

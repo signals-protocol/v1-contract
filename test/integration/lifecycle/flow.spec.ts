@@ -1,15 +1,7 @@
 import { ethers } from "hardhat";
 import { expect } from "chai";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
-import {
-  MarketLifecycleModule,
-  OracleModule,
-  TradeModule,
-  SignalsCoreHarness,
-  SignalsPosition,
-  TestERC1967Proxy,
-  MockFeePolicy,
-} from "../../../typechain-types";
+import { MarketLifecycleModule, OracleModule, TradeModule, SignalsCoreHarness, SignalsCore, SignalsPosition, SignalsLPShare, TestERC1967Proxy, MockFeePolicy, LPVaultModule } from '../../../typechain-types';
 import {
   DATA_FEED_ID,
   FEED_DECIMALS,
@@ -38,25 +30,9 @@ describe("Lifecycle + Trade integration", () => {
     const payment = await (
       await ethers.getContractFactory("SignalsUSDToken")
     ).deploy();
-    const positionImplFactory = await ethers.getContractFactory(
-      "SignalsPosition"
-    );
+    const positionImplFactory = await ethers.getContractFactory("SignalsPosition");
     const positionImpl = await positionImplFactory.deploy();
     await positionImpl.waitForDeployment();
-    const positionInit = positionImplFactory.interface.encodeFunctionData(
-      "initialize",
-      [owner.address]
-    );
-    const positionProxy = (await (
-      await ethers.getContractFactory("TestERC1967Proxy")
-    ).deploy(
-      await positionImpl.getAddress(),
-      positionInit
-    )) as TestERC1967Proxy;
-    const position = (await ethers.getContractAt(
-      "SignalsPosition",
-      await positionProxy.getAddress()
-    )) as SignalsPosition;
     const lazyLib = await (
       await ethers.getContractFactory("LazyMulSegmentTree")
     ).deploy();
@@ -78,6 +54,9 @@ describe("Lifecycle + Trade integration", () => {
     const riskModule = await (
       await ethers.getContractFactory("RiskModule")
     ).deploy();
+    const vaultModule = (await (
+      await ethers.getContractFactory("LPVaultModule")
+    ).deploy()) as LPVaultModule;
 
     const coreImpl = (await (
       await ethers.getContractFactory("SignalsCoreHarness", {
@@ -87,35 +66,66 @@ describe("Lifecycle + Trade integration", () => {
     const submitWindow = 300;
     const opsWindow = 60;
     const claimDelay = submitWindow + opsWindow;
-    const initData = coreImpl.interface.encodeFunctionData("initialize", [
-      payment.target,
-      await position.getAddress(),
-      submitWindow,
-      claimDelay,
-    ]);
-    const proxy = (await (
-      await ethers.getContractFactory("TestERC1967Proxy")
-    ).deploy(coreImpl.target, initData)) as TestERC1967Proxy;
+    const lpShareImpl = await (await ethers.getContractFactory("SignalsLPShare")).deploy();
+
+    const proxyFactory = await ethers.getContractFactory("TestERC1967Proxy");
+    const positionProxy = (await proxyFactory.deploy(positionImpl.target, "0x")) as TestERC1967Proxy;
+    const lpShareProxy = (await proxyFactory.deploy(lpShareImpl.target, "0x")) as TestERC1967Proxy;
+    const coreProxy = (await proxyFactory.deploy(coreImpl.target, "0x")) as TestERC1967Proxy;
+
+    const position = (await ethers.getContractAt(
+      "SignalsPosition",
+      await positionProxy.getAddress()
+    )) as SignalsPosition;
+    const lpShare = (await ethers.getContractAt(
+      "SignalsLPShare",
+      await lpShareProxy.getAddress()
+    )) as SignalsLPShare;
     const core = (await ethers.getContractAt(
       "SignalsCoreHarness",
-      await proxy.getAddress()
+      await coreProxy.getAddress()
     )) as SignalsCoreHarness;
 
     const feePolicy = (await (
       await ethers.getContractFactory("MockFeePolicy")
     ).deploy(0)) as MockFeePolicy;
-    await core.setModules(
-      tradeModule.target,
-      lifecycleModule.target,
-      riskModule.target,
-      ethers.ZeroAddress,
-      oracleModule.target
+
+    const coreParams: SignalsCore.InitParamsStruct = {
+      paymentToken: payment.target.toString(),
+      positionContract: await position.getAddress(),
+      lpShareToken: await lpShare.getAddress(),
+      tradeModule: tradeModule.target.toString(),
+      lifecycleModule: lifecycleModule.target.toString(),
+      riskModule: riskModule.target.toString(),
+      vaultModule: vaultModule.target.toString(),
+      oracleModule: oracleModule.target.toString(),
+      ownerSafe: owner.address,
+      settlementSubmitWindow: submitWindow,
+      pendingOpsWindow: opsWindow,
+      claimDelaySeconds: claimDelay,
+      redstoneFeedId: FEED_ID,
+      redstoneFeedDecimals: FEED_DECIMALS,
+      maxSampleDistance: MAX_SAMPLE_DISTANCE,
+      futureTolerance: FUTURE_TOLERANCE,
+      lambda: ethers.parseEther("0.3"),
+      kDrawdown: ethers.parseEther("1"),
+      enforceAlpha: true,
+      rhoBS: 0,
+      phiLP: ethers.parseEther("1"),
+      phiBS: 0,
+      phiTR: 0,
+      withdrawalLagBatches: 1,
+      operatorAllowlist: [owner.address],
+    };
+    await core.initialize(coreParams);
+    await position.initialize(await core.getAddress(), owner.address);
+    await lpShare.initialize(
+      await core.getAddress(),
+      payment.target.toString(),
+      "Signals LP",
+      "SIGLP",
+      owner.address
     );
-    
-    // Configure Redstone oracle params
-    await core.setRedstoneConfig(FEED_ID, FEED_DECIMALS, MAX_SAMPLE_DISTANCE, FUTURE_TOLERANCE);
-    await core.setSettlementTimeline(submitWindow, opsWindow, claimDelay);
-    await position.connect(owner).setCore(await core.getAddress());
 
     return {
       owner,

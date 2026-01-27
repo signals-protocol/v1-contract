@@ -37,11 +37,10 @@ describe("LP Vault Scenarios", () => {
     )) as LPVaultModuleProxy;
 
     await proxy.setPaymentToken(payment.target);
-    await proxy.setMinSeedAmount(usdc("100"));
     await proxy.setWithdrawalLagBatches(1); // D_lag = 1 batch
 
     // Configure Risk (sets pdd := -λ)
-    // λ = 0.2 → pdd = -0.2 (20% drawdown floor)
+    // λ = 0.2 → pdd = -0.2 (20% NAV loss floor)
     await proxy.setRiskConfig(
       ethers.parseEther("0.2"), // lambda = 0.2
       ethers.parseEther("1"), // kDrawdown
@@ -189,18 +188,18 @@ describe("LP Vault Scenarios", () => {
   });
 
   // ============================================================
-  // Scenario 2: Drawdown + Backstop Grant
+  // Scenario 2: Peak Drawdown + Backstop Grant
   // ============================================================
-  describe("Scenario: Drawdown + Grant", () => {
+  describe("Scenario: Peak Drawdown + Grant", () => {
     /**
      * Vault experiences significant loss that triggers backstop grant.
      *
      * Day 1: Large market loss (L = -2000) on 10000 NAV = -20%
-     * Drawdown floor (pdd) = -20%, so backstop grant should activate
+     * NAV loss floor (pdd) = -20%, so backstop grant should activate
      *
      * Verify: Grant limits loss, backstop NAV decreases, LP protected
      */
-    it("backstop grant protects LP from excessive drawdown", async () => {
+    it("backstop grant protects LP from excessive peak drawdown", async () => {
       const { proxy, firstBatchId } = await loadFixture(
         deploySeededVaultFixture
       );
@@ -213,7 +212,7 @@ describe("LP Vault Scenarios", () => {
       expect(backstopBefore).to.equal(ethers.parseEther("500"));
 
       // Large loss: -2000 on 10000 = 20% loss
-      // This should trigger drawdown floor protection
+      // This should trigger NAV loss floor protection
       await proxy.harnessRecordPnl(
         day1,
         ethers.parseEther("-2000"),
@@ -234,16 +233,16 @@ describe("LP Vault Scenarios", () => {
       // Backstop should have decreased (provided grant)
       expect(backstopAfter).to.be.lte(backstopBefore);
 
-      // Drawdown should be limited by pdd
+      // Peak drawdown should be limited by NAV loss floor (pdd)
       const price = await proxy.getVaultPrice();
       const peak = await proxy.getVaultPricePeak();
       const drawdown = WAD - (price * WAD) / peak;
 
-      // Drawdown should not exceed 20% (pdd = -0.2)
+      // Peak drawdown should not exceed 20% (pdd = -0.2)
       expect(drawdown).to.be.lte(ethers.parseEther("0.25")); // Allow some margin
     });
 
-    it("recovery from drawdown updates peak correctly", async () => {
+    it("recovery from peak drawdown updates peak correctly", async () => {
       const { proxy, firstBatchId } = await loadFixture(
         deploySeededVaultFixture
       );

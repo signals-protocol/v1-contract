@@ -1,11 +1,7 @@
 import { ethers } from "hardhat";
 import { expect } from "chai";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
-import {
-  MarketLifecycleModule,
-  OracleModule,
-  SignalsCoreHarness,
-} from "../../../typechain-types";
+import { MarketLifecycleModule, OracleModule, SignalsCoreHarness, SignalsCore, SignalsLPShare, TradeModule } from '../../../typechain-types';
 import { ISignalsCore } from "../../../typechain-types/contracts/testonly/TradeModuleHarness";
 import {
   DATA_FEED_ID,
@@ -43,43 +39,77 @@ describe("OracleModule", () => {
     const riskModule = await (
       await ethers.getContractFactory("RiskModule")
     ).deploy();
-
+    const tradeModule = (await (
+      await ethers.getContractFactory("TradeModule", {
+        libraries: { LazyMulSegmentTree: lazyLib.target },
+      })
+    ).deploy()) as TradeModule;
+    const vaultModule = await (
+      await ethers.getContractFactory("LPVaultModule")
+    ).deploy();
     const coreImpl = (await (
       await ethers.getContractFactory("SignalsCoreHarness", {
         libraries: { LazyMulSegmentTree: lazyLib.target },
       })
     ).deploy()) as SignalsCoreHarness;
 
-    const initData = coreImpl.interface.encodeFunctionData("initialize", [
-      payment.target,
-      position.target,
-      120, // settlementSubmitWindow
-      300, // pendingOpsWindow
-    ]);
-    const proxy = await (
-      await ethers.getContractFactory("TestERC1967Proxy")
-    ).deploy(coreImpl.target, initData);
+    const lpShareImpl = await (
+      await ethers.getContractFactory("SignalsLPShare")
+    ).deploy();
+    const proxyFactory = await ethers.getContractFactory("TestERC1967Proxy");
+    const lpShareProxy = await proxyFactory.deploy(
+      await lpShareImpl.getAddress(),
+      "0x"
+    );
+    const coreProxy = await proxyFactory.deploy(coreImpl.target, "0x");
+    const lpShare = (await ethers.getContractAt(
+      "SignalsLPShare",
+      await lpShareProxy.getAddress()
+    )) as SignalsLPShare;
     const core = (await ethers.getContractAt(
       "SignalsCoreHarness",
-      proxy.target
+      coreProxy.target
     )) as SignalsCoreHarness;
 
-    await core.setModules(
-      ethers.ZeroAddress,
-      lifecycleImpl.target,
-      riskModule.target,
-      ethers.ZeroAddress,
-      oracleModule.target
-    );
-
-    // Configure Redstone params (feedId, decimals, maxDistance, futureTolerance)
+    const submitWindow = 120;
+    const opsWindow = 300;
+    const claimDelay = submitWindow + opsWindow;
     const feedId = ethers.encodeBytes32String(DATA_FEED_ID);
-    const maxSampleDistance = 600n; // 10 min max distance from Tset
-    const futureTolerance = 60n; // 1 min future tolerance
-    await core.setRedstoneConfig(feedId, FEED_DECIMALS, maxSampleDistance, futureTolerance);
-    
-    // Configure settlement timeline (submitWindow, opsWindow, claimDelay)
-    await core.setSettlementTimeline(120, 300, 420);
+    const coreParams: SignalsCore.InitParamsStruct = {
+      paymentToken: payment.target.toString(),
+      positionContract: position.target.toString(),
+      lpShareToken: await lpShare.getAddress(),
+      tradeModule: tradeModule.target.toString(),
+      lifecycleModule: lifecycleImpl.target.toString(),
+      riskModule: riskModule.target.toString(),
+      vaultModule: vaultModule.target.toString(),
+      oracleModule: oracleModule.target.toString(),
+      ownerSafe: owner.address,
+      settlementSubmitWindow: submitWindow,
+      pendingOpsWindow: opsWindow,
+      claimDelaySeconds: claimDelay,
+      redstoneFeedId: feedId,
+      redstoneFeedDecimals: FEED_DECIMALS,
+      maxSampleDistance: 600n,
+      futureTolerance: 60n,
+      lambda: ethers.parseEther("0.2"),
+      kDrawdown: ethers.parseEther("1"),
+      enforceAlpha: false,
+      rhoBS: 0n,
+      phiLP: ethers.parseEther("0.8"),
+      phiBS: ethers.parseEther("0.1"),
+      phiTR: ethers.parseEther("0.1"),
+      withdrawalLagBatches: 1,
+      operatorAllowlist: [owner.address],
+    };
+    await core.initialize(coreParams);
+    await lpShare.initialize(
+      await core.getAddress(),
+      payment.target.toString(),
+      "Signals LP Share",
+      "sLP",
+      owner.address
+    );
 
     const now = BigInt(await time.latest());
     const WAD = ethers.parseEther("1");

@@ -42,7 +42,7 @@ describe('RiskMath', () => {
   });
 
   describe('calculateAlphaLimit', () => {
-    it('returns αbase when drawdown = 0', async () => {
+    it('returns αbase when peak drawdown = 0', async () => {
       const alphaBase = ethers.parseEther('100');
       const drawdown = 0n;
       const k = ethers.parseEther('1');
@@ -52,10 +52,10 @@ describe('RiskMath', () => {
       expect(alphaLimit).to.equal(alphaBase);
     });
 
-    it('returns reduced αlimit with 20% drawdown', async () => {
+    it('returns reduced αlimit with 20% peak drawdown', async () => {
       // αlimit = αbase * (1 - k * DD) = 100 * (1 - 1 * 0.2) = 80
       const alphaBase = ethers.parseEther('100');
-      const drawdown = ethers.parseEther('0.2'); // 20%
+      const drawdown = ethers.parseEther('0.2'); // 20% peak drawdown
       const k = ethers.parseEther('1');
       
       const alphaLimit = await riskModule.calculateAlphaLimit(alphaBase, drawdown, k);
@@ -63,9 +63,9 @@ describe('RiskMath', () => {
       expect(alphaLimit).to.equal(ethers.parseEther('80'));
     });
 
-    it('returns 0 when k * DD >= 1', async () => {
+    it('returns 0 when k * DD >= 1 (peak drawdown)', async () => {
       const alphaBase = ethers.parseEther('100');
-      const drawdown = ethers.parseEther('1'); // 100%
+      const drawdown = ethers.parseEther('1'); // 100% peak drawdown
       const k = ethers.parseEther('1');
       
       const alphaLimit = await riskModule.calculateAlphaLimit(alphaBase, drawdown, k);
@@ -74,7 +74,7 @@ describe('RiskMath', () => {
     });
 
     it('handles k > 1 correctly', async () => {
-      // k = 2, DD = 0.5 → k * DD = 1 → αlimit = 0
+      // k = 2, peak DD = 0.5 → k * DD = 1 → αlimit = 0
       const alphaBase = ethers.parseEther('100');
       const drawdown = ethers.parseEther('0.5');
       const k = ethers.parseEther('2');
@@ -137,4 +137,3 @@ describe('RiskMath', () => {
   // not directly exposed on RiskModule. They are tested via integration tests
   // in test/integration/risk/alphaEnforcement.spec.ts
 });
-

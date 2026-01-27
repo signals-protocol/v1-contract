@@ -25,15 +25,11 @@ contract LPVaultModuleProxy is SignalsCoreStorage {
         paymentToken = IERC20(token);
     }
 
-    function setMinSeedAmount(uint256 amount) external {
-        minSeedAmount = amount;
-    }
-
     function setWithdrawalLagBatches(uint64 lag) external {
         withdrawalLagBatches = lag;
     }
 
-    /// @notice Set risk config with pdd := -λ invariant (WP v2)
+    /// @notice Set risk config with NAV floor invariant (pdd := -λ)
     function setRiskConfig(
         uint256 lambda,
         uint256 kDrawdown,
@@ -42,11 +38,12 @@ contract LPVaultModuleProxy is SignalsCoreStorage {
         riskConfig.lambda = lambda;
         riskConfig.kDrawdown = kDrawdown;
         riskConfig.enforceAlpha = enforceAlpha;
-        // WP v2: pdd := -λ
+        // WP v2: NAV floor invariant (pdd := -λ)
         feeWaterfallConfig.pdd = -int256(lambda);
     }
 
-    /// @dev Per WP v2: pdd := -λ is enforced via setRiskConfig. This function does NOT accept pdd.
+    /// @dev Per WP v2: NAV floor invariant (pdd := -λ) is enforced via setRiskConfig.
+    ///      This function does NOT accept pdd.
     function setFeeWaterfallConfig(
         uint256 rhoBS,
         uint256 phiLP,

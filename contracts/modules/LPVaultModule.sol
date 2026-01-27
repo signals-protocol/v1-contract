@@ -48,7 +48,7 @@ contract LPVaultModule is SignalsCoreStorage {
         uint256 batchPrice,  // Batch equity price
         uint256 navPost,     // Post-batch NAV
         uint256 pricePost,   // Post-batch price
-        uint256 drawdown     // Drawdown from peak
+        uint256 drawdown     // Peak drawdown
     );
 
     event DepositRequestCreated(
@@ -103,12 +103,15 @@ contract LPVaultModule is SignalsCoreStorage {
      */
     function seedVault(uint256 seedAmount) external onlyDelegated {
         if (lpVault.isSeeded) revert SE.VaultAlreadySeeded();
-        if (seedAmount < minSeedAmount) revert SE.InsufficientSeedAmount(seedAmount, minSeedAmount);
+        if (seedAmount == 0) revert SE.ZeroAmount();
 
         paymentToken.safeTransferFrom(msg.sender, address(this), seedAmount);
 
         // Convert 6-decimal token amount to WAD (18) for internal accounting
         uint256 seedAmountWad = seedAmount.toWad();
+        if (seedAmountWad <= MIN_DEAD_SHARES) {
+            revert SE.InsufficientSeedAmount(seedAmountWad, MIN_DEAD_SHARES + 1);
+        }
         
         lpVault.nav = seedAmountWad;
         lpVault.shares = seedAmountWad;

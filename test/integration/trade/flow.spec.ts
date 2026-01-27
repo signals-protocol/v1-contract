@@ -31,22 +31,6 @@ describe("TradeModule flow (minimal parity)", () => {
     const payment = await (
       await ethers.getContractFactory("SignalsUSDToken")
     ).deploy();
-    const positionImplFactory = await ethers.getContractFactory(
-      "SignalsPosition"
-    );
-    const positionImpl = await positionImplFactory.deploy();
-    await positionImpl.waitForDeployment();
-    const positionInit = positionImplFactory.interface.encodeFunctionData(
-      "initialize",
-      [owner.address]
-    );
-    const positionProxy = (await (
-      await ethers.getContractFactory("TestERC1967Proxy")
-    ).deploy(positionImpl.target, positionInit)) as TestERC1967Proxy;
-    const position = (await ethers.getContractAt(
-      "SignalsPosition",
-      await positionProxy.getAddress()
-    )) as SignalsPosition;
     const feePolicy = await (
       await ethers.getContractFactory("MockFeePolicy")
     ).deploy(feeBps);
@@ -65,6 +49,23 @@ describe("TradeModule flow (minimal parity)", () => {
         libraries: { LazyMulSegmentTree: lazyLib.target },
       })
     ).deploy(tradeModule.target);
+
+    const positionImplFactory = await ethers.getContractFactory(
+      "SignalsPosition"
+    );
+    const positionImpl = await positionImplFactory.deploy();
+    await positionImpl.waitForDeployment();
+    const positionInit = positionImplFactory.interface.encodeFunctionData(
+      "initialize",
+      [core.target, owner.address]
+    );
+    const positionProxy = (await (
+      await ethers.getContractFactory("TestERC1967Proxy")
+    ).deploy(positionImpl.target, positionInit)) as TestERC1967Proxy;
+    const position = (await ethers.getContractAt(
+      "SignalsPosition",
+      await positionProxy.getAddress()
+    )) as SignalsPosition;
 
     await core.setAddresses(
       payment.target,
@@ -107,8 +108,6 @@ describe("TradeModule flow (minimal parity)", () => {
     };
     await core.setMarket(1, market);
     await core.seedTree(1, [WAD, WAD, WAD, WAD]);
-
-    await position.connect(owner).setCore(core.target);
 
     // fund user
     await payment.transfer(user.address, 10_000_000n); // 10 USDC (6 decimals)
@@ -348,7 +347,6 @@ describe("TradeModule flow (minimal parity)", () => {
     ).to.be.revertedWithCustomError(tradeModule, "ProceedsBelowMinimum");
 
     // Fees stay in core contract for Waterfall distribution after settlement
-    // (no external feeRecipient transfer during trade)
     const coreBalanceBefore = await payment.balanceOf(core.target);
     await core.connect(user).closePosition(1, 0);
     const coreBalanceAfter = await payment.balanceOf(core.target);

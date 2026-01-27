@@ -1,11 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Signer } from "ethers";
-import {
-  SignalsCoreHarness,
-  SignalsLPShare,
-  MockERC20,
-} from "../../../typechain-types";
+import { SignalsCoreHarness, SignalsCore, SignalsLPShare, MockERC20, LPVaultModule, MarketLifecycleModule, OracleModuleHarness, RiskModule, TradeModule } from '../../../typechain-types';
 
 /**
  * SignalsLPShare ERC-4626 Token Tests
@@ -32,28 +28,35 @@ describe("SignalsLPShare", () => {
       6
     )) as MockERC20;
 
-    // Deploy position with proxy
-    const positionImplFactory = await ethers.getContractFactory(
-      "SignalsPosition"
-    );
-    const positionImpl = await positionImplFactory.deploy();
-    const positionInit = positionImplFactory.interface.encodeFunctionData(
-      "initialize",
-      [await owner.getAddress()]
-    );
-    const positionProxy = await (
-      await ethers.getContractFactory("TestERC1967Proxy")
-    ).deploy(await positionImpl.getAddress(), positionInit);
-    const position = await ethers.getContractAt(
-      "SignalsPosition",
-      await positionProxy.getAddress()
-    );
-
     // Deploy LazyMulSegmentTree library
     const LazyMulSegmentTree = await ethers.getContractFactory(
       "LazyMulSegmentTree"
     );
     const lazyLib = await LazyMulSegmentTree.deploy();
+
+    const tradeModule = (await (
+      await ethers.getContractFactory("TradeModule", {
+        libraries: { LazyMulSegmentTree: await lazyLib.getAddress() },
+      })
+    ).deploy()) as TradeModule;
+
+    const lifecycleModule = (await (
+      await ethers.getContractFactory("MarketLifecycleModule", {
+        libraries: { LazyMulSegmentTree: await lazyLib.getAddress() },
+      })
+    ).deploy()) as MarketLifecycleModule;
+
+    const oracleModule = (await (
+      await ethers.getContractFactory("OracleModuleHarness")
+    ).deploy()) as OracleModuleHarness;
+
+    const riskModule = (await (
+      await ethers.getContractFactory("RiskModule")
+    ).deploy()) as RiskModule;
+
+    const vaultModule = (await (
+      await ethers.getContractFactory("LPVaultModule")
+    ).deploy()) as LPVaultModule;
 
     // Deploy core harness with library linking
     const SignalsCoreHarnessFactory = await ethers.getContractFactory(
@@ -64,37 +67,67 @@ describe("SignalsLPShare", () => {
     );
     const coreImpl = await SignalsCoreHarnessFactory.deploy();
 
-    // Deploy proxy
-    const initData = SignalsCoreHarnessFactory.interface.encodeFunctionData(
-      "initialize",
-      [
-        await paymentToken.getAddress(),
-        await position.getAddress(),
-        3600,
-        86400,
-      ]
+    const positionImplFactory = await ethers.getContractFactory(
+      "SignalsPosition"
     );
-    const proxy = await (
-      await ethers.getContractFactory("TestERC1967Proxy")
-    ).deploy(await coreImpl.getAddress(), initData);
+    const positionImpl = await positionImplFactory.deploy();
+    const lpShareImplFactory = await ethers.getContractFactory("SignalsLPShare");
+    const lpShareImpl = await lpShareImplFactory.deploy();
+
+    const proxyFactory = await ethers.getContractFactory("TestERC1967Proxy");
+    const positionProxy = await proxyFactory.deploy(await positionImpl.getAddress(), "0x");
+    const lpShareProxy = await proxyFactory.deploy(await lpShareImpl.getAddress(), "0x");
+    const coreProxy = await proxyFactory.deploy(await coreImpl.getAddress(), "0x");
 
     core = SignalsCoreHarnessFactory.attach(
-      await proxy.getAddress()
+      await coreProxy.getAddress()
     ) as SignalsCoreHarness;
-
-    // Connect position to core
-    await position.setCore(await core.getAddress());
-
-    // Deploy LP Share token
-    const SignalsLPShareFactory = await ethers.getContractFactory(
-      "SignalsLPShare"
+    lpShare = (await ethers.getContractAt(
+      "SignalsLPShare",
+      await lpShareProxy.getAddress()
+    )) as SignalsLPShare;
+    const position = await ethers.getContractAt(
+      "SignalsPosition",
+      await positionProxy.getAddress()
     );
-    lpShare = (await SignalsLPShareFactory.deploy(
+
+    const feedId = ethers.encodeBytes32String("BTC");
+    const coreParams: SignalsCore.InitParamsStruct = {
+      paymentToken: await paymentToken.getAddress(),
+      positionContract: await position.getAddress(),
+      lpShareToken: await lpShare.getAddress(),
+      tradeModule: await tradeModule.getAddress(),
+      lifecycleModule: await lifecycleModule.getAddress(),
+      riskModule: await riskModule.getAddress(),
+      vaultModule: await vaultModule.getAddress(),
+      oracleModule: await oracleModule.getAddress(),
+      ownerSafe: await owner.getAddress(),
+      settlementSubmitWindow: 3600,
+      pendingOpsWindow: 0,
+      claimDelaySeconds: 3600,
+      redstoneFeedId: feedId,
+      redstoneFeedDecimals: 8,
+      maxSampleDistance: 600,
+      futureTolerance: 60,
+      lambda: WAD / 10n,
+      kDrawdown: WAD,
+      enforceAlpha: true,
+      rhoBS: 0,
+      phiLP: WAD,
+      phiBS: 0,
+      phiTR: 0,
+      withdrawalLagBatches: 1,
+      operatorAllowlist: [await owner.getAddress()],
+    };
+    await core.initialize(coreParams);
+    await position.initialize(await core.getAddress(), await owner.getAddress());
+    await lpShare.initialize(
+      await core.getAddress(),
+      await paymentToken.getAddress(),
       "Signals LP Share",
       "sLP",
-      await core.getAddress(),
-      await paymentToken.getAddress()
-    )) as SignalsLPShare;
+      await owner.getAddress()
+    );
   });
 
   describe("Deployment", () => {
@@ -113,8 +146,8 @@ describe("SignalsLPShare", () => {
       );
     });
 
-    it("sets owner to core address", async () => {
-      expect(await lpShare.owner()).to.equal(await core.getAddress());
+    it("sets owner to ownerSafe", async () => {
+      expect(await lpShare.owner()).to.equal(await owner.getAddress());
     });
   });
 

@@ -46,11 +46,10 @@ describe("LPVaultModule", () => {
 
     // Configure proxy
     await proxy.setPaymentToken(payment.target);
-    await proxy.setMinSeedAmount(usdc("100")); // 6-decimal token amount
     await proxy.setWithdrawalLagBatches(1); // D_lag = 1 batch
 
     // Configure Risk (sets pdd := -λ)
-    // λ = 0.2 → pdd = -0.2 (20% drawdown floor)
+    // λ = 0.2 → pdd = -0.2 (20% NAV loss floor)
     await proxy.setRiskConfig(
       ethers.parseEther("0.2"), // lambda = 0.2
       ethers.parseEther("1"), // kDrawdown

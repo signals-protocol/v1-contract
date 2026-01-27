@@ -40,7 +40,6 @@ contract SignalsCore is
     event RiskConfigUpdated(uint256 lambda, uint256 kDrawdown, bool enforceAlpha);
     event FeeWaterfallConfigUpdated(uint256 rhoBS, int256 pdd, uint256 phiLP, uint256 phiBS, uint256 phiTR);
     event WithdrawalLagUpdated(uint64 lag);
-    event LpShareTokenUpdated(address lpShareToken);
     event ModulesUpdated(address trade, address lifecycle, address risk, address vault, address oracle);
 
     // ============================================================
@@ -58,22 +57,115 @@ contract SignalsCore is
         _disableInitializers();
     }
 
+    struct InitParams {
+        address paymentToken;
+        address positionContract;
+        address lpShareToken;
+        address tradeModule;
+        address lifecycleModule;
+        address riskModule;
+        address vaultModule;
+        address oracleModule;
+        address ownerSafe;
+        uint64 settlementSubmitWindow;
+        uint64 pendingOpsWindow;
+        uint64 claimDelaySeconds;
+        bytes32 redstoneFeedId;
+        uint8 redstoneFeedDecimals;
+        uint64 maxSampleDistance;
+        uint64 futureTolerance;
+        uint256 lambda;
+        uint256 kDrawdown;
+        bool enforceAlpha;
+        uint256 rhoBS;
+        uint256 phiLP;
+        uint256 phiBS;
+        uint256 phiTR;
+        uint64 withdrawalLagBatches;
+        address[] operatorAllowlist;
+    }
+
     /// @notice Core initializer
-    function initialize(
-        address _paymentToken,
-        address _positionContract,
-        uint64 _settlementSubmitWindow,
-        uint64 _settlementFinalizeDeadline
-    ) external initializer {
-        __Ownable_init(msg.sender);
+    function initialize(InitParams calldata params) external initializer {
+        if (params.ownerSafe == address(0)) revert SignalsErrors.ZeroAddress();
+        __Ownable_init(params.ownerSafe);
         __UUPSUpgradeable_init();
         __Pausable_init();
         __ReentrancyGuard_init();
 
-        paymentToken = IERC20(_paymentToken);
-        positionContract = ISignalsPosition(_positionContract);
-        settlementSubmitWindow = _settlementSubmitWindow;
-        claimDelaySeconds = _settlementFinalizeDeadline;
+        _requireAddress(params.paymentToken);
+        _requireAddress(params.positionContract);
+        _requireAddress(params.lpShareToken);
+        _requireAddress(params.tradeModule);
+        _requireAddress(params.lifecycleModule);
+        _requireAddress(params.riskModule);
+        _requireAddress(params.vaultModule);
+        _requireAddress(params.oracleModule);
+
+        _requireContract(params.paymentToken);
+        _requireContract(params.positionContract);
+        _requireContract(params.lpShareToken);
+        _requireContract(params.tradeModule);
+        _requireContract(params.lifecycleModule);
+        _requireContract(params.riskModule);
+        _requireContract(params.vaultModule);
+        _requireContract(params.oracleModule);
+
+        if (params.claimDelaySeconds != params.settlementSubmitWindow + params.pendingOpsWindow) {
+            revert SignalsErrors.InvalidSettlementTimeline(
+                params.claimDelaySeconds,
+                params.settlementSubmitWindow,
+                params.pendingOpsWindow
+            );
+        }
+        if (params.phiLP + params.phiBS + params.phiTR != WAD) {
+            revert SignalsErrors.InvalidFeeSplitSum(params.phiLP, params.phiBS, params.phiTR);
+        }
+        if (params.lambda == 0 || params.lambda >= WAD) revert SignalsErrors.InvalidLambda(params.lambda);
+
+        paymentToken = IERC20(params.paymentToken);
+        positionContract = ISignalsPosition(params.positionContract);
+        lpShareToken = params.lpShareToken;
+        tradeModule = params.tradeModule;
+        lifecycleModule = params.lifecycleModule;
+        riskModule = params.riskModule;
+        vaultModule = params.vaultModule;
+        oracleModule = params.oracleModule;
+
+        settlementSubmitWindow = params.settlementSubmitWindow;
+        pendingOpsWindow = params.pendingOpsWindow;
+        claimDelaySeconds = params.claimDelaySeconds;
+        redstoneFeedId = params.redstoneFeedId;
+        redstoneFeedDecimals = params.redstoneFeedDecimals;
+        maxSampleDistance = params.maxSampleDistance;
+        futureTolerance = params.futureTolerance;
+
+        riskConfig.lambda = params.lambda;
+        riskConfig.kDrawdown = params.kDrawdown;
+        riskConfig.enforceAlpha = params.enforceAlpha;
+        feeWaterfallConfig.pdd = -int256(params.lambda);
+        feeWaterfallConfig.rhoBS = params.rhoBS;
+        feeWaterfallConfig.phiLP = params.phiLP;
+        feeWaterfallConfig.phiBS = params.phiBS;
+        feeWaterfallConfig.phiTR = params.phiTR;
+
+        withdrawalLagBatches = params.withdrawalLagBatches;
+
+        uint256 operatorCount = params.operatorAllowlist.length;
+        for (uint256 i = 0; i < operatorCount; i++) {
+            address operator = params.operatorAllowlist[i];
+            if (operator == address(0)) revert SignalsErrors.ZeroAddress();
+            _operators[operator] = true;
+            emit OperatorUpdated(operator, true);
+        }
+
+        emit ModulesUpdated(
+            params.tradeModule,
+            params.lifecycleModule,
+            params.riskModule,
+            params.vaultModule,
+            params.oracleModule
+        );
     }
 
     /// @notice Set module addresses
@@ -84,6 +176,16 @@ contract SignalsCore is
         address _vaultModule,
         address _oracleModule
     ) external onlyOwner {
+        _requireAddress(_tradeModule);
+        _requireAddress(_lifecycleModule);
+        _requireAddress(_riskModule);
+        _requireAddress(_vaultModule);
+        _requireAddress(_oracleModule);
+        _requireContract(_tradeModule);
+        _requireContract(_lifecycleModule);
+        _requireContract(_riskModule);
+        _requireContract(_vaultModule);
+        _requireContract(_oracleModule);
         tradeModule = _tradeModule;
         lifecycleModule = _lifecycleModule;
         riskModule = _riskModule;
@@ -107,26 +209,15 @@ contract SignalsCore is
     // Vault Configuration
     // ============================================================
 
-    function setMinSeedAmount(uint256 amount) external onlyOwner whenNotPaused {
-        if (amount == 0) revert SignalsErrors.ZeroLimit();
-        minSeedAmount = amount;
-    }
-
-    /// @notice Set LP Share token address for ERC-4626 compatibility
-    function setLpShareToken(address _lpShareToken) external onlyOwner {
-        lpShareToken = _lpShareToken;
-        emit LpShareTokenUpdated(_lpShareToken);
-    }
-
     function setWithdrawalLagBatches(uint64 lag) external onlyOwner whenNotPaused {
         withdrawalLagBatches = lag;
         emit WithdrawalLagUpdated(lag);
     }
 
     /// @notice Configure fee waterfall parameters (except pdd)
-    /// @dev Per WP v2: pdd := -λ is enforced via setRiskConfig to maintain Safety invariant.
+    /// @dev Per WP v2: pdd := -λ is enforced via setRiskConfig to maintain the NAV floor invariant.
     ///      This function does NOT accept pdd parameter to prevent breaking the invariant.
-    ///      Use setRiskConfig to change drawdown floor (via λ).
+    ///      Use setRiskConfig to change the NAV loss floor (via λ).
     function setFeeWaterfallConfig(
         uint256 rhoBS,
         uint256 phiLP,
@@ -163,11 +254,11 @@ contract SignalsCore is
     }
 
     /// @notice Configure risk parameters for α Safety Bounds
-    /// @dev Invariant: pdd := -λ (drawdown floor equals negative lambda)
+    /// @dev Invariant: pdd := -λ (NAV loss floor equals negative lambda)
     ///      This function enforces the relationship by auto-updating pdd when lambda is set.
     ///      λ ∈ (0, 1) is required for safety invariants.
-    /// @param lambda λ: Safety parameter (WAD), e.g., 0.3e18 = 30% max drawdown. Must be in (0, 1).
-    /// @param kDrawdown k: Drawdown sensitivity factor (WAD), typically 1.0e18
+    /// @param lambda λ: NAV loss limit per batch (WAD), e.g., 0.3e18 = 30% floor. Must be in (0, 1).
+    /// @param kDrawdown k: Peak drawdown sensitivity for alpha limit (WAD), typically 1.0e18
     /// @param enforceAlpha Whether to enforce α bounds at market configuration time (create/reopen)
     function setRiskConfig(
         uint256 lambda,
@@ -175,7 +266,7 @@ contract SignalsCore is
         bool enforceAlpha
     ) external onlyOwner whenNotPaused {
         // λ must be in (0, 1) for safety invariants
-        // λ = 0 would mean no drawdown limit (unsafe)
+        // λ = 0 would mean no NAV loss limit (unsafe)
         // λ >= 1 would mean floor cannot be maintained (100%+ drop allowed is meaningless)
         if (lambda == 0 || lambda >= WAD) revert SignalsErrors.InvalidLambda(lambda);
 
@@ -184,7 +275,7 @@ contract SignalsCore is
         riskConfig.enforceAlpha = enforceAlpha;
         
         // Invariant: pdd := -λ
-        // Auto-update drawdown floor to maintain Safety guarantee
+        // Auto-update NAV floor to maintain Safety guarantee
         feeWaterfallConfig.pdd = -int256(lambda);
         
         emit RiskConfigUpdated(lambda, kDrawdown, enforceAlpha);
@@ -589,8 +680,8 @@ contract SignalsCore is
         return lpVault.pricePeak;
     }
 
-    /// @notice Get current vault drawdown
-    /// @return drawdown Drawdown in WAD (0 = no drawdown, 1e18 = 100%)
+    /// @notice Get current vault peak drawdown
+    /// @return drawdown Peak drawdown in WAD (0 = no drawdown, 1e18 = 100%)
     function getVaultDrawdown() external view returns (uint256 drawdown) {
         if (lpVault.pricePeak == 0 || lpVault.price >= lpVault.pricePeak) {
             return 0;
@@ -665,6 +756,14 @@ contract SignalsCore is
             ret,
             (int256, uint256, uint256, uint256, uint256, uint256, bool)
         );
+    }
+
+    function _requireAddress(address value) internal pure {
+        if (value == address(0)) revert SignalsErrors.ZeroAddress();
+    }
+
+    function _requireContract(address value) internal view {
+        if (value.code.length == 0) revert SignalsErrors.ModuleNotSet();
     }
 
     // --- Internal: delegate helpers ---

@@ -2,14 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { deploySeedData } from "../../helpers";
-import {
-  SignalsCoreHarness,
-  SignalsUSDToken,
-  MockSignalsPosition,
-  MockFeePolicy,
-  MarketLifecycleModule,
-  RiskModule,
-} from "../../../typechain-types";
+import { SignalsCoreHarness, SignalsCore, SignalsUSDToken, MockSignalsPosition, MockFeePolicy, MarketLifecycleModule, RiskModule } from '../../../typechain-types';
 
 /**
  * α Safety Bound Enforcement Integration Test
@@ -20,9 +13,6 @@ import {
  * 3. open/increase/close/decrease freely within configured α (no per-trade gate)
  * 4. Drawdown reduces αlimit for new market creation
  */
-
-// Constants (unused but kept for reference)
-// const WAD = ethers.parseEther("1");
 
 describe("α Safety Bound Enforcement (Integration)", () => {
   let core: SignalsCoreHarness;
@@ -61,22 +51,6 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       })
     ).deploy();
 
-    const initData = coreImpl.interface.encodeFunctionData("initialize", [
-      payment.target,
-      position.target,
-      120, // settlementSubmitWindow
-      60, // settlementFinalizeDeadline
-    ]);
-
-    const proxy = await (
-      await ethers.getContractFactory("TestERC1967Proxy")
-    ).deploy(coreImpl.target, initData);
-    core = (await ethers.getContractAt(
-      "SignalsCoreHarness",
-      proxy.target
-    )) as SignalsCoreHarness;
-
-    // Deploy modules
     const lifecycleImpl = await (
       await ethers.getContractFactory("MarketLifecycleModule", {
         libraries: { LazyMulSegmentTree: lazyLib.target },
@@ -98,16 +72,65 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       await ethers.getContractFactory("OracleModuleHarness")
     ).deploy();
 
-    await core.setModules(
-      tradeImpl.target,
-      lifecycleImpl.target,
-      riskModule.target,
-      lpVaultImpl.target,
-      oracleImpl.target
+    const lpShareImpl = await (
+      await ethers.getContractFactory("SignalsLPShare")
+    ).deploy();
+    const proxyFactory = await ethers.getContractFactory("TestERC1967Proxy");
+    const lpShareProxy = await proxyFactory.deploy(
+      await lpShareImpl.getAddress(),
+      "0x"
+    );
+    const coreProxy = await proxyFactory.deploy(coreImpl.target, "0x");
+    const lpShare = await ethers.getContractAt(
+      "SignalsLPShare",
+      await lpShareProxy.getAddress()
+    );
+    core = (await ethers.getContractAt(
+      "SignalsCoreHarness",
+      await coreProxy.getAddress()
+    )) as SignalsCoreHarness;
+
+    const submitWindow = 120;
+    const opsWindow = 60;
+    const claimDelay = submitWindow + opsWindow;
+    const feedId = ethers.encodeBytes32String("BTC");
+    const coreParams: SignalsCore.InitParamsStruct = {
+      paymentToken: payment.target.toString(),
+      positionContract: position.target.toString(),
+      lpShareToken: await lpShare.getAddress(),
+      tradeModule: tradeImpl.target.toString(),
+      lifecycleModule: lifecycleImpl.target.toString(),
+      riskModule: riskModule.target.toString(),
+      vaultModule: lpVaultImpl.target.toString(),
+      oracleModule: oracleImpl.target.toString(),
+      ownerSafe: owner.address,
+      settlementSubmitWindow: submitWindow,
+      pendingOpsWindow: opsWindow,
+      claimDelaySeconds: claimDelay,
+      redstoneFeedId: feedId,
+      redstoneFeedDecimals: 8,
+      maxSampleDistance: 600,
+      futureTolerance: 60,
+      lambda: ethers.parseEther("0.3"),
+      kDrawdown: ethers.parseEther("1"),
+      enforceAlpha: true,
+      rhoBS: ethers.parseEther("0.2"),
+      phiLP: ethers.parseEther("0.7"),
+      phiBS: ethers.parseEther("0.2"),
+      phiTR: ethers.parseEther("0.1"),
+      withdrawalLagBatches: 1,
+      operatorAllowlist: [owner.address],
+    };
+    await core.initialize(coreParams);
+    await lpShare.initialize(
+      await core.getAddress(),
+      payment.target.toString(),
+      "Signals LP Share",
+      "sLP",
+      owner.address
     );
 
     // Configure vault
-    await core.setMinSeedAmount(ethers.parseUnits("100", 6));
     // pdd is set via setRiskConfig (pdd := -λ)
     await core.setFeeWaterfallConfig(
       ethers.parseEther("0.2"), // rhoBS = 20%
@@ -165,7 +188,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
     it("allows market creation when α ≤ αlimit", async () => {
       // With NAV = 10000, λ = 0.3, n = 100:
       // αbase = 0.3 * 10000 / ln(100) = 3000 / 4.605 ≈ 651.5
-      // No drawdown → αlimit = αbase ≈ 651.5
+      // No peak drawdown → αlimit = αbase ≈ 651.5
 
       const now = await time.latest();
       const startTimestamp = now + 60;
@@ -305,9 +328,9 @@ describe("α Safety Bound Enforcement (Integration)", () => {
     });
   });
 
-  describe("Drawdown Impact on α Limit", () => {
-    it("reduces αlimit proportionally to drawdown for new market creation", async () => {
-      // Initial state: no drawdown (price = pricePeak)
+  describe("Peak Drawdown Impact on α Limit", () => {
+    it("reduces αlimit proportionally to peak drawdown for new market creation", async () => {
+      // Initial state: no peak drawdown (price = pricePeak)
       // αbase = 0.3 * 10000 / ln(100) = 3000 / 4.605 ≈ 651.5
       // αlimit = αbase * (1 - k * DD) = αbase * 1 = 651.5 (with DD=0)
 
@@ -329,7 +352,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
         )
       ).to.not.be.reverted;
 
-      // Now simulate 50% drawdown by setting price = 0.5 * pricePeak
+      // Now simulate 50% peak drawdown by setting price = 0.5 * pricePeak
       // DD = 1 - 0.5 = 0.5
       // αlimit = αbase * (1 - 1 * 0.5) = 651.5 * 0.5 ≈ 325.75
       await core.harnessSetLpVault(
@@ -357,18 +380,18 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       ).to.be.revertedWithCustomError(risk, "AlphaExceedsLimit");
     });
 
-    it("allows lower α when drawdown reduces αlimit", async () => {
+    it("allows lower α when peak drawdown reduces αlimit", async () => {
       const now = await time.latest();
       const WAD = ethers.parseEther("1");
 
-      // Simulate 50% drawdown while keeping NAV = 10000
+      // Simulate 50% peak drawdown while keeping NAV = 10000
       // αbase = 0.3 * 10000 / ln(100) ≈ 651.5
       // DD = 0.5
       // αlimit = 651.5 * (1 - 0.5) ≈ 325.75
       await core.harnessSetLpVault(
         ethers.parseEther("10000"), // nav unchanged for αbase calculation
         ethers.parseEther("10000"), // shares
-        WAD / 2n, // price = 0.5 (50% drawdown from peak)
+        WAD / 2n, // price = 0.5 (50% peak drawdown from peak)
         WAD, // pricePeak = 1
         true
       );
@@ -389,18 +412,18 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       ).to.not.be.reverted;
     });
 
-    it("rejects all market creation when drawdown reaches 100%", async () => {
+    it("rejects all market creation when peak drawdown reaches 100%", async () => {
       const now = await time.latest();
       const WAD = ethers.parseEther("1");
 
-      // Simulate nearly 100% drawdown (price ≈ 0, but NAV > 0 to enable validation)
+      // Simulate nearly 100% peak drawdown (price ≈ 0, but NAV > 0 to enable validation)
       // DD = 1 - 0/1 = 1 (100%)
       // αlimit = αbase * (1 - 1 * 1) = 0
       // Note: if NAV = 0, validation is skipped entirely, so we keep NAV > 0
       await core.harnessSetLpVault(
         ethers.parseEther("10000"), // nav > 0 to enable validation
         ethers.parseEther("10000"), // shares
-        0n, // price = 0 (100% drawdown)
+        0n, // price = 0 (100% peak drawdown)
         WAD, // pricePeak = 1
         true
       );
@@ -499,28 +522,28 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       ).to.be.revertedWithCustomError(core, "InvalidLambda");
     });
 
-    it("ignores drawdown when kDrawdown = 0", async () => {
+    it("ignores peak drawdown when kDrawdown = 0", async () => {
       const WAD = ethers.parseEther("1");
 
-      // Set k = 0 → αlimit = αbase regardless of drawdown
+      // Set k = 0 → αlimit = αbase regardless of peak drawdown
       await core.setRiskConfig(
         ethers.parseEther("0.3"),
         0n, // k = 0
         true
       );
 
-      // Simulate 50% drawdown
+      // Simulate 50% peak drawdown
       await core.harnessSetLpVault(
         ethers.parseEther("10000"),
         ethers.parseEther("10000"),
-        WAD / 2n, // price = 0.5 (50% drawdown)
+        WAD / 2n, // price = 0.5 (50% peak drawdown)
         WAD, // pricePeak = 1
         true
       );
 
       const now = await time.latest();
 
-      // With k = 0, αlimit = αbase ≈ 651 (no drawdown penalty)
+      // With k = 0, αlimit = αbase ≈ 651 (no peak drawdown penalty)
       // α = 500 should still work
       await expect(
         core.createMarketUniform(
@@ -1107,7 +1130,7 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       await expect(core.reopenMarket(1n)).to.not.be.reverted;
     });
 
-    it("reopenMarket reverts when drawdown reduces αlimit below market α", async () => {
+    it("reopenMarket reverts when peak drawdown reduces αlimit below market α", async () => {
       const now = await time.latest();
       const WAD = ethers.parseEther("1");
       const uniformFactors = Array(10).fill(WAD);
@@ -1141,14 +1164,14 @@ describe("α Safety Bound Enforcement (Integration)", () => {
       // Mark market as failed
       await core.harnessSetMarketFailed(1n, true);
 
-      // Simulate drawdown: reduce NAV significantly
+      // Simulate peak drawdown: reduce NAV significantly
       // New αbase = 0.3 * 1000 / ln(10) ≈ 130
       // α = 1000 > 130 = αlimit → should revert
       await core.harnessSetLpVault(
         ethers.parseEther("1000"), // nav reduced to 1000
         ethers.parseEther("1000"), // shares
         ethers.parseEther("1"), // price = 1
-        ethers.parseEther("10"), // pricePeak = 10 → 90% drawdown
+        ethers.parseEther("10"), // pricePeak = 10 → 90% peak drawdown
         true
       );
 

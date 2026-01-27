@@ -13,6 +13,7 @@ import {
   TradeModule,
 } from "../../typechain-types";
 import { DATA_FEED_ID, FEED_DECIMALS } from "./redstone";
+import { WAD } from "./constants";
 
 export interface FullSystem {
   owner: HardhatEthersSigner;
@@ -92,58 +93,70 @@ export async function deployFullSystem(
   const positionImplFactory = await ethers.getContractFactory("SignalsPosition");
   const positionImpl = await positionImplFactory.deploy();
   await positionImpl.waitForDeployment();
-  const positionInit = positionImplFactory.interface.encodeFunctionData(
-    "initialize",
-    [owner.address]
-  );
-  const positionProxy = await (
-    await ethers.getContractFactory("TestERC1967Proxy")
-  ).deploy(positionImpl.target, positionInit);
-  const position = (await ethers.getContractAt(
-    "SignalsPosition",
-    await positionProxy.getAddress()
-  )) as SignalsPosition;
+
+  const lpShareImplFactory = await ethers.getContractFactory("SignalsLPShare");
+  const lpShareImpl = await lpShareImplFactory.deploy();
+  await lpShareImpl.waitForDeployment();
 
   const coreImplFactory = await ethers.getContractFactory("SignalsCore");
   const coreImpl = await coreImplFactory.deploy();
   await coreImpl.waitForDeployment();
-  const coreInit = coreImplFactory.interface.encodeFunctionData("initialize", [
-    payment.target,
-    await position.getAddress(),
-    submitWindow,
-    claimDelay,
-  ]);
-  const coreProxy = await (
-    await ethers.getContractFactory("TestERC1967Proxy")
-  ).deploy(coreImpl.target, coreInit);
+
+  const proxyFactory = await ethers.getContractFactory("TestERC1967Proxy");
+  const positionProxy = await proxyFactory.deploy(positionImpl.target, "0x");
+  const lpShareProxy = await proxyFactory.deploy(lpShareImpl.target, "0x");
+  const coreProxy = await proxyFactory.deploy(coreImpl.target, "0x");
+
+  const position = (await ethers.getContractAt(
+    "SignalsPosition",
+    await positionProxy.getAddress()
+  )) as SignalsPosition;
+  const lpShare = (await ethers.getContractAt(
+    "SignalsLPShare",
+    await lpShareProxy.getAddress()
+  )) as SignalsLPShare;
   const core = (await ethers.getContractAt(
     "SignalsCore",
     await coreProxy.getAddress()
   )) as SignalsCore;
 
-  await core.setModules(
-    tradeModule.target,
-    lifecycleModule.target,
-    riskModule.target,
-    vaultModule.target,
-    oracleModule.target
-  );
-  await core.setSettlementTimeline(submitWindow, opsWindow, claimDelay);
-
   const feedId = ethers.encodeBytes32String(DATA_FEED_ID);
-  await core.setRedstoneConfig(feedId, FEED_DECIMALS, 600, 60);
-
-  await position.connect(owner).setCore(await core.getAddress());
-
-  const lpShare = (await (
-    await ethers.getContractFactory("SignalsLPShare")
-  ).deploy(
+  const coreParams: SignalsCore.InitParamsStruct = {
+    paymentToken: payment.target.toString(),
+    positionContract: await position.getAddress(),
+    lpShareToken: await lpShare.getAddress(),
+    tradeModule: tradeModule.target.toString(),
+    lifecycleModule: lifecycleModule.target.toString(),
+    riskModule: riskModule.target.toString(),
+    vaultModule: vaultModule.target.toString(),
+    oracleModule: oracleModule.target.toString(),
+    ownerSafe: owner.address,
+    settlementSubmitWindow: submitWindow,
+    pendingOpsWindow: opsWindow,
+    claimDelaySeconds: claimDelay,
+    redstoneFeedId: feedId,
+    redstoneFeedDecimals: FEED_DECIMALS,
+    maxSampleDistance: 600,
+    futureTolerance: 60,
+    lambda: WAD / 10n,
+    kDrawdown: WAD,
+    enforceAlpha: true,
+    rhoBS: 0,
+    phiLP: WAD,
+    phiBS: 0,
+    phiTR: 0,
+    withdrawalLagBatches: 1,
+    operatorAllowlist: [owner.address],
+  };
+  await core.initialize(coreParams);
+  await position.initialize(await core.getAddress(), owner.address);
+  await lpShare.initialize(
+    await core.getAddress(),
+    payment.target.toString(),
     "Signals LP",
     "SIGLP",
-    await core.getAddress(),
-    payment.target
-  )) as SignalsLPShare;
-  await core.setLpShareToken(lpShare.target);
+    owner.address
+  );
 
   return {
     owner,

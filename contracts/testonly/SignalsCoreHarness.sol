@@ -184,7 +184,7 @@ contract SignalsCoreHarness is SignalsCore {
     // LP Vault state helpers for testing
     // ============================================================
 
-    /// @notice Set LP vault state directly for testing α safety with drawdown
+    /// @notice Set LP vault state directly for testing α safety with peak drawdown
     function harnessSetLpVault(
         uint256 nav,
         uint256 shares,

@@ -1,11 +1,6 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import {
-  SignalsCoreHarness,
-  SignalsUSDToken,
-  MockSignalsPosition,
-  RiskModule,
-} from "../../../typechain-types";
+import { SignalsCoreHarness, SignalsCore, SignalsUSDToken, MockSignalsPosition, RiskModule } from '../../../typechain-types';
 
 /**
  * RiskModule Tests (TDD)
@@ -28,7 +23,7 @@ import {
  */
 
 const WAD = ethers.parseEther("1");
-const LAMBDA = ethers.parseEther("0.3"); // 30% max drawdown (pdd = -λ)
+const LAMBDA = ethers.parseEther("0.3"); // 30% NAV loss floor (pdd = -λ)
 const K_DD = ethers.parseEther("1"); // Drawdown sensitivity factor
 
 describe("RiskModule", () => {
@@ -62,22 +57,6 @@ describe("RiskModule", () => {
       })
     ).deploy();
 
-    const initData = coreImpl.interface.encodeFunctionData("initialize", [
-      payment.target,
-      position.target,
-      120, // settlementSubmitWindow
-      60, // settlementFinalizeDeadline
-    ]);
-
-    const proxy = await (
-      await ethers.getContractFactory("TestERC1967Proxy")
-    ).deploy(coreImpl.target, initData);
-    core = (await ethers.getContractAt(
-      "SignalsCoreHarness",
-      proxy.target
-    )) as SignalsCoreHarness;
-
-    // Deploy other modules
     const lifecycleImpl = await (
       await ethers.getContractFactory("MarketLifecycleModule", {
         libraries: { LazyMulSegmentTree: lazyLib.target },
@@ -96,17 +75,65 @@ describe("RiskModule", () => {
       await ethers.getContractFactory("OracleModuleHarness")
     ).deploy();
 
-    // setModules order: (tradeModule, lifecycleModule, riskModule, vaultModule, oracleModule)
-    await core.setModules(
-      tradeImpl.target,
-      lifecycleImpl.target,
-      riskModule.target,
-      lpVaultImpl.target,
-      oracleImpl.target
+    const lpShareImpl = await (
+      await ethers.getContractFactory("SignalsLPShare")
+    ).deploy();
+    const proxyFactory = await ethers.getContractFactory("TestERC1967Proxy");
+    const lpShareProxy = await proxyFactory.deploy(
+      await lpShareImpl.getAddress(),
+      "0x"
+    );
+    const coreProxy = await proxyFactory.deploy(coreImpl.target, "0x");
+    const lpShare = await ethers.getContractAt(
+      "SignalsLPShare",
+      await lpShareProxy.getAddress()
+    );
+    core = (await ethers.getContractAt(
+      "SignalsCoreHarness",
+      coreProxy.target
+    )) as SignalsCoreHarness;
+
+    const submitWindow = 120;
+    const opsWindow = 60;
+    const claimDelay = submitWindow + opsWindow;
+    const feedId = ethers.encodeBytes32String("BTC");
+    const coreParams: SignalsCore.InitParamsStruct = {
+      paymentToken: payment.target.toString(),
+      positionContract: position.target.toString(),
+      lpShareToken: await lpShare.getAddress(),
+      tradeModule: tradeImpl.target.toString(),
+      lifecycleModule: lifecycleImpl.target.toString(),
+      riskModule: riskModule.target.toString(),
+      vaultModule: lpVaultImpl.target.toString(),
+      oracleModule: oracleImpl.target.toString(),
+      ownerSafe: owner.address,
+      settlementSubmitWindow: submitWindow,
+      pendingOpsWindow: opsWindow,
+      claimDelaySeconds: claimDelay,
+      redstoneFeedId: feedId,
+      redstoneFeedDecimals: 8,
+      maxSampleDistance: 600,
+      futureTolerance: 60,
+      lambda: LAMBDA,
+      kDrawdown: K_DD,
+      enforceAlpha: true,
+      rhoBS: ethers.parseEther("0.2"),
+      phiLP: ethers.parseEther("0.7"),
+      phiBS: ethers.parseEther("0.2"),
+      phiTR: ethers.parseEther("0.1"),
+      withdrawalLagBatches: 1,
+      operatorAllowlist: [owner.address],
+    };
+    await core.initialize(coreParams);
+    await lpShare.initialize(
+      await core.getAddress(),
+      payment.target.toString(),
+      "Signals LP Share",
+      "sLP",
+      owner.address
     );
 
     // Configure vault
-    await core.setMinSeedAmount(ethers.parseUnits("100", 6));
     // pdd is set via setRiskConfig (pdd := -λ)
     await core.setFeeWaterfallConfig(
       ethers.parseEther("0.2"), // rhoBS = 20%
@@ -337,10 +364,10 @@ describe("RiskModule", () => {
       );
     });
 
-    it("αlimit = αbase when drawdown is zero", async () => {
+    it("αlimit = αbase when peak drawdown is zero", async () => {
       const Et = ethers.parseEther("10000");
       const numBins = 100n;
-      const drawdown = 0n; // No drawdown
+      const drawdown = 0n; // No peak drawdown
 
       const alphaBase = await riskModule.calculateAlphaBase(
         Et,
@@ -356,10 +383,10 @@ describe("RiskModule", () => {
       expect(alphaLimit).to.equal(alphaBase);
     });
 
-    it("αlimit decreases with drawdown", async () => {
+    it("αlimit decreases with peak drawdown", async () => {
       const Et = ethers.parseEther("10000");
       const numBins = 100n;
-      const drawdown = ethers.parseEther("0.2"); // 20% drawdown
+      const drawdown = ethers.parseEther("0.2"); // 20% peak drawdown
 
       const alphaBase = await riskModule.calculateAlphaBase(
         Et,
@@ -378,10 +405,10 @@ describe("RiskModule", () => {
       expect(alphaLimit).to.equal(expectedLimit);
     });
 
-    it("αlimit = 0 when drawdown reaches 100% (extreme)", async () => {
+    it("αlimit = 0 when peak drawdown reaches 100% (extreme)", async () => {
       const Et = ethers.parseEther("10000");
       const numBins = 100n;
-      const drawdown = WAD; // 100% drawdown
+      const drawdown = WAD; // 100% peak drawdown
 
       const alphaBase = await riskModule.calculateAlphaBase(
         Et,
@@ -400,7 +427,7 @@ describe("RiskModule", () => {
     it("αlimit never goes negative (max with 0)", async () => {
       const Et = ethers.parseEther("10000");
       const numBins = 100n;
-      const drawdown = ethers.parseEther("1.5"); // 150% drawdown (impossible but test edge)
+      const drawdown = ethers.parseEther("1.5"); // 150% peak drawdown (impossible but test edge)
 
       const alphaBase = await riskModule.calculateAlphaBase(
         Et,
@@ -457,8 +484,8 @@ describe("RiskModule", () => {
   // NOTE: Actual enforcement tests are in alphaEnforcement.spec.ts (integration)
   //       RiskModule only tests calculation correctness here
   describe("7-4: α Enforcement Scenarios (Calculation)", () => {
-    describe("Drawdown triggers α limit reduction", () => {
-      it("reduces αlimit proportionally to drawdown", async () => {
+    describe("Peak drawdown triggers α limit reduction", () => {
+      it("reduces αlimit proportionally to peak drawdown", async () => {
         const alphaBase = ethers.parseEther("1000");
 
         const limit0 = await riskModule.calculateAlphaLimit(
@@ -484,17 +511,17 @@ describe("RiskModule", () => {
     });
 
     describe("Recovery (α limit increases)", () => {
-      it("αlimit increases as drawdown recovers", async () => {
+      it("αlimit increases as peak drawdown recovers", async () => {
         const alphaBase = ethers.parseEther("1000");
 
-        // Start at 50% drawdown
+        // Start at 50% peak drawdown
         const limitDrawdown = await riskModule.calculateAlphaLimit(
           alphaBase,
           ethers.parseEther("0.5"),
           K_DD
         );
 
-        // Recover to 20% drawdown
+        // Recover to 20% peak drawdown
         const limitRecovered = await riskModule.calculateAlphaLimit(
           alphaBase,
           ethers.parseEther("0.2"),
@@ -505,7 +532,7 @@ describe("RiskModule", () => {
       });
     });
 
-    describe("Extreme drawdown (DD → 1, αlimit = 0)", () => {
+    describe("Extreme peak drawdown (DD → 1, αlimit = 0)", () => {
       it("αlimit = 0 prevents all new market creation", async () => {
         const alphaBase = ethers.parseEther("1000");
         const extremeDrawdown = WAD; // 100%

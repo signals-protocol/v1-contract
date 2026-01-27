@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import { ethers } from 'hardhat';
 import { Signer } from 'ethers';
 import { time } from '@nomicfoundation/hardhat-network-helpers';
-import { SignalsCoreHarness, RiskModule, MockERC20, MockFeePolicy } from '../../../typechain-types';
+import { SignalsCoreHarness, SignalsCore, RiskModule, MockERC20, MockFeePolicy } from '../../../typechain-types';
 import { deploySeedData } from '../../helpers';
 
 /**
@@ -30,16 +30,6 @@ describe('Core-first Risk Gate Call Order', () => {
     const MockERC20Factory = await ethers.getContractFactory('MockERC20');
     paymentToken = await MockERC20Factory.deploy('USDC', 'USDC', 6) as MockERC20;
     
-    // Deploy position with proxy
-    const positionImplFactory = await ethers.getContractFactory('SignalsPosition');
-    const positionImpl = await positionImplFactory.deploy();
-    const positionInit = positionImplFactory.interface.encodeFunctionData('initialize', [
-      await owner.getAddress()
-    ]);
-    const positionProxy = await (await ethers.getContractFactory('TestERC1967Proxy'))
-      .deploy(await positionImpl.getAddress(), positionInit);
-    const position = await ethers.getContractAt('SignalsPosition', await positionProxy.getAddress());
-    
     // Deploy LazyMulSegmentTree library
     const LazyMulSegmentTree = await ethers.getContractFactory('LazyMulSegmentTree');
     const lazyLib = await LazyMulSegmentTree.deploy();
@@ -50,20 +40,17 @@ describe('Core-first Risk Gate Call Order', () => {
     });
     const coreImpl = await SignalsCoreHarnessFactory.deploy();
     
-    // Deploy proxy
-    const initData = SignalsCoreHarnessFactory.interface.encodeFunctionData('initialize', [
-      await paymentToken.getAddress(),
-      await position.getAddress(),
-      3600,
-      86400,
-    ]);
-    const proxy = await (await ethers.getContractFactory('TestERC1967Proxy'))
-      .deploy(await coreImpl.getAddress(), initData);
-    
-    core = SignalsCoreHarnessFactory.attach(await proxy.getAddress()) as SignalsCoreHarness;
-    
-    // Connect position to core
-    await position.setCore(await core.getAddress());
+    const positionImplFactory = await ethers.getContractFactory('SignalsPosition');
+    const positionImpl = await positionImplFactory.deploy();
+    const lpShareImpl = await (await ethers.getContractFactory('SignalsLPShare')).deploy();
+    const proxyFactory = await ethers.getContractFactory('TestERC1967Proxy');
+    const positionProxy = await proxyFactory.deploy(await positionImpl.getAddress(), '0x');
+    const lpShareProxy = await proxyFactory.deploy(await lpShareImpl.getAddress(), '0x');
+    const coreProxy = await proxyFactory.deploy(await coreImpl.getAddress(), '0x');
+
+    const position = await ethers.getContractAt('SignalsPosition', await positionProxy.getAddress());
+    const lpShare = await ethers.getContractAt('SignalsLPShare', await lpShareProxy.getAddress());
+    core = SignalsCoreHarnessFactory.attach(await coreProxy.getAddress()) as SignalsCoreHarness;
     
     // Deploy real modules with library linking
     const RiskModuleFactory = await ethers.getContractFactory('RiskModule');
@@ -85,21 +72,52 @@ describe('Core-first Risk Gate Call Order', () => {
     const OracleModule = await ethers.getContractFactory('OracleModule');
     const oracleModule = await OracleModule.deploy();
     
-    await core.setModules(
-      await tradeModule.getAddress(),
-      await lifecycleModule.getAddress(),
-      await riskModule.getAddress(),
-      await vaultModule.getAddress(),
-      await oracleModule.getAddress()
+    feePolicy = await (await ethers.getContractFactory('MockFeePolicy')).deploy(0) as MockFeePolicy;
+    const submitWindow = 3600;
+    const opsWindow = 86400 - submitWindow;
+    const claimDelay = submitWindow + opsWindow;
+    const feedId = ethers.encodeBytes32String('BTC');
+    const coreParams: SignalsCore.InitParamsStruct = {
+      paymentToken: await paymentToken.getAddress(),
+      positionContract: await position.getAddress(),
+      lpShareToken: await lpShare.getAddress(),
+      tradeModule: await tradeModule.getAddress(),
+      lifecycleModule: await lifecycleModule.getAddress(),
+      riskModule: await riskModule.getAddress(),
+      vaultModule: await vaultModule.getAddress(),
+      oracleModule: await oracleModule.getAddress(),
+      ownerSafe: await owner.getAddress(),
+      settlementSubmitWindow: submitWindow,
+      pendingOpsWindow: opsWindow,
+      claimDelaySeconds: claimDelay,
+      redstoneFeedId: feedId,
+      redstoneFeedDecimals: 8,
+      maxSampleDistance: 600,
+      futureTolerance: 60,
+      lambda: ethers.parseEther('0.2'),
+      kDrawdown: ethers.parseEther('1'),
+      enforceAlpha: false,
+      rhoBS: 0n,
+      phiLP: ethers.parseEther('0.8'),
+      phiBS: ethers.parseEther('0.1'),
+      phiTR: ethers.parseEther('0.1'),
+      withdrawalLagBatches: 1,
+      operatorAllowlist: [await owner.getAddress()],
+    };
+    await core.initialize(coreParams);
+    await position.initialize(await core.getAddress(), await owner.getAddress());
+    await lpShare.initialize(
+      await core.getAddress(),
+      await paymentToken.getAddress(),
+      'Signals LP Share',
+      'sLP',
+      await owner.getAddress()
     );
     
     // Setup vault for testing
-    await core.setMinSeedAmount(1_000_000); // 1 USDC
     await paymentToken.mint(await owner.getAddress(), 100_000_000_000n); // 100k USDC
     await paymentToken.approve(await core.getAddress(), ethers.MaxUint256);
     await core.seedVault(10_000_000_000n); // 10k USDC
-
-    feePolicy = await (await ethers.getContractFactory('MockFeePolicy')).deploy(0) as MockFeePolicy;
   });
 
   describe('createMarket gate enforcement', () => {
@@ -113,7 +131,7 @@ describe('Core-first Risk Gate Call Order', () => {
         true                        // enforceAlpha = true
       );
       
-      // Simulate 99% drawdown to make αlimit = 0
+      // Simulate 99% peak drawdown to make αlimit = 0
       await core.harnessSetLpVault(
         ethers.parseEther('10000'), // nav
         ethers.parseEther('10000'), // shares
@@ -281,25 +299,30 @@ describe('Core-first Risk Gate Call Order', () => {
   });
 
   describe('reopenMarket gate enforcement', () => {
-    // Skip: This test requires more precise α limit calculation setup
-    // The gate is correctly wired (verified by code inspection and unit tests)
-    it.skip('calls gateReopenMarket with stored deltaEt', async () => {
-      await core.setRiskConfig(
-        ethers.parseEther('0.5'),
-        ethers.parseEther('1'),
-        true
-      );
-      
+    it('calls gateReopenMarket with stored deltaEt', async () => {
       const now = await time.latest();
       const start = now + 100;
       const end = start + 86400;
       const settle = end + 3600;
-      
-      // Create market
+
+      await core.setRiskConfig(
+        ethers.parseEther('0.3'),
+        ethers.parseEther('1'),
+        true
+      );
+
+      await core.harnessSetLpVault(
+        ethers.parseEther('10000'),
+        ethers.parseEther('1000'),
+        ethers.parseEther('10'),
+        ethers.parseEther('10'),
+        true
+      );
+
       const seedData = await deploySeedData(Array(10).fill(WAD));
       await core.createMarket(
         0, 100, 10, start, end, settle, 10,
-        ethers.parseEther('1'),
+        ethers.parseEther('1000'),
         feePolicy.target.toString(),
         await seedData.getAddress()
       );
@@ -311,8 +334,8 @@ describe('Core-first Risk Gate Call Order', () => {
       await core.harnessSetLpVault(
         ethers.parseEther('1000'),
         ethers.parseEther('1000'),
-        ethers.parseEther('0.01'), // 99% drawdown
-        ethers.parseEther('1'),
+        ethers.parseEther('1'), // 90% peak drawdown vs peak
+        ethers.parseEther('10'),
         true
       );
       

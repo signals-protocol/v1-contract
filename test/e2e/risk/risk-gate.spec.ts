@@ -13,7 +13,6 @@ describe("E2E: risk gate enforcement", () => {
     });
     const coreAddress = await core.getAddress();
 
-    await core.connect(owner).setMinSeedAmount(1);
     const seedAmount = 1_000_000n;
     await payment.connect(owner).approve(coreAddress, seedAmount);
     await core.connect(owner).seedVault(seedAmount);

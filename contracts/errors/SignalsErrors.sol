@@ -143,6 +143,8 @@ interface SignalsErrors {
     error InvalidRangeBins(uint32 lowerBin, uint32 upperBin);
     error ManagerNotSet();
     error SnapshotAlreadyCompleted();
+    error DeploymentAlreadyExecuted();
+    error Create2AddressMismatch(address expected, address actual);
 
     // ============================================================
     // Position

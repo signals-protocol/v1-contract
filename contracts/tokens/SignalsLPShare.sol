@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "../errors/SignalsErrors.sol";
 
 /// @title SignalsLPShare
@@ -17,24 +19,45 @@ import "../errors/SignalsErrors.sol";
 ///
 ///      The vault is the SignalsCore contract which holds actual NAV.
 ///      This token represents claims on the vault.
-contract SignalsLPShare is ERC20, ERC20Permit, SignalsErrors, Ownable {
+contract SignalsLPShare is
+    Initializable,
+    ERC20Upgradeable,
+    ERC20PermitUpgradeable,
+    OwnableUpgradeable,
+    UUPSUpgradeable,
+    SignalsErrors
+{
     /// @notice The SignalsCore contract that manages the vault
-    address public immutable core;
+    address public core;
     
-    /// @notice The underlying asset (payment token, e.g., USDC)
-    address public immutable asset;
+    /// @notice The underlying asset (payment token)
+    address public asset;
 
     modifier onlyCore() {
         if (msg.sender != core) revert SignalsErrors.OnlyCore();
         _;
     }
 
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
+        address core_,
+        address asset_,
         string memory name_,
         string memory symbol_,
-        address core_,
-        address asset_
-    ) ERC20(name_, symbol_) ERC20Permit(name_) Ownable(core_) {
+        address ownerSafe_
+    ) external initializer {
+        if (core_ == address(0)) revert SignalsErrors.ZeroAddress();
+        if (asset_ == address(0)) revert SignalsErrors.ZeroAddress();
+        if (ownerSafe_ == address(0)) revert SignalsErrors.ZeroAddress();
+        if (core_.code.length == 0 || asset_.code.length == 0) revert SignalsErrors.ModuleNotSet();
+        __ERC20_init(name_, symbol_);
+        __ERC20Permit_init(name_);
+        __Ownable_init(ownerSafe_);
+        __UUPSUpgradeable_init();
         core = core_;
         asset = asset_;
     }
@@ -151,5 +174,6 @@ contract SignalsLPShare is ERC20, ERC20Permit, SignalsErrors, Ownable {
         }
         return 1e18; // Default 1:1
     }
-}
 
+    function _authorizeUpgrade(address) internal override onlyOwner {}
+}

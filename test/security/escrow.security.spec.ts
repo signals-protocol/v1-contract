@@ -4,6 +4,7 @@ import {
   time,
   loadFixture,
 } from "@nomicfoundation/hardhat-toolbox/network-helpers";
+import { SignalsCore } from '../../typechain-types';
 import { WAD, USDC_DECIMALS, SMALL_QUANTITY } from "../helpers/constants";
 import {
   buildRedstonePayload,
@@ -33,21 +34,6 @@ describe("Escrow Security", () => {
     const fundAmount = ethers.parseUnits("1000000", USDC_DECIMALS);
     await payment.transfer(user1.address, fundAmount);
     await payment.transfer(user2.address, fundAmount);
-
-    const positionImpl = await (
-      await ethers.getContractFactory("SignalsPosition")
-    ).deploy();
-    const positionInit = positionImpl.interface.encodeFunctionData(
-      "initialize",
-      [owner.address]
-    );
-    const positionProxy = await (
-      await ethers.getContractFactory("TestERC1967Proxy")
-    ).deploy(positionImpl.target, positionInit);
-    const position = await ethers.getContractAt(
-      "SignalsPosition",
-      positionProxy.target
-    );
 
     const feePolicy = await (
       await ethers.getContractFactory("MockFeePolicy")
@@ -82,64 +68,70 @@ describe("Escrow Security", () => {
         libraries: { LazyMulSegmentTree: lazyLib.target },
       })
     ).deploy();
-    const coreInit = coreImpl.interface.encodeFunctionData("initialize", [
-      payment.target,
-      position.target,
-      3600, // settlementSubmitWindow
-      3600, // settlementFinalizeDeadline
-    ]);
-    const coreProxy = await (
-      await ethers.getContractFactory("TestERC1967Proxy")
-    ).deploy(coreImpl.target, coreInit);
+    const positionImpl = await (
+      await ethers.getContractFactory("SignalsPosition")
+    ).deploy();
+    const lpShareImpl = await (
+      await ethers.getContractFactory("SignalsLPShare")
+    ).deploy();
+    const proxyFactory = await ethers.getContractFactory("TestERC1967Proxy");
+    const positionProxy = await proxyFactory.deploy(positionImpl.target, "0x");
+    const lpShareProxy = await proxyFactory.deploy(lpShareImpl.target, "0x");
+    const coreProxy = await proxyFactory.deploy(coreImpl.target, "0x");
+
+    const position = await ethers.getContractAt(
+      "SignalsPosition",
+      await positionProxy.getAddress()
+    );
+    const lpShare = await ethers.getContractAt(
+      "SignalsLPShare",
+      await lpShareProxy.getAddress()
+    );
     const core = await ethers.getContractAt(
       "SignalsCoreHarness",
-      coreProxy.target
+      await coreProxy.getAddress()
     );
 
-    // Deploy LP Share with core address
-    const lpShare = await (
-      await ethers.getContractFactory("SignalsLPShare")
-    ).deploy("Signals LP Share", "sLP", core.target, payment.target);
-
-    // Set modules
-    await core.setModules(
-      tradeModule.target,
-      lifecycleModule.target,
-      riskModule.target,
-      lpVaultModule.target,
-      oracleModule.target
-    );
-
-    // Set LP share token
-    await core.setLpShareToken(lpShare.target);
-
-    // Configure Redstone
     const feedId = ethers.encodeBytes32String("BTC");
-    await core.setRedstoneConfig(
-      feedId,
-      8,
-      600, // maxSampleDistance
-      60 // futureTolerance
+    const submitWindow = 3600;
+    const opsWindow = 3600;
+    const claimDelay = submitWindow + opsWindow;
+    const coreParams: SignalsCore.InitParamsStruct = {
+      paymentToken: payment.target.toString(),
+      positionContract: await position.getAddress(),
+      lpShareToken: await lpShare.getAddress(),
+      tradeModule: tradeModule.target.toString(),
+      lifecycleModule: lifecycleModule.target.toString(),
+      riskModule: riskModule.target.toString(),
+      vaultModule: lpVaultModule.target.toString(),
+      oracleModule: oracleModule.target.toString(),
+      ownerSafe: owner.address,
+      settlementSubmitWindow: submitWindow,
+      pendingOpsWindow: opsWindow,
+      claimDelaySeconds: claimDelay,
+      redstoneFeedId: feedId,
+      redstoneFeedDecimals: 8,
+      maxSampleDistance: 600,
+      futureTolerance: 60,
+      lambda: ethers.parseEther("0.2"),
+      kDrawdown: ethers.parseEther("1"),
+      enforceAlpha: false,
+      rhoBS: 0n,
+      phiLP: ethers.parseEther("0.7"),
+      phiBS: ethers.parseEther("0.2"),
+      phiTR: ethers.parseEther("0.1"),
+      withdrawalLagBatches: 0,
+      operatorAllowlist: [owner.address],
+    };
+    await core.initialize(coreParams);
+    await position.initialize(await core.getAddress(), owner.address);
+    await lpShare.initialize(
+      await core.getAddress(),
+      payment.target.toString(),
+      "Signals LP Share",
+      "sLP",
+      owner.address
     );
-
-    // Set settlement timeline
-    await core.setSettlementTimeline(3600, 3600, 7200);
-
-    // Configure risk and fee waterfall (required for batch processing)
-    await core.setRiskConfig(
-      ethers.parseEther("0.2"), // lambda
-      ethers.parseEther("1"), // kDrawdown
-      false // enforceAlpha
-    );
-    await core.setFeeWaterfallConfig(
-      0n, // rhoBS
-      ethers.parseEther("0.7"), // phiLP
-      ethers.parseEther("0.2"), // phiBS
-      ethers.parseEther("0.1") // phiTR
-    );
-
-    // Link position to core
-    await position.setCore(core.target);
 
     // Approve
     await payment.connect(user1).approve(core.target, ethers.MaxUint256);

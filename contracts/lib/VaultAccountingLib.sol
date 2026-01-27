@@ -13,7 +13,7 @@ import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
  *      - P^e_t = N^pre_t / S_{t-1}
  *      - Deposit: (N', S') = (N + D, S + D/P)
  *      - Withdraw: (N'', S'') = (N - x·P, S - x)
- *      - DD_t = 1 - P_t / P^peak_t
+ *      - DD_t = 1 - P_t / P^peak_t (peak drawdown)
  */
 library VaultAccountingLib {
     using FixedPointMathU for uint256;
@@ -45,7 +45,7 @@ library VaultAccountingLib {
         uint256 shares;      // S_t: final shares (WAD)
         uint256 price;       // P_t: final price (WAD)
         uint256 pricePeak;   // P^peak_t: updated peak price (WAD)
-        uint256 drawdown;    // DD_t: drawdown from peak (WAD)
+        uint256 drawdown;    // DD_t: peak drawdown (WAD)
     }
 
     // ============================================================
@@ -252,13 +252,13 @@ library VaultAccountingLib {
     }
 
     /**
-     * @notice Compute drawdown from peak
+     * @notice Compute peak drawdown from peak
      * @dev DD_t = 1 - P_t / P^peak_t
      *      Returns 0 if price >= peak
      *      Returns WAD (100%) if price = 0 and peak > 0
      * @param price Current price P_t (WAD)
      * @param peak Peak price P^peak_t (WAD)
-     * @return drawdown Drawdown (WAD, 0 to 1e18)
+     * @return drawdown Peak drawdown (WAD, 0 to 1e18)
      */
     function computeDrawdown(uint256 price, uint256 peak) internal pure returns (uint256 drawdown) {
         if (peak == 0) {
@@ -295,9 +295,9 @@ library VaultAccountingLib {
      * @dev When shares=0 (all LPs exited):
      *      - price defaults to 1.0 (WAD)
      *      - pricePeak is preserved from previous state
-     *      - drawdown is set to 0 (no active LP exposure)
+     *      - peak drawdown is set to 0 (no active LP exposure)
      * 
-     *      This ensures drawdown-based calculations (like α_limit) don't
+     *      This ensures peak drawdown-based calculations (like α_limit) don't
      *      produce misleading values when the vault is empty.
      * 
      * @param nav Final NAV after deposits/withdrawals
@@ -325,5 +325,3 @@ library VaultAccountingLib {
         }
     }
 }
-
-

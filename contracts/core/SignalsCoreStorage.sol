@@ -112,9 +112,6 @@ abstract contract SignalsCoreStorage {
     
     VaultState internal lpVault;
 
-    /// @notice Minimum seed amount for first deposit
-    uint256 public minSeedAmount;
-
     // ============================================================
     // Fee Waterfall & Capital Stack
     // ============================================================
@@ -127,7 +124,7 @@ abstract contract SignalsCoreStorage {
 
     /// @notice Fee waterfall configuration parameters
     struct FeeWaterfallConfig {
-        int256 pdd;              // Drawdown floor (negative WAD, e.g., -0.3e18 = -30%)
+        int256 pdd;              // NAV loss floor (negative WAD, pdd := -lambda, e.g., -0.3e18 = -30%)
         uint256 rhoBS;           // ρ_BS: Backstop coverage target ratio (WAD)
         uint256 phiLP;           // ϕ_LP: LP residual fee share (WAD)
         uint256 phiBS;           // ϕ_BS: Backstop residual fee share (WAD)
@@ -295,8 +292,8 @@ abstract contract SignalsCoreStorage {
 
     /// @notice Risk parameters for α Safety Bounds
     struct RiskConfig {
-        uint256 lambda;      // λ: Safety parameter (WAD), e.g., 0.3e18 = 30% max drawdown
-        uint256 kDrawdown;   // k: Drawdown sensitivity factor (WAD), typically 1.0e18
+        uint256 lambda;      // λ: NAV loss limit per batch (WAD); sets pdd := -lambda
+        uint256 kDrawdown;   // k: Peak drawdown sensitivity for alpha limit (WAD)
         bool enforceAlpha;   // Whether to enforce α bounds at market config time (create/reopen)
     }
 

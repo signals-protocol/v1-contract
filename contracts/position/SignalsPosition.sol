@@ -41,18 +41,15 @@ contract SignalsPosition is
         _disableInitializers();
     }
 
-    function initialize(address _core) external initializer {
+    function initialize(address _core, address _ownerSafe) external initializer {
         if (_core == address(0)) revert SignalsErrors.ZeroAddress();
+        if (_ownerSafe == address(0)) revert SignalsErrors.ZeroAddress();
+        if (_core.code.length == 0) revert SignalsErrors.ModuleNotSet();
         __ERC721_init("Signals Position", "SIGP");
-        __Ownable_init(msg.sender);
+        __Ownable_init(_ownerSafe);
         __UUPSUpgradeable_init();
         core = _core;
         _nextId = 1;
-    }
-
-    function setCore(address _core) external onlyOwner {
-        if (_core == address(0)) revert SignalsErrors.ZeroAddress();
-        core = _core;
     }
 
     // --- Core-only position lifecycle ---

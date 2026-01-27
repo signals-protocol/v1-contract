@@ -36,7 +36,6 @@ describe("Vault Security", () => {
     )) as LPVaultModuleProxy;
 
     await proxy.setPaymentToken(payment.target);
-    await proxy.setMinSeedAmount(usdc("100"));
     await proxy.setWithdrawalLagBatches(0);
 
     // Configure Risk and FeeWaterfall

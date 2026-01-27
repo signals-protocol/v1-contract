@@ -28,23 +28,6 @@ describe("Core Security", () => {
     await payment.transfer(user.address, fundAmount);
     await payment.transfer(attacker.address, fundAmount);
 
-    const positionImplFactory = await ethers.getContractFactory(
-      "SignalsPosition"
-    );
-    const positionImpl = await positionImplFactory.deploy();
-    await positionImpl.waitForDeployment();
-    const positionInit = positionImplFactory.interface.encodeFunctionData(
-      "initialize",
-      [owner.address]
-    );
-    const positionProxy = await (
-      await ethers.getContractFactory("TestERC1967Proxy")
-    ).deploy(positionImpl.target, positionInit);
-    const position = (await ethers.getContractAt(
-      "SignalsPosition",
-      await positionProxy.getAddress()
-    )) as SignalsPosition;
-
     const feePolicy = await (
       await ethers.getContractFactory("MockFeePolicy")
     ).deploy(0);
@@ -63,6 +46,23 @@ describe("Core Security", () => {
         libraries: { LazyMulSegmentTree: lazyLib.target },
       })
     ).deploy(tradeModule.target);
+
+    const positionImplFactory = await ethers.getContractFactory(
+      "SignalsPosition"
+    );
+    const positionImpl = await positionImplFactory.deploy();
+    await positionImpl.waitForDeployment();
+    const positionInit = positionImplFactory.interface.encodeFunctionData(
+      "initialize",
+      [core.target, owner.address]
+    );
+    const positionProxy = await (
+      await ethers.getContractFactory("TestERC1967Proxy")
+    ).deploy(positionImpl.target, positionInit);
+    const position = (await ethers.getContractAt(
+      "SignalsPosition",
+      await positionProxy.getAddress()
+    )) as SignalsPosition;
 
     await core.setAddresses(
       payment.target,
@@ -101,8 +101,6 @@ describe("Core Security", () => {
     };
     await core.setMarket(1, market);
     await core.seedTree(1, Array(100).fill(WAD));
-    await position.connect(owner).setCore(core.target);
-
     await payment.connect(user).approve(core.target, ethers.MaxUint256);
     await payment.connect(attacker).approve(core.target, ethers.MaxUint256);
 

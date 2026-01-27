@@ -36,23 +36,6 @@ async function deploySystem(
     await ethers.getContractFactory("MockFeePolicy")
   ).deploy(feeBps);
 
-  const positionImplFactory = await ethers.getContractFactory(
-    "SignalsPosition"
-  );
-  const positionImpl = await positionImplFactory.deploy();
-  await positionImpl.waitForDeployment();
-  const positionInit = positionImplFactory.interface.encodeFunctionData(
-    "initialize",
-    [owner.address]
-  );
-  const positionProxy = (await (
-    await ethers.getContractFactory("TestERC1967Proxy")
-  ).deploy(await positionImpl.getAddress(), positionInit)) as TestERC1967Proxy;
-  const position = (await ethers.getContractAt(
-    "SignalsPosition",
-    await positionProxy.getAddress()
-  )) as SignalsPosition;
-
   const lazyLib = await (
     await ethers.getContractFactory("LazyMulSegmentTree")
   ).deploy();
@@ -66,6 +49,23 @@ async function deploySystem(
       libraries: { LazyMulSegmentTree: lazyLib.target },
     })
   ).deploy(tradeModule.target);
+
+  const positionImplFactory = await ethers.getContractFactory(
+    "SignalsPosition"
+  );
+  const positionImpl = await positionImplFactory.deploy();
+  await positionImpl.waitForDeployment();
+  const positionInit = positionImplFactory.interface.encodeFunctionData(
+    "initialize",
+    [core.target, owner.address]
+  );
+  const positionProxy = (await (
+    await ethers.getContractFactory("TestERC1967Proxy")
+  ).deploy(await positionImpl.getAddress(), positionInit)) as TestERC1967Proxy;
+  const position = (await ethers.getContractAt(
+    "SignalsPosition",
+    await positionProxy.getAddress()
+  )) as SignalsPosition;
 
   await core.setAddresses(
     payment.target,
@@ -104,7 +104,6 @@ async function deploySystem(
   };
   await core.setMarket(1, market);
   await core.seedTree(1, [WAD, WAD, WAD, WAD]);
-  await position.connect(owner).setCore(core.target);
 
   // fund users
   await payment.transfer(userA.address, 10_000_000n);

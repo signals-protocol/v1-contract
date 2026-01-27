@@ -139,7 +139,6 @@ describe("UnitSystem Spec Tests", () => {
       const proxy = await proxyFactory.deploy(module.target);
 
       await proxy.setPaymentToken(payment.target);
-      await proxy.setMinSeedAmount(1_000_000n); // 1 USDC
       await proxy.setWithdrawalLagBatches(0);
       // Configure Risk (sets pdd := -λ)
       await proxy.setRiskConfig(
@@ -267,7 +266,6 @@ describe("UnitSystem Spec Tests", () => {
       const proxy = await proxyFactory.deploy(module.target);
 
       await proxy.setPaymentToken(payment.target);
-      await proxy.setMinSeedAmount(1_000_000n);
       await proxy.setWithdrawalLagBatches(0);
       // Configure Risk (sets pdd := -λ)
       await proxy.setRiskConfig(
@@ -376,7 +374,6 @@ describe("UnitSystem Spec Tests", () => {
       const proxy = await proxyFactory.deploy(module.target);
 
       await proxy.setPaymentToken(payment.target);
-      await proxy.setMinSeedAmount(1_000_000n); // 1 USDC (6 decimals)
       await proxy.setWithdrawalLagBatches(0);
       // Configure Risk (sets pdd := -λ)
       await proxy.setRiskConfig(

@@ -612,7 +612,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         // However, positions use quantity in token units, so payout is also in token units
         // For internal accounting consistency, we keep payoutReserve in token units
         // but L_t must be in WAD, so convert payoutReserve to WAD for subtraction
-        uint256 payoutReserveWad = payoutReserve * 1e12; // USDC6 to WAD (1e6 → 1e18)
+        uint256 payoutReserveWad = payoutReserve * 1e12; // 6-decimal payment token to WAD (1e6 → 1e18)
         
         lt = deltaC - int256(payoutReserveWad);
         

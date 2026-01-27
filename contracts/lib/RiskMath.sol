@@ -8,7 +8,7 @@ import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
 /// @notice Core risk calculation library for Signals Protocol
 /// @dev Implements:
 ///      - ΔEₜ (tail budget) calculation from prior
-///      - αbase/αlimit calculation with drawdown
+///      - αbase/αlimit calculation with peak drawdown
 ///      - Prior admissibility check
 ///
 ///      This library contains ONLY pure calculations.
@@ -107,7 +107,7 @@ library RiskMath {
      *      Ensures uniform-prior worst-case loss ≤ λ * E_t
      * @param Et Vault NAV (WAD)
      * @param numBins Number of outcome bins n
-     * @param lambda Safety parameter λ (WAD, e.g., 0.3 = 30% max drawdown)
+     * @param lambda Safety parameter λ (WAD, NAV loss limit per batch)
      * @return alphaBase Base liquidity parameter limit (WAD)
      */
     function calculateAlphaBase(
@@ -126,12 +126,12 @@ library RiskMath {
     }
 
     /**
-     * @notice Calculate αlimit from αbase and drawdown
+     * @notice Calculate αlimit from αbase and peak drawdown
      * @dev αlimit,t+1 = max{0, αbase,t+1 * (1 - k * DD_t)}
      *      where DD_t = 1 - P_t / P^peak_t
      * @param alphaBase Base liquidity parameter (WAD)
-     * @param drawdown Current drawdown DD_t (WAD, 0 to WAD)
-     * @param k Drawdown sensitivity factor (WAD, typically 1.0)
+     * @param drawdown Current peak drawdown DD_t (WAD, 0 to WAD)
+     * @param k Peak drawdown sensitivity factor (WAD, typically 1.0)
      * @return alphaLimit Effective liquidity parameter limit (WAD)
      */
     function calculateAlphaLimit(
@@ -152,11 +152,11 @@ library RiskMath {
     }
 
     /**
-     * @notice Calculate drawdown from current price and peak
+     * @notice Calculate peak drawdown from current price and peak
      * @dev DD_t = 1 - P_t / P^peak_t. Returns 0 if price >= peak.
      * @param price Current price (WAD)
      * @param pricePeak Peak price (WAD)
-     * @return drawdown Drawdown ratio (WAD, 0 to WAD)
+     * @return drawdown Peak drawdown ratio (WAD, 0 to WAD)
      */
     function calculateDrawdown(
         uint256 price,
@@ -217,4 +217,3 @@ library RiskMath {
         return FixedPointMathU.lnWadUp(n);
     }
 }
-

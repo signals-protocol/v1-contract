@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Signer } from "ethers";
-import { MockERC20, SignalsCoreHarness } from "../../../typechain-types";
+import { MockERC20, SignalsCoreHarness, SignalsCore } from '../../../typechain-types';
 
 /**
  * Core View Getters Tests
@@ -12,6 +12,13 @@ describe("Core View Getters", () => {
   let owner: Signer;
   let core: SignalsCoreHarness;
   let paymentToken: MockERC20;
+  let modules: {
+    trade: string;
+    lifecycle: string;
+    risk: string;
+    vault: string;
+    oracle: string;
+  };
 
   const usdc = (value: string) => ethers.parseUnits(value, 6);
 
@@ -22,58 +29,11 @@ describe("Core View Getters", () => {
     const MockERC20 = await ethers.getContractFactory("MockERC20");
     paymentToken = await MockERC20.deploy("USDC", "USDC", 6);
 
-    // Deploy position with proxy
-    const positionImplFactory = await ethers.getContractFactory(
-      "SignalsPosition"
-    );
-    const positionImpl = await positionImplFactory.deploy();
-    const positionInit = positionImplFactory.interface.encodeFunctionData(
-      "initialize",
-      [await owner.getAddress()]
-    );
-    const positionProxy = await (
-      await ethers.getContractFactory("TestERC1967Proxy")
-    ).deploy(await positionImpl.getAddress(), positionInit);
-    const position = await ethers.getContractAt(
-      "SignalsPosition",
-      await positionProxy.getAddress()
-    );
-
     // Deploy LazyMulSegmentTree library
     const LazyMulSegmentTree = await ethers.getContractFactory(
       "LazyMulSegmentTree"
     );
     const lazyLib = await LazyMulSegmentTree.deploy();
-
-    // Deploy core harness with library linking
-    const SignalsCoreHarnessFactory = await ethers.getContractFactory(
-      "SignalsCoreHarness",
-      {
-        libraries: { LazyMulSegmentTree: await lazyLib.getAddress() },
-      }
-    );
-    const coreImpl = await SignalsCoreHarnessFactory.deploy();
-
-    // Deploy proxy
-    const initData = SignalsCoreHarnessFactory.interface.encodeFunctionData(
-      "initialize",
-      [
-        await paymentToken.getAddress(),
-        await position.getAddress(),
-        3600,
-        86400,
-      ]
-    );
-    const proxy = await (
-      await ethers.getContractFactory("TestERC1967Proxy")
-    ).deploy(await coreImpl.getAddress(), initData);
-
-    core = SignalsCoreHarnessFactory.attach(
-      await proxy.getAddress()
-    ) as SignalsCoreHarness;
-
-    // Connect position to core
-    await position.setCore(await core.getAddress());
 
     // Deploy and set modules with library linking
     const RiskModule = await ethers.getContractFactory("RiskModule");
@@ -98,13 +58,95 @@ describe("Core View Getters", () => {
     // Use OracleModuleHarness to allow Hardhat local signers for Redstone verification
     const OracleModule = await ethers.getContractFactory("OracleModuleHarness");
     const oracleModule = await OracleModule.deploy();
+    modules = {
+      trade: await tradeModule.getAddress(),
+      lifecycle: await lifecycleModule.getAddress(),
+      risk: await riskModule.getAddress(),
+      vault: await vaultModule.getAddress(),
+      oracle: await oracleModule.getAddress(),
+    };
 
-    await core.setModules(
-      await tradeModule.getAddress(),
-      await lifecycleModule.getAddress(),
-      await riskModule.getAddress(),
-      await vaultModule.getAddress(),
-      await oracleModule.getAddress()
+    // Deploy core harness with library linking
+    const SignalsCoreHarnessFactory = await ethers.getContractFactory(
+      "SignalsCoreHarness",
+      {
+        libraries: { LazyMulSegmentTree: await lazyLib.getAddress() },
+      }
+    );
+    const coreImpl = await SignalsCoreHarnessFactory.deploy();
+
+    const positionImplFactory = await ethers.getContractFactory(
+      "SignalsPosition"
+    );
+    const positionImpl = await positionImplFactory.deploy();
+    const lpShareImpl = await (
+      await ethers.getContractFactory("SignalsLPShare")
+    ).deploy();
+    const proxyFactory = await ethers.getContractFactory("TestERC1967Proxy");
+    const positionProxy = await proxyFactory.deploy(
+      await positionImpl.getAddress(),
+      "0x"
+    );
+    const lpShareProxy = await proxyFactory.deploy(
+      await lpShareImpl.getAddress(),
+      "0x"
+    );
+    const coreProxy = await proxyFactory.deploy(
+      await coreImpl.getAddress(),
+      "0x"
+    );
+
+    const position = await ethers.getContractAt(
+      "SignalsPosition",
+      await positionProxy.getAddress()
+    );
+    const lpShare = await ethers.getContractAt(
+      "SignalsLPShare",
+      await lpShareProxy.getAddress()
+    );
+    core = SignalsCoreHarnessFactory.attach(
+      await coreProxy.getAddress()
+    ) as SignalsCoreHarness;
+
+    const submitWindow = 3600;
+    const opsWindow = 86400 - submitWindow;
+    const claimDelay = submitWindow + opsWindow;
+    const feedId = ethers.encodeBytes32String("BTC");
+    const coreParams: SignalsCore.InitParamsStruct = {
+      paymentToken: await paymentToken.getAddress(),
+      positionContract: await position.getAddress(),
+      lpShareToken: await lpShare.getAddress(),
+      tradeModule: await tradeModule.getAddress(),
+      lifecycleModule: await lifecycleModule.getAddress(),
+      riskModule: await riskModule.getAddress(),
+      vaultModule: await vaultModule.getAddress(),
+      oracleModule: await oracleModule.getAddress(),
+      ownerSafe: await owner.getAddress(),
+      settlementSubmitWindow: submitWindow,
+      pendingOpsWindow: opsWindow,
+      claimDelaySeconds: claimDelay,
+      redstoneFeedId: feedId,
+      redstoneFeedDecimals: 8,
+      maxSampleDistance: 600,
+      futureTolerance: 60,
+      lambda: ethers.parseEther("0.2"),
+      kDrawdown: ethers.parseEther("1"),
+      enforceAlpha: false,
+      rhoBS: 0n,
+      phiLP: ethers.parseEther("0.8"),
+      phiBS: ethers.parseEther("0.1"),
+      phiTR: ethers.parseEther("0.1"),
+      withdrawalLagBatches: 1,
+      operatorAllowlist: [await owner.getAddress()],
+    };
+    await core.initialize(coreParams);
+    await position.initialize(await core.getAddress(), await owner.getAddress());
+    await lpShare.initialize(
+      await core.getAddress(),
+      await paymentToken.getAddress(),
+      "Signals LP Share",
+      "sLP",
+      await owner.getAddress()
     );
 
     // Fund owner for capital stack operations
@@ -268,22 +310,24 @@ describe("Core View Getters", () => {
         .withArgs(3);
     });
 
-    it("emits LpShareTokenUpdated on setLpShareToken", async () => {
-      const addr = ethers.Wallet.createRandom().address;
-      await expect(core.setLpShareToken(addr))
-        .to.emit(core, "LpShareTokenUpdated")
-        .withArgs(addr);
-    });
-
     it("emits ModulesUpdated on setModules", async () => {
-      const addr1 = ethers.Wallet.createRandom().address;
-      const addr2 = ethers.Wallet.createRandom().address;
-      const addr3 = ethers.Wallet.createRandom().address;
-      const addr4 = ethers.Wallet.createRandom().address;
-      const addr5 = ethers.Wallet.createRandom().address;
-      await expect(core.setModules(addr1, addr2, addr3, addr4, addr5))
+      await expect(
+        core.setModules(
+          modules.trade,
+          modules.lifecycle,
+          modules.risk,
+          modules.vault,
+          modules.oracle
+        )
+      )
         .to.emit(core, "ModulesUpdated")
-        .withArgs(addr1, addr2, addr3, addr4, addr5);
+        .withArgs(
+          modules.trade,
+          modules.lifecycle,
+          modules.risk,
+          modules.vault,
+          modules.oracle
+        );
     });
   });
 });

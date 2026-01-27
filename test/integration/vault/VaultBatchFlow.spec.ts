@@ -38,12 +38,10 @@ describe("VaultBatchFlow Integration", () => {
     )) as LPVaultModuleProxy;
 
     await proxy.setPaymentToken(payment.target);
-    // minSeedAmount is in token units (6 decimals)
-    await proxy.setMinSeedAmount(usdc("100"));
     await proxy.setWithdrawalLagBatches(0); // Immediate withdrawals for testing
 
     // Configure Risk (sets pdd := -λ)
-    // λ = 0.2 → pdd = -0.2 (20% drawdown floor)
+    // λ = 0.2 → pdd = -0.2 (20% NAV loss floor)
     await proxy.setRiskConfig(
       ethers.parseEther("0.2"), // lambda = 0.2
       ethers.parseEther("1"), // kDrawdown
@@ -120,12 +118,12 @@ describe("VaultBatchFlow Integration", () => {
       expect(await proxy.getVaultPricePeak()).to.equal(WAD);
     });
 
-    it("rejects seed below minimum", async () => {
+    it("rejects zero seed amount", async () => {
       const { proxy, userA, module } = await loadFixture(deployVaultFixture);
 
       await expect(
-        proxy.connect(userA).seedVault(usdc("50"))
-      ).to.be.revertedWithCustomError(module, "InsufficientSeedAmount");
+        proxy.connect(userA).seedVault(0n)
+      ).to.be.revertedWithCustomError(module, "ZeroAmount");
     });
 
     it("rejects double seeding", async () => {
@@ -641,7 +639,7 @@ describe("VaultBatchFlow Integration", () => {
       expect(peak).to.be.gte(price);
     });
 
-    it("0 <= drawdown <= 100%", async () => {
+    it("0 <= peak drawdown <= 100%", async () => {
       const { proxy, firstBatchId } = await loadFixture(
         deploySeededVaultFixture
       );

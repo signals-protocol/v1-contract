@@ -13,18 +13,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { time, loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import {
-  LazyMulSegmentTree,
-  LPVaultModule,
-  MarketLifecycleModule,
-  MockFeePolicy,
-  MockERC20,
-  MockSignalsPosition,
-  OracleModule,
-  SignalsCoreHarness,
-  TestERC1967Proxy,
-  TradeModule,
-} from "../../../typechain-types";
+import { LazyMulSegmentTree, LPVaultModule, MarketLifecycleModule, MockFeePolicy, MockERC20, MockSignalsPosition, OracleModule, SignalsCoreHarness, SignalsCore, SignalsLPShare, TestERC1967Proxy, TradeModule } from '../../../typechain-types';
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import {
   DATA_FEED_ID,
@@ -107,57 +96,64 @@ describe("PayoutReserve Spec Tests", () => {
     const submitWindow = 300;
     const opsWindow = 60;
     const claimDelay = submitWindow + opsWindow;
-    const initData = coreImpl.interface.encodeFunctionData("initialize", [
-      payment.target,
-      position.target,
-      submitWindow,
-      claimDelay,
-    ]);
-
-    const proxy = (await (
-      await ethers.getContractFactory("TestERC1967Proxy")
-    ).deploy(coreImpl.target, initData)) as TestERC1967Proxy;
-
-    const core = (await ethers.getContractAt(
-      "SignalsCoreHarness",
-      await proxy.getAddress()
-    )) as SignalsCoreHarness;
-
     const feePolicy = await (await ethers.getContractFactory("MockFeePolicy")).deploy(0);
     await feePolicy.waitForDeployment();
 
-    await core.setModules(
-      trade.target,
-      lifecycle.target,
-      risk.target,
-      vault.target,
-      oracle.target
-    );
+    const lpShareImpl = await (
+      await ethers.getContractFactory("SignalsLPShare")
+    ).deploy();
+    const proxyFactory = await ethers.getContractFactory("TestERC1967Proxy");
+    const lpShareProxy = (await proxyFactory.deploy(
+      await lpShareImpl.getAddress(),
+      "0x"
+    )) as TestERC1967Proxy;
+    const coreProxy = (await proxyFactory.deploy(
+      coreImpl.target,
+      "0x"
+    )) as TestERC1967Proxy;
+    const lpShare = (await ethers.getContractAt(
+      "SignalsLPShare",
+      await lpShareProxy.getAddress()
+    )) as SignalsLPShare;
+    const core = (await ethers.getContractAt(
+      "SignalsCoreHarness",
+      await coreProxy.getAddress()
+    )) as SignalsCoreHarness;
 
-    // Configure Redstone oracle params
-    await core.setRedstoneConfig(
-      FEED_ID,
-      FEED_DECIMALS,
-      MAX_SAMPLE_DISTANCE,
-      FUTURE_TOLERANCE
-    );
-    await core.setSettlementTimeline(submitWindow, opsWindow, claimDelay);
-
-    // Vault configuration
-    await core.setMinSeedAmount(usdc("100"));
-    await core.setWithdrawalLagBatches(0);
-    // Configure Risk (sets pdd := -λ)
-    await core.setRiskConfig(
-      ethers.parseEther("0.3"), // lambda = 0.3
-      ethers.parseEther("1"), // kDrawdown
-      false // enforceAlpha
-    );
-    // Configure FeeWaterfall (pdd is already set via setRiskConfig)
-    await core.setFeeWaterfallConfig(
-      0n, // rhoBS
-      ethers.parseEther("0.8"), // phiLP (WAD ratio)
-      ethers.parseEther("0.1"), // phiBS (WAD ratio)
-      ethers.parseEther("0.1") // phiTR (WAD ratio)
+    const coreParams: SignalsCore.InitParamsStruct = {
+      paymentToken: payment.target.toString(),
+      positionContract: position.target.toString(),
+      lpShareToken: await lpShare.getAddress(),
+      tradeModule: trade.target.toString(),
+      lifecycleModule: lifecycle.target.toString(),
+      riskModule: risk.target.toString(),
+      vaultModule: vault.target.toString(),
+      oracleModule: oracle.target.toString(),
+      ownerSafe: owner.address,
+      settlementSubmitWindow: submitWindow,
+      pendingOpsWindow: opsWindow,
+      claimDelaySeconds: claimDelay,
+      redstoneFeedId: FEED_ID,
+      redstoneFeedDecimals: FEED_DECIMALS,
+      maxSampleDistance: MAX_SAMPLE_DISTANCE,
+      futureTolerance: FUTURE_TOLERANCE,
+      lambda: ethers.parseEther("0.3"),
+      kDrawdown: ethers.parseEther("1"),
+      enforceAlpha: false,
+      rhoBS: 0n,
+      phiLP: ethers.parseEther("0.8"),
+      phiBS: ethers.parseEther("0.1"),
+      phiTR: ethers.parseEther("0.1"),
+      withdrawalLagBatches: 0,
+      operatorAllowlist: [owner.address],
+    };
+    await core.initialize(coreParams);
+    await lpShare.initialize(
+      await core.getAddress(),
+      payment.target.toString(),
+      "Signals LP Share",
+      "sLP",
+      owner.address
     );
 
     // Fund accounts with 6-decimal token amounts

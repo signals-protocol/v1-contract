@@ -14,7 +14,7 @@ export interface FeeWaterfallParams {
   Bprev: bigint; // Previous Backstop NAV
   Tprev: bigint; // Previous Treasury NAV
   deltaEt: bigint; // Available backstop support
-  pdd: bigint; // Drawdown floor (negative, WAD)
+  pdd: bigint; // NAV loss floor (negative, WAD)
   rhoBS: bigint; // Backstop coverage ratio (WAD)
   phiLP: bigint; // LP fee share (WAD)
   phiBS: bigint; // Backstop fee share (WAD)
@@ -44,7 +44,7 @@ function wMul(a: bigint, b: bigint): bigint {
 /**
  * WAD multiply with round-up (ceil)
  * Ceil semantics are required for Nfloor calculation
- * to ensure grantNeed is never under-estimated (drawdown floor is invariant).
+ * to ensure grantNeed is never under-estimated (NAV loss floor is invariant).
  */
 function wMulUp(a: bigint, b: bigint): bigint {
   const product = a * b;
@@ -90,11 +90,11 @@ export function calculateFeeWaterfall(
   }
 
   // ========================================
-  // Step 2: Drawdown Floor & Grant
+  // Step 2: NAV Loss Floor & Grant
   // ========================================
   // G^need_t := max{0, ⌈G^min_t⌉} requires ceil semantics.
   // We use wMulUp for Nfloor to ensure conservative (higher) floor calculation.
-  // This guarantees grantNeed is never under-estimated (drawdown floor is invariant).
+  // This guarantees grantNeed is never under-estimated (NAV loss floor is invariant).
   let Nfloor: bigint;
   if (p.Nprev > 0n) {
     const wadPlusPdd = WAD + p.pdd;
@@ -106,7 +106,7 @@ export function calculateFeeWaterfall(
 
   const grantNeed = Nfloor > Nraw ? Nfloor - Nraw : 0n;
 
-  // If grantNeed > deltaEt, batch must revert (drawdown floor invariant).
+  // If grantNeed > deltaEt, batch must revert (NAV loss floor invariant).
   if (grantNeed > p.deltaEt) {
     throw new Error(
       `GrantExceedsTailBudget: grantNeed=${grantNeed}, deltaEt=${p.deltaEt}`
@@ -180,7 +180,7 @@ export function generateRandomParams(): FeeWaterfallParams {
     Bprev: randNav() / 5n, // ~20% of NAV
     Tprev: randNav() / 20n, // ~5% of NAV
     deltaEt: randNav() / 10n,
-    pdd: -300000000000000000n, // -0.3 (30% drawdown floor)
+    pdd: -300000000000000000n, // -0.3 (30% NAV loss floor)
     rhoBS: 200000000000000000n, // 0.2 (20% coverage)
     phiLP: 700000000000000000n, // 0.7
     phiBS: 200000000000000000n, // 0.2

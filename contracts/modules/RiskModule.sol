@@ -11,7 +11,7 @@ import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
 /// @notice Delegate-only module for Risk calculations and enforcement
 /// @dev Implements:
 ///      - ΔEₜ (tail budget) calculation from prior
-///      - αbase/αlimit calculation with drawdown
+///      - αbase/αlimit calculation with peak drawdown
 ///      - Prior admissibility check
 ///
 ///      Core-first Risk Gate Architecture:
@@ -88,7 +88,7 @@ contract RiskModule is SignalsCoreStorage {
      * @dev Delegates to RiskMath library
      * @param Et Vault NAV (WAD)
      * @param numBins Number of outcome bins n
-     * @param lambda Safety parameter λ (WAD, e.g., 0.3 = 30% max drawdown)
+     * @param lambda Safety parameter λ (WAD, NAV loss limit per batch)
      * @return alphaBase Base liquidity parameter limit (WAD)
      */
     function calculateAlphaBase(
@@ -100,11 +100,11 @@ contract RiskModule is SignalsCoreStorage {
     }
 
     /**
-     * @notice Calculate αlimit from αbase and drawdown
+     * @notice Calculate αlimit from αbase and peak drawdown
      * @dev Delegates to RiskMath library
      * @param alphaBase Base liquidity parameter (WAD)
-     * @param drawdown Current drawdown DD_t (WAD, 0 to WAD)
-     * @param k Drawdown sensitivity factor (WAD, typically 1.0)
+     * @param drawdown Current peak drawdown DD_t (WAD, 0 to WAD)
+     * @param k Peak drawdown sensitivity factor (WAD, typically 1.0)
      * @return alphaLimit Effective liquidity parameter limit (WAD)
      */
     function calculateAlphaLimit(
@@ -117,10 +117,10 @@ contract RiskModule is SignalsCoreStorage {
 
     /**
      * @notice Get current αlimit for the system
-     * @dev Combines αbase calculation with current drawdown using RiskMath
+     * @dev Combines αbase calculation with current peak drawdown using RiskMath
      * @param numBins Number of bins for α calculation
-     * @param lambda Safety parameter λ (WAD)
-     * @param k Drawdown sensitivity factor (WAD)
+     * @param lambda Safety parameter λ (WAD, NAV loss limit per batch)
+     * @param k Peak drawdown sensitivity factor (WAD)
      * @return alphaLimit Current effective α limit (WAD)
      */
     function getAlphaLimit(
@@ -263,7 +263,7 @@ contract RiskModule is SignalsCoreStorage {
         // Calculate αbase using RiskMath
         uint256 alphaBase = RiskMath.calculateAlphaBase(lpVault.nav, numBins, riskConfig.lambda);
         
-        // Calculate drawdown using RiskMath
+        // Calculate peak drawdown using RiskMath
         uint256 drawdown = RiskMath.calculateDrawdown(lpVault.price, lpVault.pricePeak);
         
         // Calculate αlimit using RiskMath

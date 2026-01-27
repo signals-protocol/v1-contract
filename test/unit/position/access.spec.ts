@@ -1,7 +1,23 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
-import { SignalsPosition } from "../../../typechain-types";
+import { Signer } from "ethers";
+import { SignalsPosition, SignalsUSDToken } from "../../../typechain-types";
+
+async function deployCoreSigner(): Promise<{ address: string; signer: Signer }> {
+  const token = (await (
+    await ethers.getContractFactory("SignalsUSDToken")
+  ).deploy()) as SignalsUSDToken;
+  await token.waitForDeployment();
+  const address = await token.getAddress();
+  await ethers.provider.send("hardhat_impersonateAccount", [address]);
+  await ethers.provider.send("hardhat_setBalance", [
+    address,
+    ethers.toBeHex(ethers.parseEther("10")),
+  ]);
+  const signer = await ethers.getSigner(address);
+  return { address, signer };
+}
 
 /**
  * Position Access Control Tests
@@ -14,7 +30,8 @@ import { SignalsPosition } from "../../../typechain-types";
 
 describe("SignalsPosition Access Control", () => {
   async function deployPositionFixture() {
-    const [owner, core, alice, bob] = await ethers.getSigners();
+    const [owner, alice, bob] = await ethers.getSigners();
+    const core = await deployCoreSigner();
 
     const implFactory = await ethers.getContractFactory("SignalsPosition");
     const impl = await implFactory.deploy();
@@ -22,6 +39,7 @@ describe("SignalsPosition Access Control", () => {
 
     const initData = implFactory.interface.encodeFunctionData("initialize", [
       core.address,
+      owner.address,
     ]);
     const proxy = await (
       await ethers.getContractFactory("TestERC1967Proxy")
@@ -32,41 +50,15 @@ describe("SignalsPosition Access Control", () => {
       await proxy.getAddress()
     )) as SignalsPosition;
 
-    return { owner, core, alice, bob, position };
+    return { owner, core: core.signer, alice, bob, position };
   }
 
   describe("Core Authorization", () => {
     it("exposes current core address", async () => {
       const { position, core } = await loadFixture(deployPositionFixture);
-      expect(await position.core()).to.equal(core.address);
+      expect(await position.core()).to.equal(await core.getAddress());
     });
 
-    it("allows owner to update core address", async () => {
-      const { position, owner } = await loadFixture(deployPositionFixture);
-
-      const newCore = ethers.Wallet.createRandom().address;
-      await position.connect(owner).setCore(newCore);
-
-      expect(await position.core()).to.equal(newCore);
-    });
-
-    it("restricts setCore to owner only", async () => {
-      const { position, alice } = await loadFixture(deployPositionFixture);
-
-      const newCore = ethers.Wallet.createRandom().address;
-
-      await expect(
-        position.connect(alice).setCore(newCore)
-      ).to.be.revertedWithCustomError(position, "OwnableUnauthorizedAccount");
-    });
-
-    it("reverts setCore with zero address", async () => {
-      const { position, owner } = await loadFixture(deployPositionFixture);
-
-      await expect(
-        position.connect(owner).setCore(ethers.ZeroAddress)
-      ).to.be.revertedWithCustomError(position, "ZeroAddress");
-    });
   });
 
   describe("onlyCore Modifier", () => {
@@ -157,27 +149,6 @@ describe("SignalsPosition Access Control", () => {
   });
 
   describe("Edge Cases", () => {
-    it("handles core change mid-operation", async () => {
-      const { position, core, owner, alice, bob } = await loadFixture(
-        deployPositionFixture
-      );
-
-      // Mint with original core
-      await position.connect(core).mintPosition(alice.address, 1, 0, 10, 1000);
-
-      // Change core
-      await position.connect(owner).setCore(bob.address);
-
-      // Old core can no longer operate
-      await expect(position.connect(core).updateQuantity(1, 2000))
-        .to.be.revertedWithCustomError(position, "UnauthorizedCaller")
-        .withArgs(core.address);
-
-      // New core can operate
-      await expect(position.connect(bob).updateQuantity(1, 2000)).to.not.be
-        .reverted;
-    });
-
     it("prevents operations after position is burned", async () => {
       const { position, core, alice } = await loadFixture(
         deployPositionFixture

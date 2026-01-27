@@ -85,22 +85,6 @@ export async function deployTradeModuleSystem(
     await ethers.getContractFactory("MockFeePolicy")
   ).deploy(0)) as MockFeePolicy;
 
-  // Deploy SignalsPosition with UUPS proxy
-  const positionImplFactory = await ethers.getContractFactory("SignalsPosition");
-  const positionImpl = await positionImplFactory.deploy();
-  await positionImpl.waitForDeployment();
-  const positionInit = positionImplFactory.interface.encodeFunctionData(
-    "initialize",
-    [owner.address]
-  );
-  const positionProxy = await (
-    await ethers.getContractFactory("TestERC1967Proxy")
-  ).deploy(positionImpl.target, positionInit);
-  const position = (await ethers.getContractAt(
-    "SignalsPosition",
-    await positionProxy.getAddress()
-  )) as SignalsPosition;
-
   // Deploy LazyMulSegmentTree library
   const lazyLib = await (
     await ethers.getContractFactory("LazyMulSegmentTree")
@@ -119,6 +103,22 @@ export async function deployTradeModuleSystem(
       libraries: { LazyMulSegmentTree: lazyLib.target },
     })
   ).deploy(tradeModule.target)) as TradeModuleProxy;
+
+  // Deploy SignalsPosition with UUPS proxy (core address known now)
+  const positionImplFactory = await ethers.getContractFactory("SignalsPosition");
+  const positionImpl = await positionImplFactory.deploy();
+  await positionImpl.waitForDeployment();
+  const positionInit = positionImplFactory.interface.encodeFunctionData(
+    "initialize",
+    [core.target, owner.address]
+  );
+  const positionProxy = await (
+    await ethers.getContractFactory("TestERC1967Proxy")
+  ).deploy(positionImpl.target, positionInit);
+  const position = (await ethers.getContractAt(
+    "SignalsPosition",
+    await positionProxy.getAddress()
+  )) as SignalsPosition;
 
   // Configure addresses
   await core.setAddresses(
@@ -169,9 +169,6 @@ export async function deployTradeModuleSystem(
     const factors = Array.from({ length: config.numBins }, () => WAD);
     await core.seedTree(marketId, factors);
   }
-
-  // Connect position to core
-  await position.connect(owner).setCore(core.target);
 
   // Fund users
   const fundAmount = opts.fundAmount ?? ethers.parseUnits("100000", USDC_DECIMALS);
