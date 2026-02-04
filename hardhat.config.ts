@@ -5,6 +5,24 @@ import "@openzeppelin/hardhat-upgrades";
 
 dotenv.config();
 
+const hardhatForkUrl = process.env.HARDHAT_FORK_URL;
+const hardhatForkBlock = process.env.HARDHAT_FORK_BLOCK
+  ? Number.parseInt(process.env.HARDHAT_FORK_BLOCK, 10)
+  : undefined;
+const hardhatForkHardfork = process.env.HARDHAT_FORK_HARDFORK || "shanghai";
+const hardhatForkChainId = process.env.HARDHAT_FORK_CHAIN_ID
+  ? Number.parseInt(process.env.HARDHAT_FORK_CHAIN_ID, 10)
+  : 4114;
+const hardhatForkChains = hardhatForkUrl
+  ? {
+      [hardhatForkChainId]: {
+        hardforkHistory: {
+          [hardhatForkHardfork]: 0,
+        },
+      },
+    }
+  : undefined;
+
 const defaultAccounts = process.env.DEPLOYER_KEY
   ? [process.env.DEPLOYER_KEY]
   : [];
@@ -40,6 +58,16 @@ const config: HardhatUserConfig = {
           ? hardhatAccountCount
           : 30,
       },
+      forking: hardhatForkUrl
+        ? {
+            url: hardhatForkUrl,
+            blockNumber: Number.isFinite(hardhatForkBlock)
+              ? hardhatForkBlock
+              : undefined,
+          }
+        : undefined,
+      hardfork: hardhatForkHardfork,
+      chains: hardhatForkChains,
     },
     local: {
       chainId: 31337,
