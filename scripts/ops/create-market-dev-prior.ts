@@ -37,13 +37,13 @@ interface CreateMarketConfig {
 
 const CONFIG: CreateMarketConfig = {
   skipStaticCall: false,
-  feePolicyAddress: "", // required
+  feePolicyAddress: "0x40fBd67EfD2DF8b64DE0646e4441699f38D88aA7", // dev FeePolicy10bps
   market: {
     anchorPrice: 94_000,
     numBins: 60,
     tickSpacing: 200,
     startDelaySec: -60,
-    durationSec: 3 * 24 * 3600,
+    durationSec: 30 * 24 * 3600,
     settlementDelaySec: 0,
     seedChunkSize: 50,
     liquidity: {
