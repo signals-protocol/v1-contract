@@ -1,4 +1,8 @@
 import hre from "hardhat";
+import type {
+  ContractTransactionReceipt,
+  ContractTransactionResponse,
+} from "ethers";
 import type { Environment } from "../types/environment";
 import { predictCreate2 } from "./predict-create2";
 
@@ -8,9 +12,16 @@ function sumGas(entries: GasEntry[]): bigint {
   return entries.reduce((acc, entry) => acc + entry.gasUsed, 0n);
 }
 
-async function recordGas(label: string, txPromise: Promise<{ wait: () => Promise<{ gasUsed: bigint }> }>, entries: GasEntry[]) {
+async function recordGas(
+  label: string,
+  txPromise: Promise<ContractTransactionResponse>,
+  entries: GasEntry[]
+): Promise<ContractTransactionReceipt> {
   const tx = await txPromise;
   const receipt = await tx.wait();
+  if (!receipt) {
+    throw new Error(`[estimate-gas] missing receipt for ${label}`);
+  }
   entries.push({ label, gasUsed: receipt.gasUsed });
   return receipt;
 }
@@ -25,10 +36,13 @@ export async function estimateDeployGasAction(env: Environment = "local") {
 
   const factory = await ethers.getContractFactory("SignalsCreate2Factory");
   const factoryDeploy = await factory.deploy(deployer.address);
-  const factoryReceipt = await factoryDeploy.waitForDeployment();
+  await factoryDeploy.waitForDeployment();
   const factoryTx = factoryDeploy.deploymentTransaction();
   if (factoryTx) {
     const receipt = await factoryTx.wait();
+    if (!receipt) {
+      throw new Error("[estimate-gas] missing receipt for SignalsCreate2Factory");
+    }
     entries.push({ label: "SignalsCreate2Factory", gasUsed: receipt.gasUsed });
   }
   const create2FactoryAddress = factoryDeploy.target.toString();

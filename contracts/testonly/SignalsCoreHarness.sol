@@ -250,7 +250,7 @@ contract SignalsCoreHarness is SignalsCore {
         return marketId;
     }
 
-    /// @dev Set market failed state for testing reopenMarket
+    /// @dev Set market failed state for testing settlement failure paths
     function harnessSetMarketFailed(uint256 marketId, bool failed) external onlyOwner {
         markets[marketId].failed = failed;
         if (failed) {

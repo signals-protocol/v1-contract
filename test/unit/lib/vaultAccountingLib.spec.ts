@@ -6,7 +6,7 @@ import { WAD } from "../../helpers/constants";
 /**
  * VaultAccountingLib Unit Tests
  *
- * Reference: docs/vault-invariants.md, whitepaper section 3
+ * Reference: whitepaper section 3
  *
  * Invariants:
  * - INV-V1: N^pre_t = N_{t-1} + L_t + F_t + G_t

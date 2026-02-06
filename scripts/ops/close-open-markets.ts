@@ -162,7 +162,6 @@ function shouldCloseMarket(market: any, now: number): boolean {
 async function maybeUpdateTiming(
   core: any,
   marketId: bigint,
-  market: any,
   now: number,
   submitWindowSec: number,
   currentBatchId: bigint
@@ -259,10 +258,11 @@ async function main() {
   if (EXECUTE && !deployer) {
     throw new Error("Missing signer (set DEPLOYER_KEY for testnet transactions)");
   }
+  const runner: any = EXECUTE ? deployer : ethers.provider;
   const core = await ethers.getContractAt(
     "SignalsCore",
     coreAddress,
-    EXECUTE ? deployer : ethers.provider
+    runner
   );
   const owner = await core.owner();
   const signerAddress = deployer?.address ?? "unknown";
@@ -311,7 +311,7 @@ async function main() {
 
   for (const marketId of candidates) {
     let market = await core.markets(marketId);
-    await maybeUpdateTiming(core, marketId, market, now, submitWindowSec, currentBatchId);
+    await maybeUpdateTiming(core, marketId, now, submitWindowSec, currentBatchId);
     if (EXECUTE) {
       market = await core.markets(marketId);
     }

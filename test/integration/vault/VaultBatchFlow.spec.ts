@@ -14,7 +14,7 @@ function usdc(amount: string | number): bigint {
  * VaultBatchFlow Integration Tests
  *
  * Tests LPVaultModule + VaultAccountingLib integration using Request ID model.
- * Reference: docs/vault-invariants.md, whitepaper section 3
+ * Reference: whitepaper section 3
  */
 
 describe("VaultBatchFlow Integration", () => {

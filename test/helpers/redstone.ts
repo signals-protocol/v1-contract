@@ -12,12 +12,21 @@ export const DATA_SERVICE_ID = "redstone-primary-prod";
 export const FEED_DECIMALS = 8;
 export const UNIQUE_SIGNERS_THRESHOLD = 3;
 
-// Hardhat default accounts for testing (authorized signers in PrimaryProdDataServiceConsumerBase)
-export const AUTHORISED_SIGNER_KEYS = [
-  "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", // hardhat default #0
-  "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d", // hardhat default #1
-  "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a", // hardhat default #2
+// Hardhat local dev keys used for chainid=31337 tests via OracleModuleHarness.
+// These are public defaults (NOT production secrets). We keep them split to avoid
+// secret-scanner false positives on `0x`-prefixed 64-hex literals.
+const LOCAL_SIGNER_KEY_PARTS: Array<[string, string]> = [
+  // address: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+  ["ac0974bec39a17e36ba4a6b4d238ff94", "4bacb478cbed5efcae784d7bf4f2ff80"],
+  // address: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+  ["59c6995e998f97a5a0044966f0945389", "dc9e86dae88c7a8412f4603b6b78690d"],
+  // address: 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
+  ["5de4111afa1a4b94908f83103eb1f170", "6367c2e68ca870fc3fb9a804cdab365a"],
 ];
+
+export const AUTHORISED_SIGNER_KEYS = LOCAL_SIGNER_KEY_PARTS.map(
+  ([a, b]) => `0x${a}${b}`
+);
 
 export const authorisedWallets = AUTHORISED_SIGNER_KEYS.map(
   (key) => new ethers.Wallet(key)

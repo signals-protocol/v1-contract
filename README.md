@@ -4,28 +4,30 @@ Solidity contracts for the Signals v1 protocol.
 
 ## Architecture
 
-- **SignalsCore (UUPS)**: central storage and access control
-- **Modules**: Trade, MarketLifecycle, Oracle, LPVault, Risk
-- **Tokens**: SignalsPosition (ERC-721), SignalsLPShare (ERC-4626)
-- **Libraries**: ClmsrMath, RiskMath, FeeWaterfallLib, VaultAccountingLib, LazyMulSegmentTree
+- **SignalsCore (UUPS)**: upgradeable entry core that holds storage and delegates to modules
+- **Modules**: Trade, MarketLifecycle, Oracle (Redstone signed-pull), LPVault, Risk
+- **Tokens**: SignalsPosition (upgradeable ERC-721), SignalsLPShare (upgradeable ERC-20 + permit, ERC-4626-style informational views for an async request/claim vault)
+- **Libraries**: ClmsrMath, RiskMath, FeeWaterfallLib, VaultAccountingLib, LazyMulSegmentTree, FixedPointMathU
 
 ## Public Interfaces
 
-- `contracts/interfaces/ISignalsCore.sol` defines the external entrypoints
+- `contracts/interfaces/ISignalsCore.sol` defines the external entrypoints for integrators
 - Events and custom errors are declared in core contracts and modules
 
 ## Build and Test
 
 ```bash
 yarn install
-yarn compile
+yarn hardhat compile
 yarn test
+yarn lint
 ```
 
 ## Documentation
 
-- Protocol reference: `v1-docs/docs/reference`
-- Whitepaper: `v1-whitepaper/whitepaper.tex`
+- Protocol docs: https://docs.signals.wtf
+- Deployments: https://docs.signals.wtf/docs/start-here/deployments
+- Whitepaper: https://docs.signals.wtf/docs/whitepaper
 
 ## Governance and Upgrades
 
