@@ -294,7 +294,7 @@ abstract contract SignalsCoreStorage {
     struct RiskConfig {
         uint256 lambda;      // λ: NAV loss limit per batch (WAD); sets pdd := -lambda
         uint256 kDrawdown;   // k: Peak drawdown sensitivity for alpha limit (WAD)
-        bool enforceAlpha;   // Whether to enforce α bounds at market config time (create/reopen)
+        bool enforceAlpha;   // Whether to enforce α bounds at market creation time
     }
 
     /// @notice Risk configuration

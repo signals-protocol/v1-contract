@@ -292,22 +292,52 @@ describe("Operator Access Control", () => {
       .withArgs(999);
   });
 
-  it("reopenMarket is owner-only, rejects operator", async () => {
-    const { core, owner, operator, lifecycleModule } = await loadFixture(
+  it("pause: operator can pause; unpause is owner-only", async () => {
+    const { core, owner, operator, outsider } = await loadFixture(
       deployOperatorFixture
     );
 
     await core.connect(owner).setOperator(operator.address, true);
 
-    // operator is rejected with OwnableUnauthorizedAccount
-    await expect(core.connect(operator).reopenMarket(999))
+    await expect(core.connect(outsider).pause())
+      .to.be.revertedWithCustomError(core, "UnauthorizedCaller")
+      .withArgs(outsider.address);
+
+    await expect(core.connect(operator).pause())
+      .to.emit(core, "Paused")
+      .withArgs(operator.address);
+
+    await expect(core.connect(operator).unpause())
       .to.be.revertedWithCustomError(core, "OwnableUnauthorizedAccount")
       .withArgs(operator.address);
 
-    // owner passes access control but fails on MarketNotFound
-    await expect(core.connect(owner).reopenMarket(999))
-      .to.be.revertedWithCustomError(lifecycleModule, "MarketNotFound")
-      .withArgs(999);
+    await expect(core.connect(owner).unpause())
+      .to.emit(core, "Unpaused")
+      .withArgs(owner.address);
+  });
+
+  it("pause blocks requestDeposit but allows claimWithdraw", async () => {
+    const { core, owner, operator } = await loadFixture(deployOperatorFixture);
+
+    await core.connect(owner).setOperator(operator.address, true);
+
+    // Create a withdrawal claim for batch 2, using harness to mark markets as resolved.
+    await core.connect(owner).requestWithdraw(ethers.parseEther("1000"));
+    await core.connect(owner).harnessSetBatchMarketState(1n, 1n, 1n);
+    await core.connect(owner).harnessSetBatchMarketState(2n, 1n, 1n);
+    await core.connect(owner).processDailyBatch(1n);
+    await core.connect(owner).processDailyBatch(2n);
+
+    await core.connect(operator).pause();
+
+    // requestDeposit is guarded by whenNotPaused, so should revert while paused.
+    await expect(core.connect(operator).requestDeposit(ethers.parseUnits("10", USDC_DECIMALS)))
+      .to.be.revertedWithCustomError(core, "EnforcedPause");
+
+    // claimWithdraw must remain available during pause (user funds are claimable post-batch).
+    await expect(core.connect(owner).claimWithdraw(0n)).to.not.be.reverted;
+
+    await core.connect(owner).unpause();
   });
 
   it("updateMarketTiming is owner-only, rejects operator", async () => {

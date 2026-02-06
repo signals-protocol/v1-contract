@@ -15,16 +15,6 @@ interface IRiskModule {
         address seedData
     ) external view;
 
-    /// @notice Gate for market reopen - re-validates α and prior
-    /// @param liquidityParameter Market α to validate (WAD)
-    /// @param numBins Number of outcome bins
-    /// @param deltaEt Stored tail budget from market creation (WAD)
-    function gateReopenMarket(
-        uint256 liquidityParameter,
-        uint32 numBins,
-        uint256 deltaEt
-    ) external view;
-
     /// @notice Gate for position open - validates exposure caps
     /// @param marketId Market ID
     /// @param trader Trader address

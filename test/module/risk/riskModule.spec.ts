@@ -472,9 +472,9 @@ describe("RiskModule", () => {
   // Trade α Enforcement - Design Decision
   // ============================================================
   // "No per-trade α gate"
-  // - α is enforced ONLY at market creation (createMarket) and reopen (reopenMarket)
-  // - Trading is free within the α/prior set at Zero-Hour
-  // - RiskModule provides CALCULATION helpers, enforcement is in MarketLifecycleModule
+  // - α is enforced at market creation (createMarket) via SignalsCore -> RiskModule.gateCreateMarket
+  // - Trading is free within the α/prior set at market creation time
+  // - RiskModule provides CALCULATION helpers; enforcement is triggered by SignalsCore before delegating to MarketLifecycleModule
   // - Integration tests in alphaEnforcement.spec.ts verify this behavior
   // ============================================================
 

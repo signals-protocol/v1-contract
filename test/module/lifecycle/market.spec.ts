@@ -547,31 +547,6 @@ describe("MarketLifecycleModule", () => {
     expect(market.settled).to.equal(true);
   });
 
-  it("reopens settled market and resets state", async () => {
-    const { core, feePolicy } = await setup();
-    await createDefaultMarket(core, feePolicy.target.toString());
-    const market = await core.markets(1);
-    await core.harnessSetMarket(
-      1,
-      cloneMarket(market, {
-        settled: true,
-        settlementValue: 5,
-        settlementTick: 2,
-        settlementTimestamp: market.settlementTimestamp + 10n,
-        snapshotChunksDone: true,
-        snapshotChunkCursor: 1,
-      })
-    );
-
-    await core.reopenMarket(1);
-    const reopened = await core.markets(1);
-    expect(reopened.settled).to.equal(false);
-    expect(reopened.isSeeded).to.equal(true);
-    expect(reopened.settlementValue).to.equal(0);
-    expect(reopened.snapshotChunkCursor).to.equal(0);
-    expect(reopened.snapshotChunksDone).to.equal(false);
-  });
-
   it("marks settlement failed during PendingOps window when no candidate", async () => {
     const { core, lifecycle, feePolicy } = await setup();
     const { end } = await createDefaultMarket(core, feePolicy.target.toString());

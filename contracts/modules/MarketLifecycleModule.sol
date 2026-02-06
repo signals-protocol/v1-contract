@@ -44,7 +44,6 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         int256 lt,
         uint256 ftot
     );
-    event MarketReopened(uint256 indexed marketId);
     event MarketFailed(uint256 indexed marketId, uint64 timestamp);
     event MarketSettledSecondary(
         uint256 indexed marketId,
@@ -343,34 +342,6 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         _markMarketResolved(marketId, batchId);
         market.failed = false;
         emit MarketSettledSecondary(marketId, settlementValue, settlementTick, market.settlementFinalizedAt);
-    }
-
-    function reopenMarket(uint256 marketId) external onlyDelegated {
-        ISignalsCore.Market storage market = markets[marketId];
-        require(_marketExists(marketId), SE.MarketNotFound(marketId));
-        // Can reopen either settled or failed markets
-        require(market.settled || market.failed, SE.MarketNotSettled(marketId));
-
-        uint64 oldBatchId = market.settlementTimestamp == 0
-            ? 0
-            : _getBatchIdForMarket(marketId);
-
-        if (market.settlementTimestamp != 0) {
-            _deregisterMarketForBatch(oldBatchId);
-            _unmarkMarketResolved(marketId, oldBatchId);
-        }
-
-        market.settled = false;
-        market.failed = false;
-        market.settlementValue = 0;
-        market.settlementTick = 0;
-        market.settlementTimestamp = 0;
-        market.settlementFinalizedAt = 0;
-        market.snapshotChunkCursor = 0;
-        market.snapshotChunksDone = false;
-
-        settlementOracleState[marketId] = SettlementOracleState({candidateValue: 0, candidatePriceTimestamp: 0});
-        emit MarketReopened(marketId);
     }
 
     function updateMarketTiming(

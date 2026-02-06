@@ -192,22 +192,6 @@ contract RiskModule is SignalsCoreStorage {
     }
 
     /**
-     * @notice Gate for market reopen - re-validates α and prior
-     * @dev Drawdown may have increased since creation, requiring re-validation
-     * @param liquidityParameter Market α to validate (WAD)
-     * @param numBins Number of outcome bins
-     * @param deltaEt Stored tail budget from market creation (WAD)
-     */
-    function gateReopenMarket(
-        uint256 liquidityParameter,
-        uint32 numBins,
-        uint256 deltaEt
-    ) external view onlyDelegated {
-        _enforceAlphaLimit(liquidityParameter, numBins);
-        _enforcePriorAdmissibility(deltaEt);
-    }
-
-    /**
      * @notice Gate for position open - validates exposure caps
      * @dev Currently no-op. Exposure cap enforcement to be implemented.
      * @param marketId Market ID

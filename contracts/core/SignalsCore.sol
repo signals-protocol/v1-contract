@@ -206,6 +206,22 @@ contract SignalsCore is
     }
 
     // ============================================================
+    // Emergency Pause
+    // ============================================================
+
+    /// @notice Pause core entrypoints guarded by `whenNotPaused`
+    /// @dev Intended as an incident response tool (replaces market "reopen" flows).
+    ///      Claims remain available while paused.
+    function pause() external onlyOwnerOrOperator whenNotPaused {
+        _pause();
+    }
+
+    /// @notice Unpause core entrypoints guarded by `whenNotPaused`
+    function unpause() external onlyOwner whenPaused {
+        _unpause();
+    }
+
+    // ============================================================
     // Vault Configuration
     // ============================================================
 
@@ -259,7 +275,7 @@ contract SignalsCore is
     ///      λ ∈ (0, 1) is required for safety invariants.
     /// @param lambda λ: NAV loss limit per batch (WAD), e.g., 0.3e18 = 30% floor. Must be in (0, 1).
     /// @param kDrawdown k: Peak drawdown sensitivity for alpha limit (WAD), typically 1.0e18
-    /// @param enforceAlpha Whether to enforce α bounds at market configuration time (create/reopen)
+    /// @param enforceAlpha Whether to enforce α bounds at market creation time (createMarket)
     function setRiskConfig(
         uint256 lambda,
         uint256 kDrawdown,
@@ -476,18 +492,6 @@ contract SignalsCore is
             marketId,
             settlementValue
         ));
-    }
-
-    function reopenMarket(uint256 marketId) external override onlyOwner whenNotPaused {
-        // Risk gate first: get market data for validation
-        ISignalsCore.Market storage market = markets[marketId];
-        
-        _riskGate(abi.encodeCall(
-            IRiskModule.gateReopenMarket,
-            (market.liquidityParameter, market.numBins, market.deltaEt)
-        ));
-
-        _delegate(lifecycleModule, abi.encodeWithSignature("reopenMarket(uint256)", marketId));
     }
 
     function seedNextChunks(uint256 marketId, uint32 count) public override onlyOwnerOrOperator whenNotPaused {

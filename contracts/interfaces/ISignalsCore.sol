@@ -104,6 +104,10 @@ interface ISignalsCore {
     function setOperator(address operator, bool allowed) external;
     function operators(address operator) external view returns (bool);
 
+    // Emergency pause
+    function pause() external;
+    function unpause() external;
+
     // Lifecycle: settlement snapshot trigger
     function requestSettlementChunks(uint256 marketId, uint32 maxChunksPerTx) external returns (uint32 emitted);
 
@@ -133,8 +137,6 @@ interface ISignalsCore {
     ) external returns (uint256 marketId);
 
     function finalizePrimarySettlement(uint256 marketId) external;
-
-    function reopenMarket(uint256 marketId) external;
 
     function seedNextChunks(uint256 marketId, uint32 count) external;
 
