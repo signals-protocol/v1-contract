@@ -46,8 +46,14 @@ contract SignalsCore is
     // Modifiers
     // ============================================================
     modifier onlyOwnerOrOperator() {
-        if (msg.sender != owner() && !_operators[msg.sender]) {
-            revert SignalsErrors.UnauthorizedCaller(msg.sender);
+        // Pause is an incident-response switch.
+        // While paused, restrict operator actions and require owner-only.
+        if (paused()) {
+            if (msg.sender != owner()) revert SignalsErrors.UnauthorizedCaller(msg.sender);
+        } else {
+            if (msg.sender != owner() && !_operators[msg.sender]) {
+                revert SignalsErrors.UnauthorizedCaller(msg.sender);
+            }
         }
         _;
     }
@@ -225,7 +231,7 @@ contract SignalsCore is
     // Vault Configuration
     // ============================================================
 
-    function setWithdrawalLagBatches(uint64 lag) external onlyOwner whenNotPaused {
+    function setWithdrawalLagBatches(uint64 lag) external onlyOwner {
         withdrawalLagBatches = lag;
         emit WithdrawalLagUpdated(lag);
     }
@@ -239,7 +245,7 @@ contract SignalsCore is
         uint256 phiLP,
         uint256 phiBS,
         uint256 phiTR
-    ) external onlyOwner whenNotPaused {
+    ) external onlyOwner {
         if (phiLP + phiBS + phiTR != WAD) revert SignalsErrors.InvalidFeeSplitSum(phiLP, phiBS, phiTR);
         // pdd is NOT set here - it's controlled by setRiskConfig (pdd := -λ)
         feeWaterfallConfig.rhoBS = rhoBS;
@@ -257,7 +263,7 @@ contract SignalsCore is
         _delegate(vaultModule, abi.encodeWithSignature("fundBackstop(uint256)", amount6));
     }
 
-    function withdrawBackstop(uint256 amount6) external onlyOwner whenNotPaused nonReentrant {
+    function withdrawBackstop(uint256 amount6) external onlyOwner nonReentrant {
         _delegate(vaultModule, abi.encodeWithSignature("withdrawBackstop(uint256,address)", amount6, owner()));
     }
 
@@ -265,7 +271,7 @@ contract SignalsCore is
         _delegate(vaultModule, abi.encodeWithSignature("fundTreasury(uint256)", amount6));
     }
 
-    function withdrawTreasury(uint256 amount6) external onlyOwner whenNotPaused nonReentrant {
+    function withdrawTreasury(uint256 amount6) external onlyOwner nonReentrant {
         _delegate(vaultModule, abi.encodeWithSignature("withdrawTreasury(uint256,address)", amount6, owner()));
     }
 
@@ -280,7 +286,7 @@ contract SignalsCore is
         uint256 lambda,
         uint256 kDrawdown,
         bool enforceAlpha
-    ) external onlyOwner whenNotPaused {
+    ) external onlyOwner {
         // λ must be in (0, 1) for safety invariants
         // λ = 0 would mean no NAV loss limit (unsafe)
         // λ >= 1 would mean floor cannot be maintained (100%+ drop allowed is meaningless)
@@ -312,13 +318,9 @@ contract SignalsCore is
             (marketId, msg.sender, quantity)
         ));
 
-        bytes memory ret = _delegate(tradeModule, abi.encodeWithSignature(
-            "openPosition(uint256,int256,int256,uint128,uint256)",
-            marketId,
-            lowerTick,
-            upperTick,
-            quantity,
-            maxCost
+        bytes memory ret = _delegate(tradeModule, abi.encodeCall(
+            ISignalsCore.openPosition,
+            (marketId, lowerTick, upperTick, quantity, maxCost)
         ));
         if (ret.length > 0) positionId = abi.decode(ret, (uint256));
     }
@@ -334,11 +336,9 @@ contract SignalsCore is
             (positionId, msg.sender, quantity)
         ));
 
-        _delegate(tradeModule, abi.encodeWithSignature(
-            "increasePosition(uint256,uint128,uint256)",
-            positionId,
-            quantity,
-            maxCost
+        _delegate(tradeModule, abi.encodeCall(
+            ISignalsCore.increasePosition,
+            (positionId, quantity, maxCost)
         ));
     }
 
@@ -347,11 +347,9 @@ contract SignalsCore is
         uint128 quantity,
         uint256 minProceeds
     ) external override whenNotPaused nonReentrant {
-        _delegate(tradeModule, abi.encodeWithSignature(
-            "decreasePosition(uint256,uint128,uint256)",
-            positionId,
-            quantity,
-            minProceeds
+        _delegate(tradeModule, abi.encodeCall(
+            ISignalsCore.decreasePosition,
+            (positionId, quantity, minProceeds)
         ));
     }
 
@@ -359,17 +357,16 @@ contract SignalsCore is
         uint256 positionId,
         uint256 minProceeds
     ) external override whenNotPaused nonReentrant {
-        _delegate(tradeModule, abi.encodeWithSignature(
-            "closePosition(uint256,uint256)",
-            positionId,
-            minProceeds
+        _delegate(tradeModule, abi.encodeCall(
+            ISignalsCore.closePosition,
+            (positionId, minProceeds)
         ));
     }
 
     /// @notice Claim payout from settled position
     /// @dev Allowed even when paused - user funds should always be claimable after settlement
     function claimPayout(uint256 positionId) external override nonReentrant {
-        _delegate(tradeModule, abi.encodeWithSignature("claimPayout(uint256)", positionId));
+        _delegate(tradeModule, abi.encodeCall(ISignalsCore.claimPayout, (positionId)));
     }
 
     // ---- View stubs ----
@@ -380,12 +377,9 @@ contract SignalsCore is
         int256 upperTick,
         uint128 quantity
     ) external override returns (uint256 cost) {
-        bytes memory ret = _delegateView(tradeModule, abi.encodeWithSignature(
-            "calculateOpenCost(uint256,int256,int256,uint128)",
-            marketId,
-            lowerTick,
-            upperTick,
-            quantity
+        bytes memory ret = _delegateView(tradeModule, abi.encodeCall(
+            ISignalsCore.calculateOpenCost,
+            (marketId, lowerTick, upperTick, quantity)
         ));
         if (ret.length > 0) cost = abi.decode(ret, (uint256));
     }
@@ -394,10 +388,9 @@ contract SignalsCore is
         uint256 positionId,
         uint128 quantity
     ) external override returns (uint256 cost) {
-        bytes memory ret = _delegateView(tradeModule, abi.encodeWithSignature(
-            "calculateIncreaseCost(uint256,uint128)",
-            positionId,
-            quantity
+        bytes memory ret = _delegateView(tradeModule, abi.encodeCall(
+            ISignalsCore.calculateIncreaseCost,
+            (positionId, quantity)
         ));
         if (ret.length > 0) cost = abi.decode(ret, (uint256));
     }
@@ -406,10 +399,9 @@ contract SignalsCore is
         uint256 positionId,
         uint128 quantity
     ) external override returns (uint256 proceeds) {
-        bytes memory ret = _delegateView(tradeModule, abi.encodeWithSignature(
-            "calculateDecreaseProceeds(uint256,uint128)",
-            positionId,
-            quantity
+        bytes memory ret = _delegateView(tradeModule, abi.encodeCall(
+            ISignalsCore.calculateDecreaseProceeds,
+            (positionId, quantity)
         ));
         if (ret.length > 0) proceeds = abi.decode(ret, (uint256));
     }
@@ -417,9 +409,9 @@ contract SignalsCore is
     function calculateCloseProceeds(
         uint256 positionId
     ) external override returns (uint256 proceeds) {
-        bytes memory ret = _delegateView(tradeModule, abi.encodeWithSignature(
-            "calculateCloseProceeds(uint256)",
-            positionId
+        bytes memory ret = _delegateView(tradeModule, abi.encodeCall(
+            ISignalsCore.calculateCloseProceeds,
+            (positionId)
         ));
         if (ret.length > 0) proceeds = abi.decode(ret, (uint256));
     }
@@ -427,9 +419,9 @@ contract SignalsCore is
     function calculatePositionValue(
         uint256 positionId
     ) external override returns (uint256 value) {
-        bytes memory ret = _delegateView(tradeModule, abi.encodeWithSignature(
-            "calculatePositionValue(uint256)",
-            positionId
+        bytes memory ret = _delegateView(tradeModule, abi.encodeCall(
+            ISignalsCore.calculatePositionValue,
+            (positionId)
         ));
         if (ret.length > 0) value = abi.decode(ret, (uint256));
     }
@@ -451,7 +443,7 @@ contract SignalsCore is
         uint256 liquidityParameter,
         address feePolicy,
         address seedData
-    ) public override onlyOwnerOrOperator whenNotPaused returns (uint256 marketId) {
+    ) public override onlyOwnerOrOperator returns (uint256 marketId) {
         // Risk gate first: validate α bounds and prior admissibility
         _riskGate(abi.encodeCall(
             IRiskModule.gateCreateMarket,
@@ -475,18 +467,18 @@ contract SignalsCore is
         if (ret.length > 0) marketId = abi.decode(ret, (uint256));
     }
 
-    function finalizePrimarySettlement(uint256 marketId) external override onlyOwnerOrOperator whenNotPaused {
+    function finalizePrimarySettlement(uint256 marketId) external override onlyOwnerOrOperator {
         _delegate(lifecycleModule, abi.encodeWithSignature("finalizePrimarySettlement(uint256)", marketId));
     }
 
-    function markSettlementFailed(uint256 marketId) external override onlyOwnerOrOperator whenNotPaused {
+    function markSettlementFailed(uint256 marketId) external override onlyOwnerOrOperator {
         _delegate(lifecycleModule, abi.encodeWithSignature("markSettlementFailed(uint256)", marketId));
     }
 
     function finalizeSecondarySettlement(
         uint256 marketId,
         int256 settlementValue
-    ) external override onlyOwner whenNotPaused {
+    ) external override onlyOwner {
         _delegate(lifecycleModule, abi.encodeWithSignature(
             "finalizeSecondarySettlement(uint256,int256)",
             marketId,
@@ -494,7 +486,7 @@ contract SignalsCore is
         ));
     }
 
-    function seedNextChunks(uint256 marketId, uint32 count) public override onlyOwnerOrOperator whenNotPaused {
+    function seedNextChunks(uint256 marketId, uint32 count) public override onlyOwnerOrOperator {
         _delegate(lifecycleModule, abi.encodeWithSignature("seedNextChunks(uint256,uint32)", marketId, count));
     }
 
@@ -503,7 +495,7 @@ contract SignalsCore is
         uint64 startTimestamp,
         uint64 endTimestamp,
         uint64 settlementTimestamp
-    ) external override onlyOwner whenNotPaused {
+    ) external override onlyOwner {
         _delegate(lifecycleModule, abi.encodeWithSignature(
             "updateMarketTiming(uint256,uint64,uint64,uint64)",
             marketId,
@@ -530,7 +522,7 @@ contract SignalsCore is
         uint8 feedDecimals,
         uint64 _maxSampleDistance,
         uint64 _futureTolerance
-    ) external onlyOwner whenNotPaused {
+    ) external onlyOwner {
         _delegate(oracleModule, abi.encodeWithSignature(
             "setRedstoneConfig(bytes32,uint8,uint64,uint64)",
             feedId,
@@ -548,7 +540,7 @@ contract SignalsCore is
         uint64 _sampleWindow,
         uint64 _opsWindow,
         uint64 _claimDelay
-    ) external onlyOwner whenNotPaused {
+    ) external onlyOwner {
         if (_claimDelay != _sampleWindow + _opsWindow) {
             revert SignalsErrors.InvalidSettlementTimeline(_claimDelay, _sampleWindow, _opsWindow);
         }
@@ -600,7 +592,6 @@ contract SignalsCore is
         external
         override
         onlyOwnerOrOperator
-        whenNotPaused
         returns (uint32 emitted)
     {
         bytes memory ret = _delegate(lifecycleModule, abi.encodeWithSignature(
@@ -637,7 +628,7 @@ contract SignalsCore is
         _delegate(vaultModule, abi.encodeWithSignature("cancelWithdraw(uint64)", requestId));
     }
 
-    function processDailyBatch(uint64 batchId) external onlyOwnerOrOperator whenNotPaused nonReentrant {
+    function processDailyBatch(uint64 batchId) external onlyOwnerOrOperator nonReentrant {
         _delegate(vaultModule, abi.encodeWithSignature("processDailyBatch(uint64)", batchId));
     }
 

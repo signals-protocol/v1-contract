@@ -56,6 +56,13 @@ describe("TickBinLib", () => {
         harness.tickToBin(MIN_TICK, TICK_SPACING, NUM_BINS, 100n)
       ).to.be.revertedWithCustomError(harness, "RangeBinsOutOfBounds");
     });
+
+    it("reverts when computed bin exceeds uint32", async () => {
+      const hugeTick = (1n << 32n) + 1n;
+      await expect(
+        harness.tickToBin(0n, 1n, NUM_BINS, hugeTick)
+      ).to.be.revertedWithCustomError(harness, "RangeBinOutOfBounds");
+    });
   });
 
   describe("ticksToBins", () => {
@@ -134,6 +141,13 @@ describe("TickBinLib", () => {
         harness.ticksToBins(MIN_TICK, MAX_TICK, TICK_SPACING, 5, 0n, 100n)
       ).to.be.revertedWithCustomError(harness, "RangeBinsOutOfBounds");
     });
+
+    it("reverts when converted range would overflow uint32 bins", async () => {
+      const hugeUpper = (1n << 32n) + 4n;
+      await expect(
+        harness.ticksToBins(0n, hugeUpper - 1n, 1n, NUM_BINS, 0n, hugeUpper)
+      ).to.be.revertedWithCustomError(harness, "RangeBinOutOfBounds");
+    });
   });
 
   describe("edge cases", () => {
@@ -149,4 +163,3 @@ describe("TickBinLib", () => {
     });
   });
 });
-

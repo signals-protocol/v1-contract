@@ -345,7 +345,6 @@ contract LPVaultModule is SignalsCoreStorage {
 
         // Batch can only process once all assigned markets are settled (primary/secondary)
         BatchMarketState storage marketState = _batchMarketState[batchId];
-        if (marketState.total == 0) revert SE.BatchHasNoMarkets(batchId);
         if (marketState.resolved != marketState.total) {
             revert SE.BatchMarketsNotResolved(batchId, marketState.resolved, marketState.total);
         }

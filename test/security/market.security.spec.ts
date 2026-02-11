@@ -131,6 +131,63 @@ describe("Market Security", () => {
   }
 
   describe("numBins Hard Cap", () => {
+    it("rejects market where maxTick + tickSpacing would overflow int256", async () => {
+      const { core, owner, feePolicy, lifecycleModule } = await loadFixture(
+        deployMarketFixture
+      );
+
+      const now = (await ethers.provider.getBlock("latest"))!.timestamp;
+      const numBins = 4;
+      const tickSpacing = 1n;
+      const maxInt256 = (1n << 255n) - 1n;
+      const maxTick = maxInt256;
+      const minTick = maxTick - 4n;
+      const seedData = await deploySeed(numBins);
+
+      await expect(
+        core.connect(owner).createMarket(
+          minTick,
+          maxTick,
+          tickSpacing,
+          now - 100,
+          now + 10000,
+          now + 10100,
+          numBins,
+          WAD,
+          feePolicy.target.toString(),
+          await seedData.getAddress()
+        )
+      ).to.be.revertedWithCustomError(lifecycleModule, "InvalidMarketParameters");
+    });
+
+    it("rejects market where tick span exceeds uint32 bins (truncation guard)", async () => {
+      const { core, owner, feePolicy, lifecycleModule } = await loadFixture(
+        deployMarketFixture
+      );
+
+      const now = (await ethers.provider.getBlock("latest"))!.timestamp;
+      const numBins = 4;
+      const minTick = 0n;
+      const maxTick = (1n << 32n) + 4n;
+      const tickSpacing = 1n;
+      const seedData = await deploySeed(numBins);
+
+      await expect(
+        core.connect(owner).createMarket(
+          minTick,
+          maxTick,
+          tickSpacing,
+          now - 100,
+          now + 10000,
+          now + 10100,
+          numBins,
+          WAD,
+          feePolicy.target.toString(),
+          await seedData.getAddress()
+        )
+      ).to.be.revertedWithCustomError(lifecycleModule, "InvalidMarketParameters");
+    });
+
     it("rejects market creation with numBins = 0", async () => {
       const { core, owner, feePolicy, lifecycleModule } = await loadFixture(
         deployMarketFixture

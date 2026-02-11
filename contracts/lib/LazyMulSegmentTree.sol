@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {FixedPointMathU} from "./FixedPointMathU.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
 
 /// @title LazyMulSegmentTree
 /// @notice Sparse lazy multiplication segment tree for CLMSR tick data.
 /// @dev Default value for all leaves is 1 WAD; nodes are allocated on demand.
 library LazyMulSegmentTree {
-    using FixedPointMathU for uint256;
-
     uint256 public constant ONE_WAD = 1e18;
+    uint256 private constant HALF_WAD = 5e17;
     uint256 public constant MIN_FACTOR = 0.01e18;
     uint256 public constant MAX_FACTOR = 100e18;
     uint256 public constant FLUSH_THRESHOLD = 1e21;
@@ -101,8 +100,7 @@ library LazyMulSegmentTree {
         if (value == 0 || factor == ONE_WAD) {
             return value;
         }
-
-        return value.wMulNearest(factor);
+        return _wMulNearestChecked(value, factor);
     }
 
     function _combineFactors(uint256 lhs, uint256 rhs) private pure returns (uint256) {
@@ -110,7 +108,36 @@ library LazyMulSegmentTree {
             return lhs;
         }
 
-        return lhs.wMulNearest(rhs);
+        return _wMulNearestChecked(lhs, rhs);
+    }
+
+    function _wMulNearestChecked(uint256 x, uint256 y) private pure returns (uint256 result) {
+        if (x == 0 || y == 0) {
+            return 0;
+        }
+
+        // Math.mulDiv(x, y, WAD) panics when y > WAD and x is too large.
+        // Bound x first so every overflow path maps to MathMulOverflow.
+        if (y > ONE_WAD) {
+            uint256 maxInput = Math.mulDiv(type(uint256).max, ONE_WAD, y);
+            if (x > maxInput) revert SE.MathMulOverflow();
+        }
+
+        result = Math.mulDiv(x, y, ONE_WAD);
+        uint256 remainder = mulmod(x, y, ONE_WAD);
+        if (remainder >= HALF_WAD) {
+            if (result == type(uint256).max) revert SE.MathMulOverflow();
+            unchecked {
+                result += 1;
+            }
+        }
+    }
+
+    function _addOrRevert(uint256 lhs, uint256 rhs) private pure returns (uint256 sum) {
+        unchecked {
+            sum = lhs + rhs;
+        }
+        if (sum < lhs) revert SE.MathMulOverflow();
     }
 
     function _packChildPtr(uint32 left, uint32 right) private pure returns (uint64) {
@@ -185,11 +212,11 @@ library LazyMulSegmentTree {
         uint32 right,
         uint256 target
     ) private {
-        uint256 combined = tree.nodes[left].sum + tree.nodes[right].sum;
+        uint256 combined = _addOrRevert(tree.nodes[left].sum, tree.nodes[right].sum);
         if (combined == target) return;
 
         if (combined < target) {
-            tree.nodes[right].sum += target - combined;
+            tree.nodes[right].sum = _addOrRevert(tree.nodes[right].sum, target - combined);
             return;
         }
 
@@ -218,7 +245,7 @@ library LazyMulSegmentTree {
         uint256 leftSum = (left != 0) ? tree.nodes[left].sum : _defaultSum(l, mid);
         uint256 rightSum = (right != 0) ? tree.nodes[right].sum : _defaultSum(mid + 1, r);
 
-        node.sum = leftSum + rightSum;
+        node.sum = _addOrRevert(leftSum, rightSum);
 
         if (nodeIndex == tree.root) {
             tree.cachedRootSum = node.sum;
@@ -299,7 +326,7 @@ library LazyMulSegmentTree {
         uint256 rightSum = (rightChild != 0)
             ? tree.nodes[rightChild].sum
             : _defaultSum(mid + 1, r);
-        current.sum = leftSum + rightSum;
+        current.sum = _addOrRevert(leftSum, rightSum);
 
         if (nodeIndex == tree.root) {
             tree.cachedRootSum = current.sum;
@@ -329,14 +356,14 @@ library LazyMulSegmentTree {
             return _mulWithCompensation(node.sum, accFactor);
         }
 
-        uint256 newAccFactor = accFactor.wMulNearest(uint256(node.pendingFactor));
+        uint256 newAccFactor = _wMulNearestChecked(accFactor, uint256(node.pendingFactor));
         uint32 mid = l + (r - l) / 2;
         (uint32 leftChild, uint32 rightChild) = _unpackChildPtr(node.childPtr);
 
         uint256 leftSum = _sumRangeWithAccFactor(tree, leftChild, l, mid, lo, hi, newAccFactor);
         uint256 rightSum = _sumRangeWithAccFactor(tree, rightChild, mid + 1, r, lo, hi, newAccFactor);
 
-        return leftSum + rightSum;
+        return _addOrRevert(leftSum, rightSum);
     }
 
     function _queryRecursive(
@@ -369,7 +396,7 @@ library LazyMulSegmentTree {
         uint256 leftSum = _queryRecursive(tree, leftChild, l, mid, lo, hi);
         uint256 rightSum = _queryRecursive(tree, rightChild, mid + 1, r, lo, hi);
 
-        return leftSum + rightSum;
+        return _addOrRevert(leftSum, rightSum);
     }
 
     function _buildTreeFromArray(
@@ -394,7 +421,7 @@ library LazyMulSegmentTree {
         (uint32 rightChild, uint256 rightSum) = _buildTreeFromArray(tree, mid + 1, r, factors);
 
         node.childPtr = _packChildPtr(leftChild, rightChild);
-        uint256 total = leftSum + rightSum;
+        uint256 total = _addOrRevert(leftSum, rightSum);
         node.sum = total;
 
         return (nodeIndex, total);

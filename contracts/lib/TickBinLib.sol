@@ -39,7 +39,12 @@ library TickBinLib {
             revert SE.InvalidTickSpacing(tick, tickSpacing);
         }
 
-        bin = uint32(uint256(offset / tickSpacing));
+        int256 rawBin = offset / tickSpacing;
+        if (rawBin > int256(uint256(type(uint32).max))) {
+            revert SE.RangeBinOutOfBounds(rawBin, numBins);
+        }
+
+        bin = uint32(uint256(rawBin));
 
         // Bin must be within valid range
         if (bin >= numBins) {
@@ -87,8 +92,19 @@ library TickBinLib {
         }
 
         // Convert to 0-based bin indices
-        loBin = uint32(uint256((lowerTick - minTick) / tickSpacing));
-        hiBin = uint32(uint256((upperTick - minTick) / tickSpacing)) - 1;
+        int256 loRaw = (lowerTick - minTick) / tickSpacing;
+        int256 hiExclusiveRaw = (upperTick - minTick) / tickSpacing;
+        int256 hiRaw = hiExclusiveRaw - 1;
+
+        if (loRaw > int256(uint256(type(uint32).max))) {
+            revert SE.RangeBinOutOfBounds(loRaw, numBins);
+        }
+        if (hiRaw > int256(uint256(type(uint32).max))) {
+            revert SE.RangeBinOutOfBounds(hiRaw, numBins);
+        }
+
+        loBin = uint32(uint256(loRaw));
+        hiBin = uint32(uint256(hiRaw));
 
         // Validate bin range
         if (loBin > hiBin) {

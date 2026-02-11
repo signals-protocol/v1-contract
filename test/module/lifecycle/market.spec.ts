@@ -651,11 +651,16 @@ describe("MarketLifecycleModule", () => {
       core.updateMarketTiming(1, 10, 5, 5)
     ).to.be.revertedWithCustomError(lifecycle, "InvalidTimeRange");
 
-    await core.updateMarketTiming(1, 5, 10, 15);
+    const now = BigInt(await time.latest());
+    const start = now + 5n;
+    const end = start + 10n;
+    const settlement = end + 5n;
+
+    await core.updateMarketTiming(1, Number(start), Number(end), Number(settlement));
     const market = await core.markets(1);
-    expect(market.startTimestamp).to.equal(5);
-    expect(market.endTimestamp).to.equal(10);
-    expect(market.settlementTimestamp).to.equal(15);
+    expect(BigInt(market.startTimestamp)).to.equal(start);
+    expect(BigInt(market.endTimestamp)).to.equal(end);
+    expect(BigInt(market.settlementTimestamp)).to.equal(settlement);
   });
 
   it("emits settlement chunk requests and marks completion", async () => {

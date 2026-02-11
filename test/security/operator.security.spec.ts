@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
+import { loadFixture, time } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { SignalsCore } from '../../typechain-types';
 import { USDC_DECIMALS, WAD, uniformFactors } from "../helpers/constants";
 import { deploySeedData } from "../helpers";
@@ -321,15 +321,16 @@ describe("Operator Access Control", () => {
 
     await core.connect(owner).setOperator(operator.address, true);
 
-    // Create a withdrawal claim for the next eligible batch, using harness to mark markets as resolved.
-    await core.connect(owner).requestWithdraw(ethers.parseEther("1000"));
     const currentBatchId = await core.getCurrentBatchId();
-    const nextBatchId = currentBatchId + 1n;
-    const withdrawBatchId = currentBatchId + 2n;
-    await core.connect(owner).harnessSetBatchMarketState(nextBatchId, 1n, 1n);
-    await core.connect(owner).harnessSetBatchMarketState(withdrawBatchId, 1n, 1n);
-    await core.connect(owner).processDailyBatch(nextBatchId);
-    await core.connect(owner).processDailyBatch(withdrawBatchId);
+    const batch1 = currentBatchId + 1n;
+    const batch2 = currentBatchId + 2n;
+
+    // Create a withdrawal claim for batch2 (withdrawalLagBatches=1 in fixture).
+    await core.connect(owner).requestWithdraw(ethers.parseEther("1000"));
+    await core.connect(owner).harnessSetBatchMarketState(batch1, 1n, 1n);
+    await core.connect(owner).harnessSetBatchMarketState(batch2, 1n, 1n);
+    await core.connect(owner).processDailyBatch(batch1);
+    await core.connect(owner).processDailyBatch(batch2);
 
     await core.connect(operator).pause();
 
@@ -339,6 +340,84 @@ describe("Operator Access Control", () => {
 
     // claimWithdraw must remain available during pause (user funds are claimable post-batch).
     await expect(core.connect(owner).claimWithdraw(0n)).to.not.be.reverted;
+
+    await core.connect(owner).unpause();
+  });
+
+  it("pause: operator can pause; while paused only owner can processDailyBatch", async () => {
+    const { core, owner, operator } = await loadFixture(deployOperatorFixture);
+
+    await core.connect(owner).setOperator(operator.address, true);
+
+    const currentBatchId = await core.getCurrentBatchId();
+    const nextBatchId = currentBatchId + 1n;
+
+    await core.connect(operator).pause();
+    await expect(core.connect(operator).processDailyBatch(nextBatchId))
+      .to.be.revertedWithCustomError(core, "UnauthorizedCaller")
+      .withArgs(operator.address);
+
+    await expect(core.connect(owner).processDailyBatch(nextBatchId)).to.not.be.reverted;
+    expect(await core.getCurrentBatchId()).to.equal(nextBatchId);
+
+    await core.connect(owner).unpause();
+  });
+
+  it("pause: operator can pause; while paused only owner can markSettlementFailed", async () => {
+    const { core, owner, operator, feePolicy, lifecycleModule } = await loadFixture(
+      deployOperatorFixture
+    );
+
+    await core.connect(owner).setOperator(operator.address, true);
+
+    const now = (await ethers.provider.getBlock("latest"))!.timestamp;
+    const seedData = await deploySeedData(uniformFactors(4));
+    const params = buildMarketParams(
+      now,
+      feePolicy.target.toString(),
+      await seedData.getAddress()
+    );
+
+    const marketId = await core.createMarket.staticCall(
+      params.minTick,
+      params.maxTick,
+      params.tickSpacing,
+      params.start,
+      params.end,
+      params.settlement,
+      params.numBins,
+      params.liquidityParameter,
+      params.feePolicyAddress,
+      params.seedData
+    );
+    await core.createMarket(
+      params.minTick,
+      params.maxTick,
+      params.tickSpacing,
+      params.start,
+      params.end,
+      params.settlement,
+      params.numBins,
+      params.liquidityParameter,
+      params.feePolicyAddress,
+      params.seedData
+    );
+
+    await core.connect(operator).pause();
+
+    const lifecycleEvents = lifecycleModule.attach(await core.getAddress());
+    const submitWindow = Number(await core.settlementSubmitWindow());
+    const opsStart = params.settlement + submitWindow;
+    const failedAt = opsStart + 1;
+
+    await expect(core.connect(operator).markSettlementFailed(marketId))
+      .to.be.revertedWithCustomError(core, "UnauthorizedCaller")
+      .withArgs(operator.address);
+
+    await time.setNextBlockTimestamp(failedAt);
+    await expect(core.connect(owner).markSettlementFailed(marketId))
+      .to.emit(lifecycleEvents, "MarketFailed")
+      .withArgs(marketId, BigInt(failedAt));
 
     await core.connect(owner).unpause();
   });

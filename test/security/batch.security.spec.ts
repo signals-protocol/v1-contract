@@ -2,7 +2,8 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { time, loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { SignalsCore } from '../../typechain-types';
-import { USDC_DECIMALS, batchEndTimestamp } from "../helpers/constants";
+import { deploySeedData } from "../helpers";
+import { USDC_DECIMALS, batchEndTimestamp, batchStartTimestamp, uniformFactors } from "../helpers/constants";
 
 /**
  * Batch Processing Security Tests
@@ -92,7 +93,7 @@ describe("Batch Processing Security", () => {
     // Seed vault
     await core.connect(owner).seedVault(ethers.parseUnits("100000", USDC_DECIMALS));
 
-    return { core, payment, owner, user1, user2, lpVaultModule };
+    return { core, payment, owner, user1, user2, lpVaultModule, lifecycleModule };
   }
 
   async function seedBatchForProcessing(core: any, batchId: bigint) {
@@ -113,8 +114,8 @@ describe("Batch Processing Security", () => {
       ).to.not.be.reverted;
     });
 
-    it("reverts processing batch with no assigned markets", async () => {
-      const { core, owner, lpVaultModule } = await loadFixture(deployBatchFixture);
+    it("allows processing batch with no assigned markets (empty batch)", async () => {
+      const { core, owner } = await loadFixture(deployBatchFixture);
 
       const currentBatchId = await core.currentBatchId();
       const nextBatchId = currentBatchId + 1n;
@@ -122,10 +123,88 @@ describe("Batch Processing Security", () => {
 
       await time.setNextBlockTimestamp(Number(batchEndTime) + 1);
 
+      const navBefore = await core.getVaultNav();
+      const sharesBefore = await core.getVaultShares();
+
       await expect(
         core.connect(owner).processDailyBatch(nextBatchId)
-      ).to.be.revertedWithCustomError(lpVaultModule, "BatchHasNoMarkets")
+      ).to.not.be.reverted;
+
+      expect(await core.currentBatchId()).to.equal(nextBatchId);
+      expect(await core.getVaultNav()).to.equal(navBefore);
+      expect(await core.getVaultShares()).to.equal(sharesBefore);
+      // SignalsCore.getDailyPnl is not a view fn (delegatecall-based), so use staticCall.
+      const [, , , , , , processed] = await core.getDailyPnl.staticCall(nextBatchId);
+      expect(processed).to.equal(true);
+    });
+
+    it("processing an empty batch blocks future market creation for that batch", async () => {
+      const { core, owner, lifecycleModule } = await loadFixture(deployBatchFixture);
+
+      const currentBatchId = await core.currentBatchId();
+      const nextBatchId = currentBatchId + 1n;
+
+      // Process the next batch without any markets assigned (empty batch).
+      await core.connect(owner).processDailyBatch(nextBatchId);
+
+      const seedData = await deploySeedData(uniformFactors(4));
+      const t0 = batchStartTimestamp(nextBatchId) + 100n;
+      const t1 = t0 + 200n;
+      const tSet = t1; // endTimestamp <= settlementTimestamp
+
+      await expect(
+        core.connect(owner).createMarket(
+          0,
+          4,
+          1,
+          Number(t0),
+          Number(t1),
+          Number(tSet),
+          4,
+          ethers.parseEther("1"),
+          owner.address, // non-zero fee policy address (contract not required for this test)
+          await seedData.getAddress()
+        )
+      ).to.be.revertedWithCustomError(lifecycleModule, "BatchAlreadyProcessed")
         .withArgs(nextBatchId);
+    });
+
+    it("updateMarketTiming cannot move an existing market into a processed batch", async () => {
+      const { core, owner, lifecycleModule } = await loadFixture(deployBatchFixture);
+
+      const base = await core.currentBatchId();
+      const batch1 = base + 1n;
+      const batch2 = base + 2n;
+
+      // Create a market for batch2.
+      const seedData = await deploySeedData(uniformFactors(4));
+      const t0 = batchStartTimestamp(batch2) + 100n;
+      const t1 = t0 + 200n;
+      const tSet = t1;
+      await core.connect(owner).createMarket(
+        0,
+        4,
+        1,
+        Number(t0),
+        Number(t1),
+        Number(tSet),
+        4,
+        ethers.parseEther("1"),
+        owner.address,
+        await seedData.getAddress()
+      );
+
+      // Process batch1 empty.
+      await core.connect(owner).processDailyBatch(batch1);
+
+      // Attempt to move the market into batch1 (already processed) should revert.
+      const t0b = batchStartTimestamp(batch1) + 100n;
+      const t1b = t0b + 200n;
+      const tSetb = t1b;
+      await expect(
+        core.connect(owner).updateMarketTiming(1n, Number(t0b), Number(t1b), Number(tSetb))
+      ).to.be.revertedWithCustomError(lifecycleModule, "BatchAlreadyProcessed")
+        .withArgs(batch1);
     });
     
     it("allows owner or operator, rejects non-operator", async () => {

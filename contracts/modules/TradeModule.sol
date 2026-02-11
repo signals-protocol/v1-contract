@@ -94,11 +94,17 @@ contract TradeModule is SignalsCoreStorage {
         require(quantity != 0, SE.InvalidQuantity(quantity));
         ISignalsCore.Market storage market = _loadAndValidateMarket(marketId);
         address feePolicy = market.feePolicy;
+        (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBins(
+            market.minTick, market.maxTick, market.tickSpacing, market.numBins,
+            lowerTick, upperTick
+        );
 
         uint256 qtyWad = uint256(quantity).toWad();
         
         // Execute-first: apply factor and get actual sum change
-        (uint256 sumBefore, uint256 sumAfter) = _applyFactorChunked(marketId, lowerTick, upperTick, qtyWad, true);
+        (uint256 sumBefore, uint256 sumAfter) = _applyFactorChunkedByBins(
+            marketId, loBin, hiBin, lowerTick, upperTick, qtyWad, true
+        );
         
         // Compute exact cost from actual sum change (no view/execute mismatch)
         uint256 costWad = ClmsrMath.computeBuyCostFromSumChange(
@@ -107,7 +113,6 @@ contract TradeModule is SignalsCoreStorage {
         uint256 cost6 = _roundDebit(costWad);
 
         uint256 fee6 = _quoteFeeWithPolicy(feePolicy, true, msg.sender, marketId, lowerTick, upperTick, quantity, cost6);
-        require(fee6 <= cost6, SE.FeeExceedsBase(fee6, cost6));
         uint256 totalCost = cost6 + fee6;
         require(totalCost <= maxCost, SE.CostExceedsMaximum(totalCost, maxCost));
 
@@ -115,7 +120,7 @@ contract TradeModule is SignalsCoreStorage {
         _pullPayment(msg.sender, totalCost);
 
         market.accumulatedFees += fee6.toWad();
-        _addExposure(marketId, lowerTick, upperTick, quantity);
+        _addExposureByBins(marketId, loBin, hiBin, quantity, market.numBins);
 
         positionId = positionContract.mintPosition(msg.sender, marketId, lowerTick, upperTick, quantity);
         if (!market.settled) {
@@ -138,12 +143,16 @@ contract TradeModule is SignalsCoreStorage {
 
         ISignalsCore.Market storage market = _loadAndValidateMarket(position.marketId);
         address feePolicy = market.feePolicy;
+        (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBins(
+            market.minTick, market.maxTick, market.tickSpacing, market.numBins,
+            position.lowerTick, position.upperTick
+        );
 
         uint256 qtyWad = uint256(quantity).toWad();
         
         // Execute-first: apply factor and get actual sum change
-        (uint256 sumBefore, uint256 sumAfter) = _applyFactorChunked(
-            position.marketId, position.lowerTick, position.upperTick, qtyWad, true
+        (uint256 sumBefore, uint256 sumAfter) = _applyFactorChunkedByBins(
+            position.marketId, loBin, hiBin, position.lowerTick, position.upperTick, qtyWad, true
         );
         
         // Compute exact cost from actual sum change
@@ -153,14 +162,13 @@ contract TradeModule is SignalsCoreStorage {
         uint256 cost6 = _roundDebit(costWad);
 
         uint256 fee6 = _quoteFeeWithPolicy(feePolicy, true, msg.sender, position.marketId, position.lowerTick, position.upperTick, quantity, cost6);
-        require(fee6 <= cost6, SE.FeeExceedsBase(fee6, cost6));
         uint256 totalCost = cost6 + fee6;
         require(totalCost <= maxCost, SE.CostExceedsMaximum(totalCost, maxCost));
 
         _pullPayment(msg.sender, totalCost);
 
         market.accumulatedFees += fee6.toWad();
-        _addExposure(position.marketId, position.lowerTick, position.upperTick, quantity);
+        _addExposureByBins(position.marketId, loBin, hiBin, quantity, market.numBins);
 
         uint128 newQuantity = position.quantity + quantity;
         positionContract.updateQuantity(positionId, newQuantity);
@@ -220,7 +228,7 @@ contract TradeModule is SignalsCoreStorage {
         uint64 claimOpen = market.settlementTimestamp + claimDelaySeconds;
         require(block.timestamp >= claimOpen, SE.ClaimTooEarly(claimOpen, uint64(block.timestamp)));
 
-        uint256 payout = _calculateClaimAmount(position, market);
+        uint256 payout = _calculateClaimAmount(position, market.settlementTick);
 
         // Draw from payout escrow (reserved at settlement finalization)
         // NAV is unaffected since payout was already reflected in P&L at settlement
@@ -363,12 +371,16 @@ contract TradeModule is SignalsCoreStorage {
         ISignalsCore.Market storage market = _loadAndValidateMarket(position.marketId);
         require(quantity <= position.quantity, SE.InsufficientPositionQuantity(quantity, position.quantity));
         feePolicy = market.feePolicy;
+        (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBins(
+            market.minTick, market.maxTick, market.tickSpacing, market.numBins,
+            position.lowerTick, position.upperTick
+        );
 
         uint256 qtyWad = uint256(quantity).toWad();
         
         // Execute-first: apply factor and get actual sum change
-        (uint256 sumBefore, uint256 sumAfter) = _applyFactorChunked(
-            position.marketId, position.lowerTick, position.upperTick, qtyWad, false
+        (uint256 sumBefore, uint256 sumAfter) = _applyFactorChunkedByBins(
+            position.marketId, loBin, hiBin, position.lowerTick, position.upperTick, qtyWad, false
         );
         
         // Compute exact proceeds from actual sum change
@@ -387,12 +399,11 @@ contract TradeModule is SignalsCoreStorage {
             quantity,
             baseProceeds
         );
-        require(fee6 <= baseProceeds, SE.FeeExceedsBase(fee6, baseProceeds));
         uint256 netProceeds = baseProceeds - fee6;
         require(netProceeds >= minProceeds, SE.ProceedsBelowMinimum(netProceeds, minProceeds));
 
         market.accumulatedFees += fee6.toWad();
-        _removeExposure(position.marketId, position.lowerTick, position.upperTick, quantity);
+        _removeExposureByBins(position.marketId, loBin, hiBin, quantity, market.numBins);
 
         _pushPayment(msg.sender, netProceeds);
 
@@ -444,8 +455,6 @@ contract TradeModule is SignalsCoreStorage {
 
     function _pullPayment(address from, uint256 amount6) internal {
         if (amount6 == 0) return;
-        uint256 balance = paymentToken.balanceOf(from);
-        require(balance >= amount6, SE.InsufficientBalance(from, amount6, balance));
         paymentToken.safeTransferFrom(from, address(this), amount6);
     }
 
@@ -493,12 +502,24 @@ contract TradeModule is SignalsCoreStorage {
         bool isBuy
     ) internal returns (uint256 sumBefore, uint256 sumAfter) {
         ISignalsCore.Market storage market = markets[marketId];
-        LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
-        
         (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBins(
             market.minTick, market.maxTick, market.tickSpacing, market.numBins,
             lowerTick, upperTick
         );
+        return _applyFactorChunkedByBins(marketId, loBin, hiBin, lowerTick, upperTick, qtyWad, isBuy);
+    }
+
+    function _applyFactorChunkedByBins(
+        uint256 marketId,
+        uint32 loBin,
+        uint32 hiBin,
+        int256 lowerTick,
+        int256 upperTick,
+        uint256 qtyWad,
+        bool isBuy
+    ) internal returns (uint256 sumBefore, uint256 sumAfter) {
+        ISignalsCore.Market storage market = markets[marketId];
+        LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
         
         uint256 alpha = market.liquidityParameter;
         uint256 maxSafeQty = ClmsrMath.maxSafeChunkQuantity(alpha);
@@ -520,8 +541,10 @@ contract TradeModule is SignalsCoreStorage {
             tree.applyRangeFactor(loBin, hiBin, factor);
             emit RangeFactorApplied(marketId, lowerTick, upperTick, factor);
             
-            remaining -= chunkQty;
-            chunkCount++;
+            unchecked {
+                remaining -= chunkQty;
+                chunkCount++;
+            }
         }
         
         require(remaining == 0, SE.ResidualQuantity(remaining));
@@ -532,10 +555,9 @@ contract TradeModule is SignalsCoreStorage {
 
     function _calculateClaimAmount(
         ISignalsPosition.Position memory position,
-        ISignalsCore.Market memory market
+        int256 settlementTick
     ) internal pure returns (uint256) {
-        if (!market.settled) return 0;
-        bool winning = position.lowerTick <= market.settlementTick && position.upperTick > market.settlementTick;
+        bool winning = position.lowerTick <= settlementTick && position.upperTick > settlementTick;
         if (!winning) return 0;
         // Payout is position quantity (6-dec) when in winning range
         return uint256(position.quantity);
@@ -563,6 +585,22 @@ contract TradeModule is SignalsCoreStorage {
         );
     }
 
+    function _addExposureByBins(
+        uint256 marketId,
+        uint32 loBin,
+        uint32 hiBin,
+        uint128 quantity,
+        uint32 numBins
+    ) internal {
+        ExposureDiffLib.rangeAdd(
+            _exposureDiff[marketId],
+            loBin,
+            hiBin,
+            int256(uint256(quantity)),
+            numBins
+        );
+    }
+
     function _removeExposure(
         uint256 marketId,
         int256 lowerTick,
@@ -580,6 +618,22 @@ contract TradeModule is SignalsCoreStorage {
             hiBin,
             -int256(uint256(quantity)),
             market.numBins
+        );
+    }
+
+    function _removeExposureByBins(
+        uint256 marketId,
+        uint32 loBin,
+        uint32 hiBin,
+        uint128 quantity,
+        uint32 numBins
+    ) internal {
+        ExposureDiffLib.rangeAdd(
+            _exposureDiff[marketId],
+            loBin,
+            hiBin,
+            -int256(uint256(quantity)),
+            numBins
         );
     }
 

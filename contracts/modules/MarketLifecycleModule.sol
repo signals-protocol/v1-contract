@@ -93,7 +93,11 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         _validateMarketParams(minTick, maxTick, tickSpacing, startTimestamp, endTimestamp, settlementTimestamp);
         require(numBins != 0, SE.BinCountExceedsLimit(0, MAX_BIN_COUNT));
         require(numBins <= MAX_BIN_COUNT, SE.BinCountExceedsLimit(numBins, MAX_BIN_COUNT));
-        uint32 expectedBins = uint32(uint256((maxTick - minTick) / tickSpacing));
+        uint256 binsRange = uint256((maxTick - minTick) / tickSpacing);
+        if (binsRange > type(uint32).max) {
+            revert SE.InvalidMarketParameters(minTick, maxTick, tickSpacing);
+        }
+        uint32 expectedBins = uint32(binsRange);
         require(expectedBins == numBins, SE.InvalidMarketParameters(minTick, maxTick, tickSpacing));
         require(liquidityParameter != 0, SE.InvalidLiquidityParameter());
         require(feePolicy != address(0), SE.ZeroAddress());
@@ -105,6 +109,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         );
 
         uint64 batchId = _getBatchIdForTimestamp(settlementTimestamp);
+        if (batchId <= currentBatchId) revert SE.BatchAlreadyProcessed(batchId);
 
         marketId = ++nextMarketId;
         
@@ -224,7 +229,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         uint64 opsStart = tSet + settlementSubmitWindow;
         require(nowTs >= opsStart, SE.PendingOpsNotStarted());
 
-        int256 settlementTick = _toSettlementTick(market, state.candidateValue);
+        int256 settlementTick = _toSettlementTick(market.minTick, market.maxTick, market.tickSpacing, state.candidateValue);
 
         market.settled = true;
         market.settlementValue = state.candidateValue;
@@ -314,7 +319,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         require(!market.settled, SE.MarketAlreadySettled(marketId));
         require(market.failed, SE.MarketNotFailed(marketId));
 
-        int256 settlementTick = _toSettlementTick(market, settlementValue);
+        int256 settlementTick = _toSettlementTick(market.minTick, market.maxTick, market.tickSpacing, settlementValue);
 
         market.settled = true;
         market.settlementValue = settlementValue;
@@ -357,6 +362,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
 
         uint64 oldSettlementTimestamp = market.settlementTimestamp;
         uint64 newBatchId = _getBatchIdForTimestamp(settlementTimestamp);
+        if (newBatchId <= currentBatchId) revert SE.BatchAlreadyProcessed(newBatchId);
 
         if (oldSettlementTimestamp == 0) {
             _registerMarketForBatch(newBatchId);
@@ -421,6 +427,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
     ) internal pure {
         require(tickSpacing > 0, SE.InvalidMarketParameters(minTick, maxTick, tickSpacing));
         require(minTick < maxTick, SE.InvalidMarketParameters(minTick, maxTick, tickSpacing));
+        require(maxTick <= type(int256).max - tickSpacing, SE.InvalidMarketParameters(minTick, maxTick, tickSpacing));
         require((maxTick - minTick) % tickSpacing == 0, SE.InvalidMarketParameters(minTick, maxTick, tickSpacing));
         _validateTimeRange(startTimestamp, endTimestamp, settlementTimestamp);
     }
@@ -436,34 +443,43 @@ contract MarketLifecycleModule is SignalsCoreStorage {
     /// @dev Convert settlement value to tick
     /// settlementTick = settlementValue / 1e6
     /// maxTick is exclusive upper bound, clamp to last valid tick
-    function _toSettlementTick(ISignalsCore.Market memory market, int256 settlementValue) internal pure returns (int256) {
-        int256 spacing = market.tickSpacing;
+    function _toSettlementTick(
+        int256 minTick,
+        int256 maxTick,
+        int256 tickSpacing,
+        int256 settlementValue
+    ) internal pure returns (int256) {
+        int256 spacing = tickSpacing;
         int256 tick = settlementValue / 1_000_000; // Convert 6-decimal value to tick
         
         // Clamp to valid range [minTick, maxTick - tickSpacing]
         // maxTick is exclusive (outcome space is [minTick, maxTick))
         // Last valid tick is maxTick - tickSpacing
-        int256 lastValidTick = market.maxTick - spacing;
-        if (tick < market.minTick) tick = market.minTick;
+        int256 lastValidTick = maxTick - spacing;
+        if (tick < minTick) tick = minTick;
         if (tick > lastValidTick) tick = lastValidTick;
         
         // Align to tick spacing
-        int256 offset = tick - market.minTick;
-        tick = market.minTick + (offset / spacing) * spacing;
+        int256 offset = tick - minTick;
+        tick = minTick + (offset / spacing) * spacing;
         return tick;
     }
 
     /// @dev Get payout exposure at a specific tick using diff-array point query
     /// @param marketId Market identifier
-    /// @param market Market struct
+    /// @param minTick Market minimum tick
+    /// @param tickSpacing Market tick spacing
+    /// @param numBins Market bin count
     /// @param tick Settlement tick (must be aligned to tickSpacing)
     /// @return exposure Total payout owed if settlement tick is `tick`
     function _getExposureAtTick(
         uint256 marketId,
-        ISignalsCore.Market memory market,
+        int256 minTick,
+        int256 tickSpacing,
+        uint32 numBins,
         int256 tick
     ) internal view returns (uint256 exposure) {
-        uint32 bin = TickBinLib.tickToBin(market.minTick, market.tickSpacing, market.numBins, tick);
+        uint32 bin = TickBinLib.tickToBin(minTick, tickSpacing, numBins, tick);
         return ExposureDiffLib.pointQuery(_exposureDiff[marketId], bin);
     }
 
@@ -576,7 +592,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         
         // Payout_t := Q_{t,τ_t} (WP v2 Eq. 3.11)
         // Get payout exposure at settlement tick using diff-array point query
-        payoutReserve = _getExposureAtTick(marketId, market, settlementTick);
+        payoutReserve = _getExposureAtTick(marketId, market.minTick, market.tickSpacing, market.numBins, settlementTick);
         
         // L_t := ΔC_t - Payout_t (WP v2 Eq. 3.12)
         // Note: payoutReserve is in token units (6 decimals), need to convert to WAD for consistency
