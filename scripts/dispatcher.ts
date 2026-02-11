@@ -4,14 +4,13 @@ import type { Environment } from "./types/environment";
 
 const MANIFEST_DIRS: Partial<Record<Environment, string>> = {
   "dev": ".openzeppelin/dev",
-  "testnet": ".openzeppelin/testnet",
   "prod": ".openzeppelin/prod",
 };
 
 function usage() {
   console.error("Usage: COMMAND=<action:env> hardhat run scripts/dispatcher.ts --network <network>");
   console.error(
-    "Actions: deploy, deploy-impls, upgrade, update-modules, deploy-fee-policies, predict-create2, seed-vault, fund-backstop, post-fund-check, safety-check, verify. Envs: local, dev, testnet, prod"
+    "Actions: deploy, deploy-impls, upgrade, update-modules, deploy-fee-policies, predict-create2, seed-vault, fund-backstop, post-fund-check, safety-check, verify. Envs: local, dev, prod"
   );
   process.exit(1);
 }

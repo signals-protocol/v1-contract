@@ -2,7 +2,13 @@ import hre from "hardhat";
 import fs from "fs";
 import path from "path";
 
-const envPath = path.resolve(__dirname, "../environments/testnet.json");
+function resolveEnvName(): string {
+  const raw = (process.env.ENV || process.env.TARGET_ENV || hre.network.name || "dev").trim();
+  return raw === "hardhat" ? "local" : raw;
+}
+
+const envName = resolveEnvName();
+const envPath = path.resolve(__dirname, `../environments/${envName}.json`);
 const env = JSON.parse(fs.readFileSync(envPath, "utf8"));
 
 const MARKET_ID = 7n;

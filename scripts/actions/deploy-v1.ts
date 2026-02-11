@@ -12,7 +12,7 @@ import type { Environment } from "../types/environment";
 import { predictCreate2 } from "./predict-create2";
 
 const CHAIN_ID_GUARD: Partial<Record<Environment, number>> = {
-  testnet: 5115,
+  dev: 5115,
   prod: 4114,
 };
 

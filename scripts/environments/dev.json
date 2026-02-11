@@ -107,8 +107,8 @@
       "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
       "version": 13,
       "timestamp": 1767531888,
-      "meta": {
-        "source": "testnet",
+        "meta": {
+        "source": "legacy",
         "prodVersion": 4
       }
     },

@@ -98,10 +98,14 @@ export function recordDeployment(
 }
 
 export function normalizeEnvironment(env: string): Environment {
-  if (env.includes(":")) {
-    const [, stage] = env.split(":");
-    return stage as Environment;
+  const trimmed = env.trim();
+  const raw = trimmed.includes(":") ? trimmed.split(":")[1] ?? "" : trimmed;
+  const normalized = raw === "localhost" || raw === "hardhat" ? "local" : raw;
+  const allowed: Environment[] = ["local", "dev", "prod"];
+  if (!allowed.includes(normalized as Environment)) {
+    throw new Error(
+      `Unknown environment '${normalized}'. Allowed: ${allowed.join(", ")}`
+    );
   }
-  if (env === "localhost") return "local";
-  return env as Environment;
+  return normalized as Environment;
 }

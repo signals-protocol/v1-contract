@@ -2,6 +2,7 @@ import { HardhatUserConfig } from "hardhat/config";
 import * as dotenv from "dotenv";
 import "@nomicfoundation/hardhat-toolbox";
 import "@openzeppelin/hardhat-upgrades";
+import "hardhat-gas-reporter";
 
 dotenv.config();
 
@@ -30,12 +31,8 @@ const hardhatAccountCount = Number.parseInt(
   process.env.HARDHAT_ACCOUNTS || "30",
   10
 );
-const defaultTestnetRpc = "https://rpc.testnet.citrea.xyz";
-const devRpc =
-  process.env.DEV_RPC_URL ||
-  process.env.TESTNET_RPC_URL ||
-  defaultTestnetRpc;
-const testnetRpc = process.env.TESTNET_RPC_URL || defaultTestnetRpc;
+const defaultDevRpc = "https://rpc.testnet.citrea.xyz";
+const devRpc = process.env.DEV_RPC_URL || defaultDevRpc;
 const prodRpc = process.env.PROD_RPC_URL || "https://rpc.mainnet.citrea.xyz";
 
 const config: HardhatUserConfig = {
@@ -45,6 +42,9 @@ const config: HardhatUserConfig = {
       optimizer: { enabled: true, runs: 200 },
       viaIR: true,
     },
+  },
+  gasReporter: {
+    enabled: process.env.REPORT_GAS === "1" || process.env.REPORT_GAS === "true",
   },
   paths: {
     sources: "./contracts",
@@ -78,11 +78,6 @@ const config: HardhatUserConfig = {
       chainId: 5115,
       accounts: defaultAccounts,
     },
-    testnet: {
-      url: testnetRpc,
-      chainId: 5115,
-      accounts: defaultAccounts,
-    },
     prod: {
       url: prodRpc,
       chainId: 4114,
@@ -92,20 +87,11 @@ const config: HardhatUserConfig = {
   etherscan: {
     apiKey: {
       "dev": process.env.BLOCKSCOUT_API_KEY || "placeholder",
-      "testnet": process.env.BLOCKSCOUT_API_KEY || "placeholder",
       "prod": process.env.BLOCKSCOUT_API_KEY || "placeholder",
     },
     customChains: [
       {
         network: "dev",
-        chainId: 5115,
-        urls: {
-          apiURL: "https://explorer.testnet.citrea.xyz/api",
-          browserURL: "https://explorer.testnet.citrea.xyz",
-        },
-      },
-      {
-        network: "testnet",
         chainId: 5115,
         urls: {
           apiURL: "https://explorer.testnet.citrea.xyz/api",

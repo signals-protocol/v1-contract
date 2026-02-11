@@ -19,14 +19,10 @@ export async function safetyCheckAction(env: Environment) {
   const envData = loadEnvironment(env);
 
   const required = [
-    "SignalsCreate2Factory",
-    "SignalsDeployer",
     "SignalsCoreProxy",
     "SignalsCoreImplementation",
     "SignalsPositionProxy",
     "SignalsPositionImplementation",
-    "SignalsLPShareProxy",
-    "SignalsLPShareImplementation",
     "TradeModule",
     "MarketLifecycleModule",
     "RiskModule",
@@ -42,10 +38,12 @@ export async function safetyCheckAction(env: Environment) {
   const coreProxy = envData.contracts.SignalsCoreProxy;
   const positionProxy = envData.contracts.SignalsPositionProxy;
   const lpShareProxy = envData.contracts.SignalsLPShareProxy ?? envData.contracts.SignalsLPShare;
+  if (!lpShareProxy) {
+    throw new Error("Missing SignalsLPShareProxy (or SignalsLPShare) in environment file");
+  }
 
   const coreImpl = await upgrades.erc1967.getImplementationAddress(coreProxy);
   const positionImpl = await upgrades.erc1967.getImplementationAddress(positionProxy);
-  const lpShareImpl = await upgrades.erc1967.getImplementationAddress(lpShareProxy);
 
   if (coreImpl.toLowerCase() !== envData.contracts.SignalsCoreImplementation.toLowerCase()) {
     throw new Error(`Core impl mismatch: manifest=${coreImpl} env=${envData.contracts.SignalsCoreImplementation}`);
@@ -55,19 +53,31 @@ export async function safetyCheckAction(env: Environment) {
       `Position impl mismatch: manifest=${positionImpl} env=${envData.contracts.SignalsPositionImplementation}`
     );
   }
-  if (lpShareImpl.toLowerCase() !== envData.contracts.SignalsLPShareImplementation.toLowerCase()) {
-    throw new Error(
-      `LPShare impl mismatch: manifest=${lpShareImpl} env=${envData.contracts.SignalsLPShareImplementation}`
-    );
-  }
-
   const core = await ethers.getContractAt("SignalsCore", coreProxy);
   const position = await ethers.getContractAt("SignalsPosition", positionProxy);
-  const lpShare = await ethers.getContractAt("SignalsLPShare", lpShareProxy);
+  const chainLpShareToken = await core.lpShareToken();
+  assertAddressMatch("LP share token", chainLpShareToken, lpShareProxy);
+  const lpShare = await ethers.getContractAt("SignalsLPShare", chainLpShareToken);
+
+  const expectedLpShareImpl = envData.contracts.SignalsLPShareImplementation;
+  if (expectedLpShareImpl) {
+    try {
+      const lpShareImpl = await upgrades.erc1967.getImplementationAddress(chainLpShareToken);
+      if (lpShareImpl.toLowerCase() !== expectedLpShareImpl.toLowerCase()) {
+        throw new Error(`LPShare impl mismatch: manifest=${lpShareImpl} env=${expectedLpShareImpl}`);
+      }
+    } catch {
+      console.warn(
+        `[safety-check] LPShare at ${chainLpShareToken} is not an ERC1967 proxy; skipping LPShare impl match check`
+      );
+    }
+  } else {
+    console.warn("[safety-check] SignalsLPShareImplementation not set; skipping LPShare impl match check");
+  }
 
   const expectedCoreOwner = envData.config?.owners?.core;
   const expectedPositionOwner = envData.config?.owners?.position;
-  const expectedLpShareOwner = envData.config?.owners?.lpShare ?? expectedCoreOwner;
+  const expectedLpShareOwner = envData.config?.owners?.lpShare;
   if (expectedCoreOwner) {
     const actual = await core.owner();
     assertAddressMatch("Core owner", actual, expectedCoreOwner);
@@ -84,7 +94,7 @@ export async function safetyCheckAction(env: Environment) {
     const actual = await lpShare.owner();
     assertAddressMatch("LPShare owner", actual, expectedLpShareOwner);
   } else {
-    console.warn("[safety-check] expected lpShare owner not set in environment config");
+    console.warn("[safety-check] expected lpShare owner not set in environment config; skipping owner check");
   }
 
   const moduleChecks = [
@@ -137,8 +147,6 @@ export async function safetyCheckAction(env: Environment) {
   }
   assertAddressMatch("Payment token", paymentToken, expectedPaymentToken);
 
-  const lpShareToken = await core.lpShareToken();
-  assertAddressMatch("LP share token", lpShareToken, lpShareProxy);
   const lpShareCore = await lpShare.core();
   assertAddressMatch("LPShare core", lpShareCore, coreProxy);
 

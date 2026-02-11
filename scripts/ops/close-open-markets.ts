@@ -54,7 +54,7 @@ interface TimingResult {
 
 // === Editable config (top-level) ============================================
 const CONFIG: CloseOpenMarketsConfig = {
-  targetEnv: "testnet",
+  targetEnv: "dev",
   filter: {
     mode: "unsettled",
     includeFailed: true,
@@ -256,7 +256,7 @@ async function main() {
 
   const [deployer] = await ethers.getSigners();
   if (EXECUTE && !deployer) {
-    throw new Error("Missing signer (set DEPLOYER_KEY for testnet transactions)");
+    throw new Error("Missing signer (set DEPLOYER_KEY for transactions)");
   }
   const runner: any = EXECUTE ? deployer : ethers.provider;
   const core = await ethers.getContractAt(
