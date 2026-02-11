@@ -118,3 +118,7 @@ whitepaper.tex
 # Internal specs (not tracked)
 docs/
 .cursor/
+
+# Verification generated artifacts
+verification/foundry/corpus/
+verification/foundry/crytic-export/

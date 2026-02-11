@@ -1,0 +1,12 @@
+testMode: "property"
+testLimit: 200000
+seqLen: 100
+corpusDir: "corpus"
+shrinkLimit: 5000
+allContracts: false
+format: "text"
+filterFunctions:
+  - "step(uint32,uint32,uint256)"
+  - "echidna_total_sum_non_zero()"
+  - "echidna_total_vs_leaf_drift_bounded()"
+  - "echidna_total_vs_fullrange_drift_bounded()"

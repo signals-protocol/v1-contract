@@ -1,0 +1,17 @@
+[profile.default]
+src = "src"
+test = "test"
+out = "out"
+cache_path = "cache"
+solc_version = "0.8.30"
+via_ir = true
+optimizer = true
+optimizer_runs = 200
+
+# Allow importing protocol contracts and npm dependencies from the parent project.
+allow_paths = ["../../contracts", "../../node_modules"]
+remappings = [
+    "contracts/=../../contracts/",
+    "@openzeppelin/=../../node_modules/@openzeppelin/",
+    "@prb/=../../node_modules/@prb/"
+]
