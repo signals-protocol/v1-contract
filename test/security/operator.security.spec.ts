@@ -321,12 +321,15 @@ describe("Operator Access Control", () => {
 
     await core.connect(owner).setOperator(operator.address, true);
 
-    // Create a withdrawal claim for batch 2, using harness to mark markets as resolved.
+    // Create a withdrawal claim for the next eligible batch, using harness to mark markets as resolved.
     await core.connect(owner).requestWithdraw(ethers.parseEther("1000"));
-    await core.connect(owner).harnessSetBatchMarketState(1n, 1n, 1n);
-    await core.connect(owner).harnessSetBatchMarketState(2n, 1n, 1n);
-    await core.connect(owner).processDailyBatch(1n);
-    await core.connect(owner).processDailyBatch(2n);
+    const currentBatchId = await core.getCurrentBatchId();
+    const nextBatchId = currentBatchId + 1n;
+    const withdrawBatchId = currentBatchId + 2n;
+    await core.connect(owner).harnessSetBatchMarketState(nextBatchId, 1n, 1n);
+    await core.connect(owner).harnessSetBatchMarketState(withdrawBatchId, 1n, 1n);
+    await core.connect(owner).processDailyBatch(nextBatchId);
+    await core.connect(owner).processDailyBatch(withdrawBatchId);
 
     await core.connect(operator).pause();
 
