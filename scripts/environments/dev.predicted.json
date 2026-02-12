@@ -1,0 +1,46 @@
+{
+  "network": "dev",
+  "chainId": 5115,
+  "release": "v1",
+  "deployerEOA": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
+  "create2Factory": "0x247aA8fabb783deFbC2cB0e3a5D378eD44d4E67A",
+  "contracts": {
+    "SignalsCreate2Factory": "0x247aA8fabb783deFbC2cB0e3a5D378eD44d4E67A",
+    "SignalsDeployer": "0xa11340e517381fBD1275e81EeaEA405dFC8193Cd",
+    "SignalsCoreProxy": "0x5160e4deD8D54288189934781986915c253D6164",
+    "SignalsPositionProxy": "0x76B980Da002Ea7098A894E6770651AE570dA4C32",
+    "SignalsLPShareProxy": "0x1D6dCCff73DA38DC8303B37750Ed4a88c6b2408B",
+    "SignalsLPShare": "0x1D6dCCff73DA38DC8303B37750Ed4a88c6b2408B",
+    "SignalsCoreImplementation": "0xF6A0C56dd5A5F43f800A6Ea0f85C19c8ab0fdFa5",
+    "SignalsPositionImplementation": "0x1099301f8a362C9881a97F3d4caC7F3E087A2B37",
+    "SignalsLPShareImplementation": "0x1b7b96fb51341778d1172DD71Dc660aB235A0a77"
+  },
+  "create2": {
+    "vanityPrefix": "0x516",
+    "maxNonce": 1000000,
+    "salts": {
+      "DEPLOYER": {
+        "nonce": 0,
+        "salt": "0x5094b38353cb4a2e8dfd908802d69dd014b147d4efd3bf1920a31f318f65fb5b"
+      },
+      "CORE_PROXY": {
+        "nonce": 3355,
+        "salt": "0x3cb0281700c79eacab86e3310b60bd1e7104ee2764132fc997d6bb4f74622fd5"
+      },
+      "POSITION_PROXY": {
+        "nonce": 0,
+        "salt": "0x664d68bb9bb2f1ef7acca328b918b855d4370ce277d3f9c832e8ac2f6bd985e9"
+      },
+      "LPSHARE_PROXY": {
+        "nonce": 0,
+        "salt": "0xd776bae18dd85b592c6d2acb12e556e55ecd756a0b58e82731d862f2caac0636"
+      }
+    },
+    "initCodeHash": {
+      "DEPLOYER": "0x26e00e4e56caa903a7405fbfdf3d0d6be5d43238b792aa5307a778b938637f4d",
+      "CORE_PROXY": "0x99a99aaa5bb54bcda5643f58ae6141b4ec985055337c41bf176f0811aa35ccb7",
+      "POSITION_PROXY": "0x9ac3e193275ecb4387d80dbbb2d804b188f6926d96c13adbf851b0f9a2967ba9",
+      "LPSHARE_PROXY": "0x51772a86f39e7a4536074912155d595e7a30dd95585369a279ec99c42d0b2911"
+    }
+  }
+}
