@@ -2,6 +2,8 @@ name: Jira Sync
 on:
   pull_request_review:
     types: [submitted]
+  pull_request:
+    types: [closed]
 
 permissions:
   contents: read
@@ -10,8 +12,10 @@ permissions:
 jobs:
   sync-review-status:
     if: >-
-      github.event.review.state == 'approved' ||
-      github.event.review.state == 'changes_requested'
+      github.event_name == 'pull_request_review' && (
+        github.event.review.state == 'approved' ||
+        github.event.review.state == 'changes_requested'
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -36,6 +40,45 @@ jobs:
             | jq -r --arg t "$TARGET" '.transitions[] | select(.name==$t) | .id')
 
           [ -z "$TID" ] && echo "$KEY: no '$TARGET' transition available" && exit 0
+
+          curl -su "$JIRA_EMAIL:$JIRA_TOKEN" -X POST \
+            -H "Content-Type: application/json" \
+            -d "{\"transition\":{\"id\":\"$TID\"}}" \
+            "$JIRA_URL/rest/api/3/issue/$KEY/transitions"
+          echo "Transitioned $KEY → $TARGET"
+
+  sync-merge-status:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Transition Jira on merge
+        env:
+          JIRA_URL: ${{ secrets.JIRA_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          KEY=$(echo "$PR_TITLE" | grep -oE 'SIG-[0-9]+' | head -1)
+          [ -z "$KEY" ] && echo "No SIG-N in title" && exit 0
+          [ -z "$JIRA_EMAIL" ] && echo "No Jira credentials" && exit 0
+
+          # CD repos get "Deploying", others get "Done"
+          CD_REPOS="signals-app v1-server v1-admin v1-docs"
+          if echo "$CD_REPOS" | grep -qw "$REPO_NAME"; then
+            TARGET="Deploying"
+          else
+            TARGET="Done"
+          fi
+
+          TID=$(curl -su "$JIRA_EMAIL:$JIRA_TOKEN" \
+            "$JIRA_URL/rest/api/3/issue/$KEY/transitions" \
+            | jq -r --arg t "$TARGET" '.transitions[] | select(.name==$t) | .id')
+
+          [ -z "$TID" ] && echo "$KEY: no '$TARGET' transition" && exit 0
 
           curl -su "$JIRA_EMAIL:$JIRA_TOKEN" -X POST \
             -H "Content-Type: application/json" \
