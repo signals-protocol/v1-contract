@@ -1,0 +1,44 @@
+name: Jira Sync
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  sync-review-status:
+    if: >-
+      github.event.review.state == 'approved' ||
+      github.event.review.state == 'changes_requested'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Sync review result to Jira
+        env:
+          JIRA_URL: ${{ secrets.JIRA_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          REVIEW_STATE: ${{ github.event.review.state }}
+        run: |
+          KEY=$(echo "$PR_TITLE" | grep -oE 'SIG-[0-9]+' | head -1)
+          [ -z "$KEY" ] && echo "No SIG-N in title" && exit 0
+
+          case "$REVIEW_STATE" in
+            approved)           TARGET="Approved" ;;
+            changes_requested)  TARGET="Changes Requested" ;;
+          esac
+
+          TID=$(curl -su "$JIRA_EMAIL:$JIRA_TOKEN" \
+            "$JIRA_URL/rest/api/3/issue/$KEY/transitions" \
+            | jq -r --arg t "$TARGET" '.transitions[] | select(.name==$t) | .id')
+
+          [ -z "$TID" ] && echo "$KEY: no '$TARGET' transition available" && exit 0
+
+          curl -su "$JIRA_EMAIL:$JIRA_TOKEN" -X POST \
+            -H "Content-Type: application/json" \
+            -d "{\"transition\":{\"id\":\"$TID\"}}" \
+            "$JIRA_URL/rest/api/3/issue/$KEY/transitions"
+          echo "Transitioned $KEY → $TARGET"
