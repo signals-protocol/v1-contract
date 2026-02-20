@@ -25,7 +25,6 @@ yarn test                    # Hardhat tests
 - Event signature change → v1-subgraph schema + mappings
 - Interface change → v1-sdk ABI regen (`npx hardhat typechain`)
 - Math/rounding change → v1-sdk quote logic sync
-- Use `/cross-impact` for detailed analysis
 
 ## Deploy Scripts
 - `yarn deploy:dev` / `yarn deploy:prod` — contract deployment
