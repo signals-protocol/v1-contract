@@ -1,0 +1,13 @@
+name: Auto Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    uses: signals-protocol/v1-skills/.github/workflows/auto-review.yml@main
+    secrets: inherit
