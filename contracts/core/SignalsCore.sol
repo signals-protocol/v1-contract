@@ -369,6 +369,12 @@ contract SignalsCore is
         _delegate(tradeModule, abi.encodeCall(ISignalsCore.claimPayout, (positionId)));
     }
 
+    /// @notice Batch claim payouts from multiple settled positions
+    /// @dev Allowed even when paused - user funds should always be claimable after settlement
+    function batchClaimPayout(uint256[] calldata positionIds) external override nonReentrant {
+        _delegate(tradeModule, abi.encodeCall(ISignalsCore.batchClaimPayout, (positionIds)));
+    }
+
     // ---- View stubs ----
 
     function calculateOpenCost(

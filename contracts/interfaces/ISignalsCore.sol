@@ -78,6 +78,8 @@ interface ISignalsCore {
 
     function claimPayout(uint256 positionId) external;
 
+    function batchClaimPayout(uint256[] calldata positionIds) external;
+
     // View helpers for cost/proceeds calculation
     function calculateOpenCost(
         uint256 marketId,

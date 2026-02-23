@@ -174,6 +174,7 @@ interface SignalsErrors {
     error ChunkLimitExceeded(uint256 required, uint256 maxAllowed);
     error QuantityOverflow();
     error ProceedsBelowMinimum(uint256 proceeds, uint256 minProceeds);
+    error BatchClaimTooLarge(uint256 provided, uint256 maxAllowed);
 
     // ============================================================
     // Tree
