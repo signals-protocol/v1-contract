@@ -236,6 +236,21 @@ contract SignalsCore is
         emit WithdrawalLagUpdated(lag);
     }
 
+    /// @notice Override the current batch ID (dev/testnet operations only)
+    /// @dev Allows rolling back currentBatchId so that createMarket/updateMarketTiming
+    ///      can target batches that would otherwise be rejected by batchId <= currentBatchId.
+    ///      No storage layout change — writes to existing currentBatchId slot.
+    function setCurrentBatchId(uint64 batchId) external onlyOwner {
+        currentBatchId = batchId;
+    }
+
+    /// @notice Reset the processed flag on a daily P&L snapshot (dev/testnet operations only)
+    /// @dev Allows re-recording P&L to a batch that was already processed.
+    ///      No storage layout change — writes to existing _dailyPnl mapping.
+    function resetBatchProcessed(uint64 batchId) external onlyOwner {
+        _dailyPnl[batchId].processed = false;
+    }
+
     /// @notice Configure fee waterfall parameters (except pdd)
     /// @dev Per WP v2: pdd := -λ is enforced via setRiskConfig to maintain the NAV floor invariant.
     ///      This function does NOT accept pdd parameter to prevent breaking the invariant.
