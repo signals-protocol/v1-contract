@@ -1,15 +1,15 @@
 {
   "network": "dev",
-  "version": 20,
+  "version": 21,
   "contracts": {
     "SignalsCreate2Factory": "0x247aA8fabb783deFbC2cB0e3a5D378eD44d4E67A",
     "SignalsDeployer": "0xa11340e517381fBD1275e81EeaEA405dFC8193Cd",
     "SignalsCoreProxy": "0x5160e4deD8D54288189934781986915c253D6164",
-    "SignalsCoreImplementation": "0xF6A0C56dd5A5F43f800A6Ea0f85C19c8ab0fdFa5",
+    "SignalsCoreImplementation": "0xEeDC15abF9E28A5194f9A8496B3d67edDc047eDA",
     "SignalsPositionProxy": "0x76B980Da002Ea7098A894E6770651AE570dA4C32",
-    "SignalsPositionImplementation": "0x1099301f8a362C9881a97F3d4caC7F3E087A2B37",
+    "SignalsPositionImplementation": "0x814C0E3e878f122fA50E65Fb8943b4480b5AdfbB",
     "SignalsLPShareProxy": "0x1D6dCCff73DA38DC8303B37750Ed4a88c6b2408B",
-    "SignalsLPShareImplementation": "0x1b7b96fb51341778d1172DD71Dc660aB235A0a77",
+    "SignalsLPShareImplementation": "0x3c4805B220bd95a620b3104617d6EC672aE8381c",
     "SignalsLPShare": "0x1D6dCCff73DA38DC8303B37750Ed4a88c6b2408B",
     "TradeModule": "0x77E80a98D8855d85d26bA139D14b5b957Fd332fb",
     "MarketLifecycleModule": "0xe4Ea476ffBcA97b0D1E13fcA077813C6e9B468A5",
@@ -162,6 +162,12 @@
       "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
       "version": 20,
       "timestamp": 1770907206
+    },
+    {
+      "action": "deploy-impls",
+      "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
+      "version": 21,
+      "timestamp": 1771846030
     }
   ]
 }
