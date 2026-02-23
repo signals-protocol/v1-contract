@@ -244,11 +244,15 @@ contract SignalsCore is
         currentBatchId = batchId;
     }
 
-    /// @notice Reset the processed flag on a daily P&L snapshot (dev/testnet operations only)
-    /// @dev Allows re-recording P&L to a batch that was already processed.
+    /// @notice Full reset of a daily P&L snapshot (dev/testnet operations only)
+    /// @dev Clears input fields AND processed flag so the batch can accept new settlements.
     ///      No storage layout change — writes to existing _dailyPnl mapping.
     function resetBatchProcessed(uint64 batchId) external onlyOwner {
-        _dailyPnl[batchId].processed = false;
+        DailyPnlSnapshot storage snap = _dailyPnl[batchId];
+        snap.Lt = 0;
+        snap.Ftot = 0;
+        snap.DeltaEtSum = 0;
+        snap.processed = false;
     }
 
     /// @notice Configure fee waterfall parameters (except pdd)

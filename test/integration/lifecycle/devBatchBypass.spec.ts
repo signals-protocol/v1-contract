@@ -302,9 +302,27 @@ describe("Dev Batch Bypass: setCurrentBatchId + resetBatchProcessed", () => {
 
       // Process the batch
       const batchId = await core.getCurrentBatchId();
-      // The batch might need specific ID. Let's use setCurrentBatchId approach.
-      // For now just verify resetBatchProcessed doesn't revert
+
+      // Verify resetBatchProcessed clears input fields and processed flag
       await expect(core.resetBatchProcessed(batchId)).to.not.be.reverted;
+
+      // Verify the batch can accept new settlements (proves DeltaEtSum was cleared)
+      // Re-settle: create another market, settle it to the same batch
+      const now2 = BigInt(await time.latest());
+      const settlement2 = now2 + 200n;
+      await core.createMarketUniform(
+        0, 4, 1,
+        Number(now2 - 10n),
+        Number(now2 + 100n),
+        Number(settlement2),
+        4,
+        WAD,
+        feePolicy.target.toString()
+      );
+      await time.increaseTo(Number(settlement2) + 301);
+      await core.markSettlementFailed(2);
+      // If DeltaEtSum wasn't cleared, this would revert with BatchDeltaEtExceedsBackstop
+      await expect(core.finalizeSecondarySettlement(2, 2000000)).to.not.be.reverted;
     });
 
     it("non-owner reverts", async () => {
