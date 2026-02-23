@@ -1,0 +1,80 @@
+{
+  "generatedAt": "2026-02-23T13:17:28.531Z",
+  "network": "prod",
+  "chainId": 4114,
+  "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
+  "coreProxy": "0x516312275875932ec2B53A41df4De02743131729",
+  "deployed": {
+    "SignalsCoreImplementation": "0x0e1E1787d384992064958B49f8D20f305D12D7a1",
+    "LazyMulSegmentTree": "0x2fc1c9B3a3B089Cd4f5FB9E2Ca008Af8FF8C8C31",
+    "TradeModule": "0xCA0BF0a8A5B8Aba133CF76EFEAE696b82a2E8b41",
+    "MarketLifecycleModule": "0x071e77189e3C04451374e2b79De2BBb61f83D961",
+    "OracleModule": "0x90Be79E7239eEb3BB2Af52a229447bEa3AE77779",
+    "RiskModule": "0x713b57E6bf69A97610C2895F0923681fbE7A1bAD",
+    "LPVaultModule": "0x2e04d3f70028FAE135a5BdB0a1507725CafD9bbe"
+  },
+  "modulesDeployed": [
+    "TradeModule",
+    "MarketLifecycleModule",
+    "LPVaultModule"
+  ],
+  "safe": {
+    "to": "0x516312275875932ec2B53A41df4De02743131729",
+    "value": "0",
+    "abi": [
+      {
+        "type": "function",
+        "name": "upgradeToAndCall",
+        "stateMutability": "payable",
+        "inputs": [
+          {
+            "name": "newImplementation",
+            "type": "address"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          }
+        ],
+        "outputs": []
+      },
+      {
+        "type": "function",
+        "name": "setModules",
+        "stateMutability": "nonpayable",
+        "inputs": [
+          {
+            "name": "tradeModule_",
+            "type": "address"
+          },
+          {
+            "name": "lifecycleModule_",
+            "type": "address"
+          },
+          {
+            "name": "riskModule_",
+            "type": "address"
+          },
+          {
+            "name": "vaultModule_",
+            "type": "address"
+          },
+          {
+            "name": "oracleModule_",
+            "type": "address"
+          }
+        ],
+        "outputs": []
+      }
+    ],
+    "method": "upgradeToAndCall(address newImplementation, bytes data)",
+    "args": {
+      "newImplementation": "0x0e1E1787d384992064958B49f8D20f305D12D7a1",
+      "data": "0x753e2b7f000000000000000000000000ca0bf0a8a5b8aba133cf76efeae696b82a2e8b41000000000000000000000000071e77189e3c04451374e2b79de2bbb61f83d961000000000000000000000000713b57e6bf69a97610c2895f0923681fbe7a1bad0000000000000000000000002e04d3f70028fae135a5bdb0a1507725cafd9bbe00000000000000000000000090be79e7239eeb3bb2af52a229447bea3ae77779"
+    },
+    "calldata": "0x4f1ef2860000000000000000000000000e1e1787d384992064958b49f8d20f305d12d7a1000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000a4753e2b7f000000000000000000000000ca0bf0a8a5b8aba133cf76efeae696b82a2e8b41000000000000000000000000071e77189e3c04451374e2b79de2bbb61f83d961000000000000000000000000713b57e6bf69a97610c2895f0923681fbe7a1bad0000000000000000000000002e04d3f70028fae135a5bdb0a1507725cafd9bbe00000000000000000000000090be79e7239eeb3bb2af52a229447bea3ae7777900000000000000000000000000000000000000000000000000000000"
+  },
+  "debug": {
+    "setModulesCalldata": "0x753e2b7f000000000000000000000000ca0bf0a8a5b8aba133cf76efeae696b82a2e8b41000000000000000000000000071e77189e3c04451374e2b79de2bbb61f83d961000000000000000000000000713b57e6bf69a97610c2895f0923681fbe7a1bad0000000000000000000000002e04d3f70028fae135a5bdb0a1507725cafd9bbe00000000000000000000000090be79e7239eeb3bb2af52a229447bea3ae77779"
+  }
+}
