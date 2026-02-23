@@ -1,17 +1,17 @@
 {
   "network": "dev",
-  "version": 20,
+  "version": 21,
   "contracts": {
     "SignalsCreate2Factory": "0x247aA8fabb783deFbC2cB0e3a5D378eD44d4E67A",
     "SignalsDeployer": "0xa11340e517381fBD1275e81EeaEA405dFC8193Cd",
     "SignalsCoreProxy": "0x5160e4deD8D54288189934781986915c253D6164",
-    "SignalsCoreImplementation": "0xF6A0C56dd5A5F43f800A6Ea0f85C19c8ab0fdFa5",
+    "SignalsCoreImplementation": "0xeA8c634d926B8C36307082C2B238566Cbe402e11",
     "SignalsPositionProxy": "0x76B980Da002Ea7098A894E6770651AE570dA4C32",
     "SignalsPositionImplementation": "0x1099301f8a362C9881a97F3d4caC7F3E087A2B37",
     "SignalsLPShareProxy": "0x1D6dCCff73DA38DC8303B37750Ed4a88c6b2408B",
     "SignalsLPShareImplementation": "0x1b7b96fb51341778d1172DD71Dc660aB235A0a77",
     "SignalsLPShare": "0x1D6dCCff73DA38DC8303B37750Ed4a88c6b2408B",
-    "TradeModule": "0x77E80a98D8855d85d26bA139D14b5b957Fd332fb",
+    "TradeModule": "0x9105F47697f2E03B96373702467DeFd3994D571d",
     "MarketLifecycleModule": "0xe4Ea476ffBcA97b0D1E13fcA077813C6e9B468A5",
     "OracleModule": "0x359B6D87E45D295Dc8EACcA61592e7a123b80D8C",
     "RiskModule": "0xA78c40E95d32Cb10b5F02fF35c80Aef74153972c",
@@ -22,7 +22,7 @@
     "FeePolicy100bps": "0x6b92D3DDC75A9a6CF7594a07c9B4F4e4b695b370",
     "FeePolicy200bps": "0xD91E6d22f210566e9B42fF4A923D67e30Aa1071C",
     "PaymentToken": "0xaC57cf391cE6e60c61fa0ca8B6b4819f452A1Cb4",
-    "LazyMulSegmentTree": "0x632F61A027F0bd733Adb15F86548bE6d7930A4E2"
+    "LazyMulSegmentTree": "0x09c7E51dC4B5F696A8CB4F5B5890d43fA46eB4CD"
   },
   "config": {
     "settlementSubmitWindow": "600",
@@ -162,6 +162,15 @@
       "deployer": "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
       "version": 20,
       "timestamp": 1770907206
+    },
+    {
+      "action": "safe-upgradeToAndCall(setModules)",
+      "deployer": "0x0e5ed8B5Be63bf1f92Cc9A516B7cAADa1AeA6Bf8",
+      "version": 21,
+      "timestamp": 1740306000,
+      "meta": {
+        "description": "batchClaimPayout: upgrade core + update TradeModule"
+      }
     }
   ]
 }
