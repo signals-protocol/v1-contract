@@ -187,12 +187,6 @@ interface ISignalsCore {
     /// @notice Get current batch ID
     function getCurrentBatchId() external view returns (uint64);
 
-    /// @notice Override the current batch ID (dev/testnet operations only)
-    function setCurrentBatchId(uint64 batchId) external;
-
-    /// @notice Reset the processed flag on a daily P&L snapshot (dev/testnet operations only)
-    function resetBatchProcessed(uint64 batchId) external;
-
     /// @notice Get market counts for a batch (one-to-many)
     function getBatchMarketState(uint64 batchId) external view returns (uint64 total, uint64 resolved);
 
