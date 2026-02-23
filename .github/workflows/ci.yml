@@ -70,6 +70,8 @@ jobs:
 
       - name: Run coverage
         run: yarn test:cov
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
 
       - name: Coverage summary
         if: always()

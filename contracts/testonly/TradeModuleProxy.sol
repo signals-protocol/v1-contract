@@ -93,6 +93,10 @@ contract TradeModuleProxy is SignalsCoreStorage {
         _delegate(abi.encodeWithSignature("claimPayout(uint256)", positionId));
     }
 
+    function batchClaimPayout(uint256[] calldata positionIds) external {
+        _delegate(abi.encodeWithSignature("batchClaimPayout(uint256[])", positionIds));
+    }
+
     // views
     function calculateOpenCost(uint256 marketId, int256 lowerTick, int256 upperTick, uint128 quantity) external returns (uint256) {
         bytes memory ret = _delegateView(abi.encodeWithSignature(
@@ -128,5 +132,11 @@ contract TradeModuleProxy is SignalsCoreStorage {
     /// @notice Retrieve market struct for testing
     function harnessGetMarket(uint256 marketId) external view returns (ISignalsCore.Market memory) {
         return markets[marketId];
+    }
+
+    /// @notice Set payout reserve for testing claim flows (additive to total)
+    function setPayoutReserve(uint256 marketId, uint256 amount) external {
+        _payoutReserveRemaining[marketId] = amount;
+        _totalPayoutReserve6 += amount;
     }
 }

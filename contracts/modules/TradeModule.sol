@@ -19,6 +19,7 @@ contract TradeModule is SignalsCoreStorage {
     
     uint256 internal constant WAD = 1e18;
     uint256 internal constant MAX_CHUNKS_PER_TX = 100;
+    uint256 internal constant MAX_BATCH_CLAIM = 100;
 
     event PositionOpened(
         uint256 indexed positionId,
@@ -218,6 +219,35 @@ contract TradeModule is SignalsCoreStorage {
      * @param positionId Position ID to claim payout for
      */
     function claimPayout(uint256 positionId) external onlyDelegated {
+        uint256 payout = _processClaimPayout(positionId);
+        if (payout > 0) _pushPayment(msg.sender, payout);
+    }
+
+    /**
+     * @notice Batch claim payouts from multiple settled positions
+     * @dev Aggregates all payouts into a single ERC20 transfer for gas efficiency.
+     *      Allowed even when paused - user funds should always be claimable after settlement.
+     * @param positionIds Array of position IDs to claim
+     */
+    function batchClaimPayout(uint256[] calldata positionIds) external onlyDelegated {
+        uint256 len = positionIds.length;
+        require(len > 0 && len <= MAX_BATCH_CLAIM, SE.BatchClaimTooLarge(len, MAX_BATCH_CLAIM));
+
+        uint256 totalPayout;
+        for (uint256 i; i < len; ) {
+            totalPayout += _processClaimPayout(positionIds[i]);
+            unchecked { ++i; }
+        }
+        if (totalPayout > 0) _pushPayment(msg.sender, totalPayout);
+    }
+
+    /**
+     * @dev Process a single claim: validate, update reserves, burn NFT, emit events.
+     *      Does NOT transfer tokens - caller aggregates payouts.
+     * @param positionId Position ID to process
+     * @return payout Amount owed to caller (6-dec)
+     */
+    function _processClaimPayout(uint256 positionId) internal returns (uint256 payout) {
         ISignalsPosition.Position memory position = positionContract.getPosition(positionId);
         require(positionContract.ownerOf(positionId) == msg.sender, SE.UnauthorizedCaller(msg.sender));
 
@@ -228,20 +258,15 @@ contract TradeModule is SignalsCoreStorage {
         uint64 claimOpen = market.settlementTimestamp + claimDelaySeconds;
         require(block.timestamp >= claimOpen, SE.ClaimTooEarly(claimOpen, uint64(block.timestamp)));
 
-        uint256 payout = _calculateClaimAmount(position, market.settlementTick);
+        payout = _calculateClaimAmount(position, market.settlementTick);
 
         // Draw from payout escrow (reserved at settlement finalization)
         // NAV is unaffected since payout was already reflected in P&L at settlement
         if (payout > 0) {
             uint256 remaining = _payoutReserveRemaining[position.marketId];
-            // Revert if reserve is insufficient - indicates critical accounting bug
             require(payout <= remaining, SE.InsufficientPayoutReserve(payout, remaining));
             _payoutReserveRemaining[position.marketId] = remaining - payout;
-            
-            // Track total payout reserve for free balance calculation
             _totalPayoutReserve6 -= payout;
-            
-            _pushPayment(msg.sender, payout);
         }
 
         positionContract.burn(positionId);
