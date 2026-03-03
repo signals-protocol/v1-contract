@@ -81,4 +81,28 @@ contract LazyMulTreeTarget {
         uint256 rangeSum = tree.getRangeSum(0, size - 1);
         return total > rangeSum ? total - rangeSum : rangeSum - total;
     }
+
+    /// @dev Apply MAX_FACTOR to a bounded range (for fuzz testing recursive flush).
+    function applyMaxFactor(uint32 lo, uint32 hi) external {
+        lo = uint32(uint256(lo) % uint256(size));
+        hi = uint32(uint256(hi) % uint256(size));
+        if (lo > hi) {
+            (lo, hi) = (hi, lo);
+        }
+        tree.applyRangeFactor(lo, hi, MAX_FACTOR);
+    }
+
+    function tryApplyMaxFactor(uint32 lo, uint32 hi) external returns (bool ok, bytes4 selector) {
+        try this.applyMaxFactor(lo, hi) {
+            return (true, bytes4(0));
+        } catch (bytes memory err) {
+            bytes4 sel = bytes4(0);
+            if (err.length >= 4) {
+                assembly ("memory-safe") {
+                    sel := mload(add(err, 32))
+                }
+            }
+            return (false, sel);
+        }
+    }
 }

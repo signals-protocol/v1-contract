@@ -160,23 +160,8 @@ library LazyMulSegmentTreeNoLink {
         node.sum = _mulWithCompensation(node.sum, factor);
     }
 
-    function _applyFactorToNode(Tree storage tree, uint32 nodeIndex, uint256 factor) private {
-        if (nodeIndex == 0 || factor == ONE_WAD) return;
-
-        Node storage node = tree.nodes[nodeIndex];
-        _scaleNodeSum(node, factor);
-
-        uint256 priorPending = uint256(node.pendingFactor);
-        uint256 newPendingFactor = _combineFactors(priorPending, factor);
-
-        if (newPendingFactor > type(uint192).max) revert SE.LazyFactorOverflow();
-        node.pendingFactor = uint192(newPendingFactor);
-
-        if (nodeIndex == tree.root) {
-            tree.cachedRootSum = node.sum;
-        }
-    }
-
+    /// @dev Push pending factor to children with recursive flush when threshold exceeded.
+    /// Unlike v0's _forcePushPendingFactor, this has l,r in scope for auto-allocate.
     function _pushPendingFactor(Tree storage tree, uint32 nodeIndex, uint32 l, uint32 r) private {
         if (nodeIndex == 0) return;
 
@@ -196,13 +181,44 @@ library LazyMulSegmentTreeNoLink {
                 right = _allocateNode(tree, mid + 1, r);
             }
 
-            _applyFactorToNode(tree, left, pendingFactorVal);
-            _applyFactorToNode(tree, right, pendingFactorVal);
+            _applyFactorToChildWithFlush(tree, left, pendingFactorVal, l, mid);
+            _applyFactorToChildWithFlush(tree, right, pendingFactorVal, mid + 1, r);
 
             node.childPtr = _packChildPtr(left, right);
             node.pendingFactor = uint192(ONE_WAD);
 
             _pullUpSum(tree, nodeIndex, l, r);
+        }
+    }
+
+    /// @dev Apply factor to a child during push-down, triggering recursive flush when
+    /// the combined pending factor would exceed threshold. Leaf nodes (l == r) skip
+    /// flush since they have no children. Safe because l,r are known at this point
+    /// (unlike v0's _forcePushPendingFactor which lacked range info).
+    function _applyFactorToChildWithFlush(
+        Tree storage tree, uint32 nodeIndex, uint256 factor, uint32 l, uint32 r
+    ) private {
+        if (nodeIndex == 0 || factor == ONE_WAD) return;
+
+        Node storage node = tree.nodes[nodeIndex];
+        uint256 priorPending = uint256(node.pendingFactor);
+        uint256 newPendingFactor = _combineFactors(priorPending, factor);
+
+        if (r > l && priorPending != ONE_WAD &&
+            (newPendingFactor > FLUSH_THRESHOLD || newPendingFactor < UNDERFLOW_FLUSH_THRESHOLD)
+        ) {
+            // Flush BEFORE scaling so _pullUpSum sees clean children sums
+            _pushPendingFactor(tree, nodeIndex, l, r);
+            newPendingFactor = factor;
+        } else if (newPendingFactor > type(uint192).max) {
+            revert SE.LazyFactorOverflow();
+        }
+
+        _scaleNodeSum(node, factor);
+        node.pendingFactor = uint192(newPendingFactor);
+
+        if (nodeIndex == tree.root) {
+            tree.cachedRootSum = node.sum;
         }
     }
 
@@ -267,6 +283,13 @@ library LazyMulSegmentTreeNoLink {
         Node storage node = tree.nodes[nodeIndex];
 
         if (l >= lo && r <= hi) {
+            // Leaf: no children → pending is dead data. Scale sum only.
+            if (l == r) {
+                _scaleNodeSum(node, factor);
+                if (nodeIndex == tree.root) tree.cachedRootSum = node.sum;
+                return;
+            }
+
             uint256 priorPending = uint256(node.pendingFactor);
             uint256 combinedPending = _combineFactors(priorPending, factor);
 

@@ -534,6 +534,14 @@ contract TradeModule is SignalsCoreStorage {
         return _applyFactorChunkedByBins(marketId, loBin, hiBin, lowerTick, upperTick, qtyWad, isBuy);
     }
 
+    /// @dev Fail fast if required chunks exceed MAX_CHUNKS_PER_TX (defense-in-depth).
+    function _enforceChunkLimit(uint256 qtyWad, uint256 maxSafeQty) internal pure {
+        if (maxSafeQty > 0) {
+            uint256 required = (qtyWad + maxSafeQty - 1) / maxSafeQty;
+            require(required <= MAX_CHUNKS_PER_TX, SE.ChunkLimitExceeded(required, MAX_CHUNKS_PER_TX));
+        }
+    }
+
     function _applyFactorChunkedByBins(
         uint256 marketId,
         uint32 loBin,
@@ -543,38 +551,53 @@ contract TradeModule is SignalsCoreStorage {
         uint256 qtyWad,
         bool isBuy
     ) internal returns (uint256 sumBefore, uint256 sumAfter) {
-        ISignalsCore.Market storage market = markets[marketId];
-        LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
-        
-        uint256 alpha = market.liquidityParameter;
-        uint256 maxSafeQty = ClmsrMath.maxSafeChunkQuantity(alpha);
-        
-        sumBefore = tree.totalSum();
-        
-        // Apply factor in chunks if quantity exceeds safe limit
-        uint256 remaining = qtyWad;
+        uint256 maxSafeQty = ClmsrMath.maxSafeChunkQuantity(markets[marketId].liquidityParameter);
+
+        _enforceChunkLimit(qtyWad, maxSafeQty);
+
+        sumBefore = marketTrees[marketId].totalSum();
+
+        uint256 remaining = _applyChunkLoop(
+            marketTrees[marketId], markets[marketId], marketId, loBin, hiBin, lowerTick, upperTick, qtyWad, maxSafeQty, isBuy
+        );
+
+        require(remaining == 0, SE.ResidualQuantity(remaining));
+
+        sumAfter = marketTrees[marketId].totalSum();
+    }
+
+    function _applyChunkLoop(
+        LazyMulSegmentTree.Tree storage tree,
+        ISignalsCore.Market storage market,
+        uint256 marketId,
+        uint32 loBin,
+        uint32 hiBin,
+        int256 lowerTick,
+        int256 upperTick,
+        uint256 remaining,
+        uint256 maxSafeQty,
+        bool isBuy
+    ) private returns (uint256) {
         uint256 chunkCount;
-        
+
         while (remaining > 0 && chunkCount < MAX_CHUNKS_PER_TX) {
             uint256 chunkQty = remaining > maxSafeQty ? maxSafeQty : remaining;
-            
-            uint256 factor = ClmsrMath._safeExp(chunkQty, alpha);
+
+            uint256 factor = ClmsrMath._safeExp(chunkQty, market.liquidityParameter);
             if (!isBuy) {
                 factor = WAD.wDivUp(factor);
             }
-            
+
             tree.applyRangeFactor(loBin, hiBin, factor);
             emit RangeFactorApplied(marketId, lowerTick, upperTick, factor);
-            
+
             unchecked {
                 remaining -= chunkQty;
                 chunkCount++;
             }
         }
-        
-        require(remaining == 0, SE.ResidualQuantity(remaining));
-        
-        sumAfter = tree.totalSum();
+
+        return remaining;
     }
 
 
