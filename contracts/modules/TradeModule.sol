@@ -551,20 +551,19 @@ contract TradeModule is SignalsCoreStorage {
         uint256 qtyWad,
         bool isBuy
     ) internal returns (uint256 sumBefore, uint256 sumAfter) {
-        LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
         uint256 maxSafeQty = ClmsrMath.maxSafeChunkQuantity(markets[marketId].liquidityParameter);
 
         _enforceChunkLimit(qtyWad, maxSafeQty);
 
-        sumBefore = tree.totalSum();
+        sumBefore = marketTrees[marketId].totalSum();
 
         uint256 remaining = _applyChunkLoop(
-            tree, markets[marketId], marketId, loBin, hiBin, lowerTick, upperTick, qtyWad, maxSafeQty, isBuy
+            marketTrees[marketId], markets[marketId], marketId, loBin, hiBin, lowerTick, upperTick, qtyWad, maxSafeQty, isBuy
         );
 
         require(remaining == 0, SE.ResidualQuantity(remaining));
 
-        sumAfter = tree.totalSum();
+        sumAfter = marketTrees[marketId].totalSum();
     }
 
     function _applyChunkLoop(
