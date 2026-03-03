@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import hre from "hardhat";
 import { loadEnvironment } from "../utils/environment";
+import type { Environment } from "../types/environment";
 
 type ModuleKey =
   | "TradeModule"
@@ -30,6 +31,11 @@ const DEFAULT_MODULES: ModuleKey[] = [
   "MarketLifecycleModule",
   "LPVaultModule",
 ];
+
+const EXPECTED_CHAIN_IDS: Record<string, number> = {
+  dev: 5115,
+  prod: 4114,
+};
 
 function parseModulesToDeploy(): Set<ModuleKey> {
   const raw = process.env.MODULES;
@@ -89,16 +95,20 @@ function writeCopyFile(
 }
 
 async function main() {
-  const env = "prod" as const;
   const { ethers, network } = hre;
-  if (network.name !== env) {
-    throw new Error(`Network mismatch: expected --network ${env}, got ${network.name}`);
+  const env = network.name as Environment;
+
+  const expectedChainId = EXPECTED_CHAIN_IDS[env];
+  if (!expectedChainId) {
+    throw new Error(
+      `Unsupported environment "${env}". Expected: ${Object.keys(EXPECTED_CHAIN_IDS).join(", ")}`
+    );
   }
 
   const [deployer] = await ethers.getSigners();
   const { chainId } = await ethers.provider.getNetwork();
-  if (Number(chainId) !== 4114) {
-    throw new Error(`ChainId mismatch: expected 4114, got ${chainId}`);
+  if (Number(chainId) !== expectedChainId) {
+    throw new Error(`ChainId mismatch: expected ${expectedChainId}, got ${chainId}`);
   }
 
   const envData = loadEnvironment(env);
@@ -256,8 +266,8 @@ async function main() {
   };
 
   const tag = getTimestampTag(new Date());
-  const outPath = path.join("releases", "prod", `${tag}-safe-upgrade-plan.json`);
-  const copyDir = path.join("releases", "prod", `${tag}-safe-copy`);
+  const outPath = path.join("releases", env, `${tag}-safe-upgrade-plan.json`);
+  const copyDir = path.join("releases", env, `${tag}-safe-copy`);
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.mkdirSync(copyDir, { recursive: true });
   fs.writeFileSync(outPath, JSON.stringify(plan, null, 2));
@@ -275,7 +285,7 @@ async function main() {
 
   console.log("");
   console.log("==============================================");
-  console.log("Safe Manual Execution (Citrea) [OWNER ONLY]");
+  console.log(`Safe Manual Execution (Citrea ${env}) [OWNER ONLY]`);
   console.log("==============================================");
   console.log("1) Safe -> New Transaction -> Contract Interaction");
   console.log("2) To = Core proxy, Value = 0");
