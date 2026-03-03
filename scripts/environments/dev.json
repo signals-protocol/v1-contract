@@ -167,7 +167,7 @@
       "action": "safe-upgradeToAndCall(setModules)",
       "deployer": "0x0e5ed8B5Be63bf1f92Cc9A516B7cAADa1AeA6Bf8",
       "version": 21,
-      "timestamp": 1741000009,
+      "timestamp": 1772537753,
       "meta": {
         "feature": "LazyMulSegmentTree recursive flush",
         "modules": ["TradeModule", "MarketLifecycleModule"]
