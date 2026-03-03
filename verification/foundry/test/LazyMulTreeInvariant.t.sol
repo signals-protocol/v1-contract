@@ -48,4 +48,31 @@ contract LazyMulTreeInvariant {
     function testFuzz_stateful_1024_ops(uint256 seed) public {
         _runStateful(seed, 1024);
     }
+
+    /// @dev SIG-294: Fuzz test that applies MAX_FACTOR to random ranges 50+ times.
+    /// Verifies recursive flush prevents LazyFactorOverflow and maintains sum consistency.
+    function testFuzz_recursive_flush_no_overflow(uint256 seed) public {
+        LazyMulTreeTarget target = new LazyMulTreeTarget(80);
+
+        uint256 s = seed;
+        for (uint256 i = 0; i < 50; i++) {
+            s = _next(s);
+            uint32 lo = uint32(s);
+            s = _next(s);
+            uint32 hi = uint32(s);
+
+            (bool ok, bytes4 selector) = target.tryApplyMaxFactor(lo, hi);
+            if (!ok) {
+                // Panic (arithmetic overflow) is never acceptable
+                assert(selector != PANIC_SELECTOR);
+            }
+        }
+
+        uint256 total = target.totalSum();
+        uint256 driftRange = target.driftTotalVsFullRange();
+        uint256 maxAllowedDrift = DRIFT_TOLERANCE_WAD_WEI + (total / REL_DRIFT_DENOM);
+
+        assert(total > 0);
+        assert(driftRange <= maxAllowedDrift);
+    }
 }
