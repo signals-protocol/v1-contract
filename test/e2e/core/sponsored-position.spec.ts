@@ -11,7 +11,6 @@ import {
   SignalsPosition,
   SignalsUSDToken,
   MockFeePolicy,
-  TradeModule,
 } from "../../../typechain-types";
 
 describe("E2E: Sponsored Position (openPositionFor)", () => {
@@ -302,18 +301,14 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
 
   describe("closePosition — sponsored proceeds split", () => {
     let sponsoredPositionId: bigint;
-    let actualCost: bigint;
 
     beforeEach(async () => {
       const cost = await core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
       const maxCost = cost + 1_000_000n;
 
-      const sponsorBefore = await payment.balanceOf(sponsor.address);
       await core.connect(sponsor).openPositionFor(
         beneficiary.address, marketId, 1, 3, QUANTITY, maxCost
       );
-      const sponsorAfter = await payment.balanceOf(sponsor.address);
-      actualCost = sponsorBefore - sponsorAfter;
 
       const positions = await position.getPositionsByOwner(beneficiary.address);
       sponsoredPositionId = positions[0];
@@ -413,8 +408,6 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
       const positions = await position.getPositionsByOwner(beneficiary.address);
       const positionId = positions[0];
 
-      const initialCost = await core.getSponsoredCost(positionId);
-
       // Close 25%
       const quarter = QUANTITY / 4n;
       await core.connect(beneficiary).decreasePosition(positionId, quarter, 0);
@@ -423,7 +416,6 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
       await core.connect(beneficiary).decreasePosition(positionId, quarter, 0);
 
       // Close remaining 50%
-      const remaining = QUANTITY - quarter - quarter;
       await core.connect(beneficiary).closePosition(positionId, 0);
 
       // Position should be burned
