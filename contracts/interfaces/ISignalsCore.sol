@@ -59,6 +59,15 @@ interface ISignalsCore {
         uint256 maxCost
     ) external returns (uint256 positionId);
 
+    function openPositionFor(
+        address beneficiary,
+        uint256 marketId,
+        int256 lowerTick,
+        int256 upperTick,
+        uint128 quantity,
+        uint256 maxCost
+    ) external returns (uint256 positionId);
+
     function increasePosition(
         uint256 positionId,
         uint128 quantity,
@@ -101,6 +110,10 @@ interface ISignalsCore {
     function calculateCloseProceeds(uint256 positionId) external returns (uint256 proceeds);
 
     function calculatePositionValue(uint256 positionId) external returns (uint256 value);
+
+    // Sponsored position queries
+    function getSponsoredCost(uint256 positionId) external view returns (uint256);
+    function getSponsorAddress(uint256 positionId) external view returns (address);
 
     // Operator allowlist
     function setOperator(address operator, bool allowed) external;
