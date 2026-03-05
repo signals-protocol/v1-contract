@@ -312,6 +312,18 @@ abstract contract SignalsCoreStorage {
     /// @notice Market ID → batch resolution flag (prevents double-counting)
     mapping(uint256 => bool) internal _marketBatchResolved;
 
+    // ============================================================
+    // Sponsored Position State
+    // ============================================================
+
+    /// @notice Position ID → original cost paid by sponsor (6-decimal)
+    /// @dev Zero for non-sponsored positions (default mapping value)
+    mapping(uint256 => uint256) internal _sponsoredCost;
+
+    /// @notice Position ID → sponsor address who paid the cost
+    /// @dev Zero address for non-sponsored positions (default mapping value)
+    mapping(uint256 => address) internal _sponsorAddress;
+
     // Reserve ample slots for future upgrades; do not change after first deployment.
-    uint256[12] internal __gap;
+    uint256[10] internal __gap;
 }

@@ -126,22 +126,9 @@ library ClmsrMath {
                 ? maxSafeQuantityPerChunk
                 : remainingQuantity;
 
-            uint256 quantityScaled = chunkQuantity.wDiv(alpha);
-            uint256 factor = quantityScaled.wExp();
-
-            if (currentAffectedSum > type(uint256).max / factor) {
-                chunkQuantity = _computeSafeChunk(
-                    currentAffectedSum,
-                    alpha,
-                    remainingQuantity,
-                    MAX_CHUNKS_PER_TX - chunkCount
-                );
-                if (chunkQuantity > remainingQuantity) {
-                    chunkQuantity = remainingQuantity;
-                }
-                quantityScaled = chunkQuantity.wDiv(alpha);
-                factor = quantityScaled.wExp();
-            }
+            (uint256 factor, uint256 consumed) = _buyChunkFactor(
+                chunkQuantity, currentAffectedSum, alpha, remainingQuantity, MAX_CHUNKS_PER_TX - chunkCount
+            );
 
             require(currentAffectedSum == 0 || factor <= type(uint256).max / currentAffectedSum, SE.MathMulOverflow());
 
@@ -149,15 +136,13 @@ library ClmsrMath {
             uint256 sumAfter = currentSumBefore - currentAffectedSum + newAffectedSum;
             require(sumAfter > currentSumBefore, SE.NonIncreasingSum(currentSumBefore, sumAfter));
 
-            uint256 ratio = sumAfter.wDivUp(currentSumBefore);
-            uint256 chunkCost = alpha.wMul(ratio.wLn());
-            cumulativeCostWad += chunkCost;
+            cumulativeCostWad += alpha.wMul(sumAfter.wDivUp(currentSumBefore).wLn());
 
-            require(chunkQuantity != 0, SE.NoChunkProgress());
+            require(consumed != 0, SE.NoChunkProgress());
 
             currentSumBefore = sumAfter;
             currentAffectedSum = newAffectedSum;
-            remainingQuantity -= chunkQuantity;
+            remainingQuantity -= consumed;
             chunkCount++;
         }
 
@@ -219,24 +204,9 @@ library ClmsrMath {
                 ? maxSafeQuantityPerChunk
                 : remainingQuantity;
 
-            uint256 quantityScaled = chunkQuantity.wDiv(alpha);
-            uint256 factor = quantityScaled.wExp();
-            uint256 inverseFactor = WAD.wDivUp(factor);
-
-            if (currentAffectedSum > type(uint256).max / inverseFactor) {
-                chunkQuantity = _computeSafeChunk(
-                    currentAffectedSum,
-                    alpha,
-                    remainingQuantity,
-                    MAX_CHUNKS_PER_TX - chunkCount
-                );
-                if (chunkQuantity > remainingQuantity) {
-                    chunkQuantity = remainingQuantity;
-                }
-                quantityScaled = chunkQuantity.wDiv(alpha);
-                factor = quantityScaled.wExp();
-                inverseFactor = WAD.wDivUp(factor);
-            }
+            (uint256 inverseFactor, uint256 consumed) = _sellChunkFactor(
+                chunkQuantity, currentAffectedSum, alpha, remainingQuantity, MAX_CHUNKS_PER_TX - chunkCount
+            );
 
             require(currentAffectedSum == 0 || inverseFactor <= type(uint256).max / currentAffectedSum, SE.MathMulOverflow());
 
@@ -245,20 +215,44 @@ library ClmsrMath {
             require(sumAfter != 0, SE.SumAfterZero());
             if (sumBefore <= sumAfter) return 0;
 
-            uint256 ratio = currentSumBefore.wDivUp(sumAfter);
-            uint256 chunkProceeds = alpha.wMul(ratio.wLn());
-            cumulativeProceeds += chunkProceeds;
+            cumulativeProceeds += alpha.wMul(currentSumBefore.wDivUp(sumAfter).wLn());
 
-            require(chunkQuantity != 0, SE.NoChunkProgress());
+            require(consumed != 0, SE.NoChunkProgress());
 
             currentSumBefore = sumAfter;
             currentAffectedSum = newAffectedSum;
-            remainingQuantity -= chunkQuantity;
+            remainingQuantity -= consumed;
             chunkCount++;
         }
 
         require(remainingQuantity == 0, SE.ResidualQuantity(remainingQuantity));
         return cumulativeProceeds;
+    }
+
+    /// @dev Compute inverseFactor and actual consumed quantity for a sell chunk.
+    ///      Extracted to reduce stack depth for coverage instrumentation.
+    function _sellChunkFactor(
+        uint256 chunkQuantity,
+        uint256 currentAffectedSum,
+        uint256 alpha,
+        uint256 remainingQuantity,
+        uint256 chunksLeft
+    ) private pure returns (uint256 inverseFactor, uint256 consumed) {
+        uint256 quantityScaled = chunkQuantity.wDiv(alpha);
+        uint256 factor = quantityScaled.wExp();
+        inverseFactor = WAD.wDivUp(factor);
+
+        if (currentAffectedSum > type(uint256).max / inverseFactor) {
+            chunkQuantity = _computeSafeChunk(currentAffectedSum, alpha, remainingQuantity, chunksLeft);
+            if (chunkQuantity > remainingQuantity) {
+                chunkQuantity = remainingQuantity;
+            }
+            quantityScaled = chunkQuantity.wDiv(alpha);
+            factor = quantityScaled.wExp();
+            inverseFactor = WAD.wDivUp(factor);
+        }
+
+        consumed = chunkQuantity;
     }
 
     function _calculateSingleSellProceeds(
@@ -307,6 +301,30 @@ library ClmsrMath {
         uint256 requiredAffectedSum = targetSumAfter - (sumBefore - affectedSum);
         uint256 factor = requiredAffectedSum.wDiv(affectedSum);
         quantityWad = alpha.wMul(factor.wLn());
+    }
+
+    /// @dev Compute factor and actual consumed quantity for a buy chunk.
+    ///      Extracted to reduce stack depth for coverage instrumentation.
+    function _buyChunkFactor(
+        uint256 chunkQuantity,
+        uint256 currentAffectedSum,
+        uint256 alpha,
+        uint256 remainingQuantity,
+        uint256 chunksLeft
+    ) private pure returns (uint256 factor, uint256 consumed) {
+        uint256 quantityScaled = chunkQuantity.wDiv(alpha);
+        factor = quantityScaled.wExp();
+
+        if (currentAffectedSum > type(uint256).max / factor) {
+            chunkQuantity = _computeSafeChunk(currentAffectedSum, alpha, remainingQuantity, chunksLeft);
+            if (chunkQuantity > remainingQuantity) {
+                chunkQuantity = remainingQuantity;
+            }
+            quantityScaled = chunkQuantity.wDiv(alpha);
+            factor = quantityScaled.wExp();
+        }
+
+        consumed = chunkQuantity;
     }
 
     function _computeSafeChunk(

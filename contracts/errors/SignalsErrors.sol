@@ -190,6 +190,11 @@ interface SignalsErrors {
     error InvalidRange(uint32 lo, uint32 hi);
 
     // ============================================================
+    // Sponsored Position
+    // ============================================================
+    error SponsoredPositionCannotIncrease(uint256 positionId);
+
+    // ============================================================
     // Exposure Ledger
     // ============================================================
     error ExposureDiffInvalidRange(int256 start, int256 end);

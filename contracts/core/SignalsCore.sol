@@ -325,6 +325,27 @@ contract SignalsCore is
         if (ret.length > 0) positionId = abi.decode(ret, (uint256));
     }
 
+    function openPositionFor(
+        address beneficiary,
+        uint256 marketId,
+        int256 lowerTick,
+        int256 upperTick,
+        uint128 quantity,
+        uint256 maxCost
+    ) external override whenNotPaused nonReentrant returns (uint256 positionId) {
+        // Risk gate: exposure cap is on beneficiary (actual position holder)
+        _riskGate(abi.encodeCall(
+            IRiskModule.gateOpenPosition,
+            (marketId, beneficiary, quantity)
+        ));
+
+        bytes memory ret = _delegate(tradeModule, abi.encodeCall(
+            ISignalsCore.openPositionFor,
+            (beneficiary, marketId, lowerTick, upperTick, quantity, maxCost)
+        ));
+        if (ret.length > 0) positionId = abi.decode(ret, (uint256));
+    }
+
     function increasePosition(
         uint256 positionId,
         uint128 quantity,
@@ -430,6 +451,16 @@ contract SignalsCore is
             (positionId)
         ));
         if (ret.length > 0) value = abi.decode(ret, (uint256));
+    }
+
+    // --- Sponsored position queries ---
+
+    function getSponsoredCost(uint256 positionId) external view override returns (uint256) {
+        return _sponsoredCost[positionId];
+    }
+
+    function getSponsorAddress(uint256 positionId) external view override returns (address) {
+        return _sponsorAddress[positionId];
     }
 
     // --- Lifecycle / oracle ---

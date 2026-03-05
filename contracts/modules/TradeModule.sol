@@ -61,6 +61,13 @@ contract TradeModule is SignalsCoreStorage {
         address policy
     );
 
+    event PositionSponsored(
+        uint256 indexed positionId,
+        address indexed sponsor,
+        address indexed beneficiary,
+        uint256 cost
+    );
+
     event RangeFactorApplied(
         uint256 indexed marketId,
         int256 indexed lo,
@@ -132,6 +139,66 @@ contract TradeModule is SignalsCoreStorage {
         emit TradeFeeCharged(msg.sender, marketId, positionId, true, cost6, fee6, feePolicy);
     }
 
+    /// @notice Open a new position on behalf of a beneficiary (sponsor pays, beneficiary owns NFT)
+    /// @dev Sponsor (msg.sender) pays USDC, beneficiary receives the position NFT.
+    ///      Records sponsorship for proceeds split on close/claim.
+    function openPositionFor(
+        address beneficiary,
+        uint256 marketId,
+        int256 lowerTick,
+        int256 upperTick,
+        uint128 quantity,
+        uint256 maxCost
+    ) external onlyDelegated returns (uint256 positionId) {
+        require(beneficiary != address(0), SE.ZeroAddress());
+        require(quantity != 0, SE.InvalidQuantity(quantity));
+        ISignalsCore.Market storage market = _loadAndValidateMarket(marketId);
+        address feePolicy = market.feePolicy;
+        (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBins(
+            market.minTick, market.maxTick, market.tickSpacing, market.numBins,
+            lowerTick, upperTick
+        );
+
+        uint256 qtyWad = uint256(quantity).toWad();
+
+        // Execute-first: apply factor and get actual sum change
+        (uint256 sumBefore, uint256 sumAfter) = _applyFactorChunkedByBins(
+            marketId, loBin, hiBin, lowerTick, upperTick, qtyWad, true
+        );
+
+        // Compute exact cost from actual sum change
+        uint256 costWad = ClmsrMath.computeBuyCostFromSumChange(
+            market.liquidityParameter, sumBefore, sumAfter
+        );
+        uint256 cost6 = _roundDebit(costWad);
+
+        // Fee: beneficiary is the trader for fee policy purposes
+        uint256 fee6 = _quoteFeeWithPolicy(feePolicy, true, beneficiary, marketId, lowerTick, upperTick, quantity, cost6);
+        uint256 totalCost = cost6 + fee6;
+        require(totalCost <= maxCost, SE.CostExceedsMaximum(totalCost, maxCost));
+
+        // Sponsor pays
+        _pullPayment(msg.sender, totalCost);
+
+        market.accumulatedFees += fee6.toWad();
+        _addExposureByBins(marketId, loBin, hiBin, quantity, market.numBins);
+
+        // Beneficiary owns the NFT
+        positionId = positionContract.mintPosition(beneficiary, marketId, lowerTick, upperTick, quantity);
+        if (!market.settled) {
+            market.openPositionCount += 1;
+        }
+
+        // Record sponsorship
+        _sponsoredCost[positionId] = cost6;
+        _sponsorAddress[positionId] = msg.sender;
+
+        // PositionOpened with beneficiary as trader (subgraph compatibility)
+        emit PositionOpened(positionId, beneficiary, marketId, lowerTick, upperTick, quantity, cost6);
+        emit TradeFeeCharged(beneficiary, marketId, positionId, true, cost6, fee6, feePolicy);
+        emit PositionSponsored(positionId, msg.sender, beneficiary, cost6);
+    }
+
     /// @notice Increase an existing position (execute-first model for exact cost calculation)
     function increasePosition(
         uint256 positionId,
@@ -139,6 +206,7 @@ contract TradeModule is SignalsCoreStorage {
         uint256 maxCost
     ) external onlyDelegated {
         require(quantity != 0, SE.InvalidQuantity(quantity));
+        require(_sponsoredCost[positionId] == 0, SE.SponsoredPositionCannotIncrease(positionId));
         ISignalsPosition.Position memory position = positionContract.getPosition(positionId);
         require(positionContract.ownerOf(positionId) == msg.sender, SE.UnauthorizedCaller(msg.sender));
 
@@ -277,6 +345,28 @@ contract TradeModule is SignalsCoreStorage {
         }
 
         emit PositionClaimed(positionId, msg.sender, payout);
+
+        // Sponsored position: split payout between user (profit) and sponsor (principal)
+        uint256 sponsoredCost = _sponsoredCost[positionId];
+        if (sponsoredCost > 0) {
+            uint256 userProfit;
+            uint256 sponsorReturn;
+            if (payout > sponsoredCost) {
+                userProfit = payout - sponsoredCost;
+                sponsorReturn = sponsoredCost;
+            } else {
+                userProfit = 0;
+                sponsorReturn = payout;
+            }
+
+            // payout is now distributed by this function, not by caller
+            // Return 0 so caller doesn't double-pay
+            payout = 0;
+
+            address sponsor = _sponsorAddress[positionId];
+            if (userProfit > 0) _pushPayment(msg.sender, userProfit);
+            if (sponsorReturn > 0) _pushPayment(sponsor, sponsorReturn);
+        }
     }
 
     // --- View stubs ---
@@ -330,6 +420,16 @@ contract TradeModule is SignalsCoreStorage {
         ISignalsPosition.Position memory position = positionContract.getPosition(positionId);
         uint256 proceedsWad = _calculateSellProceeds(position.marketId, position.lowerTick, position.upperTick, uint256(position.quantity).toWad());
         return _roundCredit(proceedsWad);
+    }
+
+    // --- Sponsored position queries ---
+
+    function getSponsoredCost(uint256 positionId) external view returns (uint256) {
+        return _sponsoredCost[positionId];
+    }
+
+    function getSponsorAddress(uint256 positionId) external view returns (address) {
+        return _sponsorAddress[positionId];
     }
 
     // --- Shared validation helpers ---
@@ -402,12 +502,12 @@ contract TradeModule is SignalsCoreStorage {
         );
 
         uint256 qtyWad = uint256(quantity).toWad();
-        
+
         // Execute-first: apply factor and get actual sum change
         (uint256 sumBefore, uint256 sumAfter) = _applyFactorChunkedByBins(
             position.marketId, loBin, hiBin, position.lowerTick, position.upperTick, qtyWad, false
         );
-        
+
         // Compute exact proceeds from actual sum change
         uint256 proceedsWad = ClmsrMath.computeSellProceedsFromSumChange(
             market.liquidityParameter, sumBefore, sumAfter
@@ -430,7 +530,13 @@ contract TradeModule is SignalsCoreStorage {
         market.accumulatedFees += fee6.toWad();
         _removeExposureByBins(position.marketId, loBin, hiBin, quantity, market.numBins);
 
-        _pushPayment(msg.sender, netProceeds);
+        // Sponsored position: split proceeds between user (profit) and sponsor (principal)
+        uint256 sponsoredCost = _sponsoredCost[positionId];
+        if (sponsoredCost > 0) {
+            _distributeSponsoredProceeds(positionId, netProceeds, sponsoredCost, quantity, position.quantity);
+        } else {
+            _pushPayment(msg.sender, netProceeds);
+        }
 
         newQuantity = position.quantity - quantity;
         if (newQuantity == 0) {
@@ -441,6 +547,38 @@ contract TradeModule is SignalsCoreStorage {
         } else {
             positionContract.updateQuantity(positionId, newQuantity);
         }
+    }
+
+    /// @dev Split proceeds between user (profit) and sponsor (principal return)
+    ///      principalPortion = sponsoredCost * sellQty / totalQty (pro-rata)
+    ///      userProfit = max(proceeds - principalPortion, 0)
+    ///      sponsorReturn = proceeds - userProfit
+    function _distributeSponsoredProceeds(
+        uint256 positionId,
+        uint256 netProceeds,
+        uint256 sponsoredCost,
+        uint128 sellQuantity,
+        uint128 totalQuantity
+    ) internal {
+        // Pro-rata principal portion for this sell
+        uint256 principalPortion = (sponsoredCost * uint256(sellQuantity)) / uint256(totalQuantity);
+
+        uint256 userProfit;
+        uint256 sponsorReturn;
+        if (netProceeds > principalPortion) {
+            userProfit = netProceeds - principalPortion;
+            sponsorReturn = principalPortion;
+        } else {
+            userProfit = 0;
+            sponsorReturn = netProceeds;
+        }
+
+        // Update remaining sponsored cost
+        _sponsoredCost[positionId] = sponsoredCost - principalPortion;
+
+        address sponsor = _sponsorAddress[positionId];
+        if (userProfit > 0) _pushPayment(msg.sender, userProfit);
+        if (sponsorReturn > 0) _pushPayment(sponsor, sponsorReturn);
     }
 
     // --- Fee/payment helpers ---
