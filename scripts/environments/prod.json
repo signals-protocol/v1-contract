@@ -1,9 +1,9 @@
 {
   "network": "prod",
-  "version": 7,
+  "version": 8,
   "contracts": {
     "SignalsCreate2Factory": "0x17925299E7E2E044672F8a889F5c35C762a2065e",
-    "SignalsCoreImplementation": "0x6414656d96cec522D93e659df240c86306E307ED",
+    "SignalsCoreImplementation": "0x84F2d11740c352182819591f85cab3F1B0266B33",
     "SignalsPositionImplementation": "0x63AA48a8a450782643A319a2a4C52B7dF8a07D3F",
     "SignalsLPShareImplementation": "0x323D7C3d15a483Dc59463807123421f10F7162a4",
     "SignalsDeployer": "0x795B4ed8869Fb2172c2c68eA21cCb5FdE6ad7AB4",
@@ -11,7 +11,7 @@
     "SignalsPositionProxy": "0x3fbD02f3F5Cf2C1e8d6b94e6F1AD30058972D004",
     "SignalsLPShareProxy": "0x7e27CAaCf3Af6b2e092cFf25D9ac20432162CE18",
     "SignalsLPShare": "0x7e27CAaCf3Af6b2e092cFf25D9ac20432162CE18",
-    "TradeModule": "0x2d393499C55Fa0756d446a6feC34A0723178c100",
+    "TradeModule": "0xf73a8D1890BB4b60C9E90CC578d64d2D9696D132",
     "MarketLifecycleModule": "0x7E0e02238443Cfa9E97e30bA22BBa0a1Fbab5E31",
     "OracleModule": "0x90Be79E7239eEb3BB2Af52a229447bEa3AE77779",
     "RiskModule": "0x713b57E6bf69A97610C2895F0923681fbE7A1bAD",
@@ -90,6 +90,17 @@
       "meta": {
         "feature": "LazyMulSegmentTree recursive flush",
         "modules": ["TradeModule", "MarketLifecycleModule"]
+      }
+    },
+    {
+      "action": "safe-upgradeToAndCall(setModules)",
+      "deployer": "0x0e5ed8B5Be63bf1f92Cc9A516B7cAADa1AeA6Bf8",
+      "version": 8,
+      "timestamp": 1741235288,
+      "meta": {
+        "feature": "openPositionFor (sponsored positions)",
+        "modules": ["TradeModule"],
+        "txHash": "0x7145f288869212690a80ea86ff1ce8b61225faf815e74417634ecbcb4b74d809"
       }
     }
   ]
