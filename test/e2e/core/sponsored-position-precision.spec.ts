@@ -81,10 +81,10 @@ describe("Sponsored Position — Precision & Regression", () => {
   describe("Token conservation invariant", () => {
     it("closePosition: sponsorReceived + beneficiaryReceived == netProceeds (exact)", async () => {
       const cost = await system.core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const positionId = await system.position.nextId();
       await system.core.connect(sponsor).openPositionFor(
         beneficiary.address, marketId, 1, 3, QUANTITY, cost + 1_000_000n
       );
-      const positionId = (await system.position.getPositionsByOwner(beneficiary.address))[0];
 
       // Snapshot all balances BEFORE close
       const coreAddr = await system.core.getAddress();
@@ -111,6 +111,7 @@ describe("Sponsored Position — Precision & Regression", () => {
 
     it("claimPayout WIN: sponsorReceived + beneficiaryReceived == payout (exact)", async () => {
       const cost = await system.core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const positionId = await system.position.nextId();
       await system.core.connect(sponsor).openPositionFor(
         beneficiary.address, marketId, 1, 3, QUANTITY, cost + 1_000_000n
       );
@@ -121,8 +122,6 @@ describe("Sponsored Position — Precision & Regression", () => {
       const coreBefore = await system.payment.balanceOf(coreAddr);
       const sponsorBefore = await system.payment.balanceOf(sponsor.address);
       const beneficiaryBefore = await system.payment.balanceOf(beneficiary.address);
-
-      const positionId = (await system.position.getPositionsByOwner(beneficiary.address))[0];
       await system.core.connect(beneficiary).claimPayout(positionId);
 
       const coreAfter = await system.payment.balanceOf(coreAddr);
@@ -140,6 +139,7 @@ describe("Sponsored Position — Precision & Regression", () => {
 
     it("claimPayout LOSS: zero outflow from core", async () => {
       const cost = await system.core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const positionId = await system.position.nextId();
       await system.core.connect(sponsor).openPositionFor(
         beneficiary.address, marketId, 1, 3, QUANTITY, cost + 1_000_000n
       );
@@ -148,8 +148,6 @@ describe("Sponsored Position — Precision & Regression", () => {
 
       const coreAddr = await system.core.getAddress();
       const coreBefore = await system.payment.balanceOf(coreAddr);
-
-      const positionId = (await system.position.getPositionsByOwner(beneficiary.address))[0];
       await system.core.connect(beneficiary).claimPayout(positionId);
 
       const coreAfter = await system.payment.balanceOf(coreAddr);
@@ -164,9 +162,9 @@ describe("Sponsored Position — Precision & Regression", () => {
   describe("Existing position regression (bit-identical)", () => {
     it("open → close: user balance delta identical to calculateCloseProceeds", async () => {
       const cost = await system.core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const positionId = await system.position.nextId();
       await system.core.connect(regularTrader).openPosition(marketId, 1, 3, QUANTITY, cost + 1_000_000n);
 
-      const positionId = (await system.position.getPositionsByOwner(regularTrader.address))[0];
       const expectedProceeds = await system.core.calculateCloseProceeds.staticCall(positionId);
 
       const before = await system.payment.balanceOf(regularTrader.address);
@@ -178,9 +176,8 @@ describe("Sponsored Position — Precision & Regression", () => {
 
     it("open → increase → close: full round trip", async () => {
       const cost = await system.core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const positionId = await system.position.nextId();
       await system.core.connect(regularTrader).openPosition(marketId, 1, 3, QUANTITY, cost + 1_000_000n);
-
-      const positionId = (await system.position.getPositionsByOwner(regularTrader.address))[0];
 
       // Increase
       await system.core.connect(regularTrader).increasePosition(positionId, 1_000, 10_000_000n);
@@ -197,9 +194,8 @@ describe("Sponsored Position — Precision & Regression", () => {
 
     it("open → settle → claim: payout == QUANTITY for winning position", async () => {
       const cost = await system.core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const positionId = await system.position.nextId();
       await system.core.connect(regularTrader).openPosition(marketId, 1, 3, QUANTITY, cost + 1_000_000n);
-
-      const positionId = (await system.position.getPositionsByOwner(regularTrader.address))[0];
 
       await settleAt(2); // WIN
 
@@ -214,10 +210,10 @@ describe("Sponsored Position — Precision & Regression", () => {
       const sponsorBal = await system.payment.balanceOf(sponsor.address);
 
       const cost = await system.core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const positionId = await system.position.nextId();
       await system.core.connect(regularTrader).openPosition(marketId, 1, 3, QUANTITY, cost + 1_000_000n);
       expect(await system.payment.balanceOf(sponsor.address)).to.equal(sponsorBal);
 
-      const positionId = (await system.position.getPositionsByOwner(regularTrader.address))[0];
       await system.core.connect(regularTrader).closePosition(positionId, 0);
       expect(await system.payment.balanceOf(sponsor.address)).to.equal(sponsorBal);
     });
@@ -230,10 +226,10 @@ describe("Sponsored Position — Precision & Regression", () => {
   describe("Partial close — rounding precision", () => {
     it("3-way partial close: sum of principal portions == original cost", async () => {
       const cost = await system.core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const positionId = await system.position.nextId();
       await system.core.connect(sponsor).openPositionFor(
         beneficiary.address, marketId, 1, 3, QUANTITY, cost + 1_000_000n
       );
-      const positionId = (await system.position.getPositionsByOwner(beneficiary.address))[0];
       const originalCost = await system.core.getSponsoredCost(positionId);
 
       // Close in 3 uneven parts: 33%, 33%, 34%
@@ -262,10 +258,10 @@ describe("Sponsored Position — Precision & Regression", () => {
     it("single-unit partial closes: no stuck dust", async () => {
       const smallQty = 10n; // very small position
       const cost = await system.core.calculateOpenCost.staticCall(marketId, 1, 3, smallQty);
+      const positionId = await system.position.nextId();
       await system.core.connect(sponsor).openPositionFor(
         beneficiary.address, marketId, 1, 3, smallQty, cost + 1_000_000n
       );
-      const positionId = (await system.position.getPositionsByOwner(beneficiary.address))[0];
 
       // Close 1 unit at a time
       for (let i = 0n; i < smallQty - 1n; i++) {
@@ -287,10 +283,10 @@ describe("Sponsored Position — Precision & Regression", () => {
   describe("Exact proceeds math", () => {
     it("WIN claim: sponsor gets exactly sponsoredCost, user gets exactly payout - sponsoredCost", async () => {
       const cost = await system.core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const positionId = await system.position.nextId();
       await system.core.connect(sponsor).openPositionFor(
         beneficiary.address, marketId, 1, 3, QUANTITY, cost + 1_000_000n
       );
-      const positionId = (await system.position.getPositionsByOwner(beneficiary.address))[0];
       const sponsoredCost = await system.core.getSponsoredCost(positionId);
 
       await settleAt(2); // WIN
@@ -311,20 +307,17 @@ describe("Sponsored Position — Precision & Regression", () => {
     it("WIN batchClaim: sponsored + regular in same batch", async () => {
       // Sponsored position
       const cost1 = await system.core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const sponsoredPosId = await system.position.nextId();
       await system.core.connect(sponsor).openPositionFor(
         beneficiary.address, marketId, 1, 3, QUANTITY, cost1 + 1_000_000n
       );
-      const sponsoredPosId = (await system.position.getPositionsByOwner(beneficiary.address))[0];
 
       // Regular position for same beneficiary (need funds)
       await system.payment.transfer(beneficiary.address, FUND);
       await system.payment.connect(beneficiary).approve(await system.core.getAddress(), ethers.MaxUint256);
       const cost2 = await system.core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const regularPosId = await system.position.nextId();
       await system.core.connect(beneficiary).openPosition(marketId, 1, 3, QUANTITY, cost2 + 1_000_000n);
-
-      const allPositions = await system.position.getPositionsByOwner(beneficiary.address);
-      expect(allPositions.length).to.equal(2);
-      const regularPosId = allPositions[1];
 
       await settleAt(2); // both WIN
 

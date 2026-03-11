@@ -153,6 +153,7 @@ describe("Events & Position Lifecycle", () => {
     it("emits PositionUpdated on increasePosition with correct args", async () => {
       const { core, position, user, marketId } = await loadFixture(deployEventFixture);
 
+      const positionId = await position.nextId();
       await core.connect(user).openPosition(
         marketId,
         2,
@@ -161,8 +162,6 @@ describe("Events & Position Lifecycle", () => {
         ethers.parseUnits("100", USDC_DECIMALS)
       );
 
-      const positions = await position.getPositionsByOwner(user.address);
-      const positionId = positions[0];
       const posBefore = await position.getPosition(positionId);
 
       const tx = await core.connect(user).increasePosition(
@@ -178,6 +177,7 @@ describe("Events & Position Lifecycle", () => {
     it("emits PositionUpdated on decreasePosition with correct args", async () => {
       const { core, position, user, marketId } = await loadFixture(deployEventFixture);
 
+      const positionId = await position.nextId();
       await core.connect(user).openPosition(
         marketId,
         2,
@@ -186,8 +186,6 @@ describe("Events & Position Lifecycle", () => {
         ethers.parseUnits("100", USDC_DECIMALS)
       );
 
-      const positions = await position.getPositionsByOwner(user.address);
-      const positionId = positions[0];
       const posBefore = await position.getPosition(positionId);
 
       const tx = await core.connect(user).decreasePosition(
@@ -203,6 +201,7 @@ describe("Events & Position Lifecycle", () => {
     it("emits PositionBurned on closePosition with correct args", async () => {
       const { core, position, user, marketId } = await loadFixture(deployEventFixture);
 
+      const positionId = await position.nextId();
       await core.connect(user).openPosition(
         marketId,
         2,
@@ -210,9 +209,6 @@ describe("Events & Position Lifecycle", () => {
         MEDIUM_QUANTITY,
         ethers.parseUnits("100", USDC_DECIMALS)
       );
-
-      const positions = await position.getPositionsByOwner(user.address);
-      const positionId = positions[0];
 
       const tx = await core.connect(user).closePosition(positionId, 0);
 
@@ -231,6 +227,7 @@ describe("Events & Position Lifecycle", () => {
 
       const tradeModule = await ethers.getContractAt("TradeModule", core.target);
 
+      const positionId = await position.nextId();
       await core.connect(user).openPosition(
         marketId,
         2,
@@ -238,9 +235,6 @@ describe("Events & Position Lifecycle", () => {
         MEDIUM_QUANTITY,
         ethers.parseUnits("100", USDC_DECIMALS)
       );
-
-      const positions = await position.getPositionsByOwner(user.address);
-      const positionId = positions[0];
 
       const tx = await core.connect(user).closePosition(positionId, 0);
       const receipt = await tx.wait();
@@ -268,8 +262,8 @@ describe("Events & Position Lifecycle", () => {
     it("openPosition creates new position", async () => {
       const { core, user, position, marketId } = await loadFixture(deployEventFixture);
 
-      const posBefore = await position.getPositionsByOwner(user.address);
-      expect(posBefore.length).to.equal(0);
+      const countBefore = await position.balanceOf(user.address);
+      expect(countBefore).to.equal(0);
 
       await core.connect(user).openPosition(
         marketId,
@@ -279,13 +273,14 @@ describe("Events & Position Lifecycle", () => {
         ethers.parseUnits("100", USDC_DECIMALS)
       );
 
-      const posAfter = await position.getPositionsByOwner(user.address);
-      expect(posAfter.length).to.equal(1);
+      const countAfter = await position.balanceOf(user.address);
+      expect(countAfter).to.equal(1);
     });
 
     it("increasePosition increases quantity", async () => {
       const { core, user, position, marketId } = await loadFixture(deployEventFixture);
 
+      const positionId = await position.nextId();
       await core.connect(user).openPosition(
         marketId,
         2,
@@ -294,9 +289,6 @@ describe("Events & Position Lifecycle", () => {
         ethers.parseUnits("100", USDC_DECIMALS)
       );
 
-      const positions = await position.getPositionsByOwner(user.address);
-      const positionId = positions[0];
-      
       const posBefore = await position.getPosition(positionId);
       const qtyBefore = posBefore.quantity;
 
@@ -314,6 +306,7 @@ describe("Events & Position Lifecycle", () => {
     it("decreasePosition decreases quantity", async () => {
       const { core, user, position, marketId } = await loadFixture(deployEventFixture);
 
+      const positionId = await position.nextId();
       await core.connect(user).openPosition(
         marketId,
         2,
@@ -322,9 +315,6 @@ describe("Events & Position Lifecycle", () => {
         ethers.parseUnits("100", USDC_DECIMALS)
       );
 
-      const positions = await position.getPositionsByOwner(user.address);
-      const positionId = positions[0];
-      
       const posBefore = await position.getPosition(positionId);
       const qtyBefore = posBefore.quantity;
 
@@ -342,6 +332,7 @@ describe("Events & Position Lifecycle", () => {
     it("closePosition removes position", async () => {
       const { core, user, position, marketId } = await loadFixture(deployEventFixture);
 
+      const positionId = await position.nextId();
       await core.connect(user).openPosition(
         marketId,
         2,
@@ -350,14 +341,11 @@ describe("Events & Position Lifecycle", () => {
         ethers.parseUnits("100", USDC_DECIMALS)
       );
 
-      const positions = await position.getPositionsByOwner(user.address);
-      const positionId = positions[0];
-      expect(positions.length).to.equal(1);
+      expect(await position.balanceOf(user.address)).to.equal(1);
 
       await core.connect(user).closePosition(positionId, 0);
 
-      const positionsAfter = await position.getPositionsByOwner(user.address);
-      expect(positionsAfter.length).to.equal(0);
+      expect(await position.balanceOf(user.address)).to.equal(0);
     });
   });
 
@@ -368,6 +356,7 @@ describe("Events & Position Lifecycle", () => {
     it("tracks positions per user correctly", async () => {
       const { core, user, user2, position, marketId } = await loadFixture(deployEventFixture);
 
+      const pos1Id = await position.nextId();
       await core.connect(user).openPosition(
         marketId,
         2,
@@ -376,6 +365,7 @@ describe("Events & Position Lifecycle", () => {
         ethers.parseUnits("50", USDC_DECIMALS)
       );
 
+      const pos2Id = await position.nextId();
       await core.connect(user2).openPosition(
         marketId,
         5,
@@ -384,19 +374,17 @@ describe("Events & Position Lifecycle", () => {
         ethers.parseUnits("50", USDC_DECIMALS)
       );
 
-      const pos1 = await position.getPositionsByOwner(user.address);
-      const pos2 = await position.getPositionsByOwner(user2.address);
-      
-      expect(pos1.length).to.equal(1);
-      expect(pos2.length).to.equal(1);
-      expect(await position.ownerOf(pos1[0])).to.equal(user.address);
-      expect(await position.ownerOf(pos2[0])).to.equal(user2.address);
+      expect(await position.balanceOf(user.address)).to.equal(1);
+      expect(await position.balanceOf(user2.address)).to.equal(1);
+      expect(await position.ownerOf(pos1Id)).to.equal(user.address);
+      expect(await position.ownerOf(pos2Id)).to.equal(user2.address);
     });
 
     it("users can trade in same market independently", async () => {
       const { core, user, user2, position, marketId } = await loadFixture(deployEventFixture);
 
       // Both open
+      const pos1Id = await position.nextId();
       await core.connect(user).openPosition(
         marketId,
         2,
@@ -413,16 +401,13 @@ describe("Events & Position Lifecycle", () => {
       );
 
       // User1 closes
-      const pos1 = await position.getPositionsByOwner(user.address);
-      await core.connect(user).closePosition(pos1[0], 0);
+      await core.connect(user).closePosition(pos1Id, 0);
 
       // User2 still has position
-      const pos2 = await position.getPositionsByOwner(user2.address);
-      expect(pos2.length).to.equal(1);
-      
+      expect(await position.balanceOf(user2.address)).to.equal(1);
+
       // User1 has no positions
-      const pos1After = await position.getPositionsByOwner(user.address);
-      expect(pos1After.length).to.equal(0);
+      expect(await position.balanceOf(user.address)).to.equal(0);
     });
   });
 
@@ -434,6 +419,7 @@ describe("Events & Position Lifecycle", () => {
       const { core, position, user, marketId } = await loadFixture(deployEventFixture);
 
       // Open
+      const positionId = await position.nextId();
       await expect(
         core.connect(user).openPosition(
           marketId,
@@ -444,8 +430,6 @@ describe("Events & Position Lifecycle", () => {
         )
       ).to.emit(position, "PositionMinted");
 
-      const positions = await position.getPositionsByOwner(user.address);
-      const positionId = positions[0];
       expect(positionId).to.be.gt(0);
 
       // Increase
@@ -472,8 +456,7 @@ describe("Events & Position Lifecycle", () => {
       ).to.emit(position, "PositionBurned");
 
       // Position removed
-      const positionsAfter = await position.getPositionsByOwner(user.address);
-      expect(positionsAfter.length).to.equal(0);
+      expect(await position.balanceOf(user.address)).to.equal(0);
     });
   });
 });

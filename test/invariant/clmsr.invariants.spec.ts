@@ -181,6 +181,7 @@ describe("CLMSR Invariants", () => {
       );
 
       // First buy
+      const positionId = await position.nextId();
       await core
         .connect(user)
         .openPosition(
@@ -193,9 +194,7 @@ describe("CLMSR Invariants", () => {
 
       const sumBefore = await getTotalSum(core, marketId);
 
-      // Get position ID and close
-      const positions = await position.getPositionsByOwner(user.address);
-      const positionId = positions[0];
+      // Close position
       await core.connect(user).closePosition(positionId, 0);
 
       const sumAfter = await getTotalSum(core, marketId);
@@ -382,6 +381,7 @@ describe("CLMSR Invariants", () => {
       const sumBefore = await getTotalSum(core, marketId);
 
       // Buy
+      const positionId = await position.nextId();
       await core
         .connect(user)
         .openPosition(
@@ -393,8 +393,7 @@ describe("CLMSR Invariants", () => {
         );
 
       // Immediately sell
-      const positions = await position.getPositionsByOwner(user.address);
-      await core.connect(user).closePosition(positions[0], 0);
+      await core.connect(user).closePosition(positionId, 0);
 
       const sumAfter = await getTotalSum(core, marketId);
 
@@ -439,6 +438,7 @@ describe("CLMSR Invariants", () => {
       );
 
       // Open position first
+      const positionId = await position.nextId();
       await core
         .connect(user)
         .openPosition(
@@ -448,9 +448,6 @@ describe("CLMSR Invariants", () => {
           MEDIUM_QUANTITY,
           ethers.parseUnits("100", USDC_DECIMALS)
         );
-
-      const positions = await position.getPositionsByOwner(user.address);
-      const positionId = positions[0];
 
       const smallProceeds = await core.calculateDecreaseProceeds.staticCall(
         positionId,
@@ -784,6 +781,7 @@ describe("CLMSR Invariants", () => {
       );
 
       // User 1 buys
+      const pos1Id = await position.nextId();
       await core
         .connect(user)
         .openPosition(
@@ -795,6 +793,7 @@ describe("CLMSR Invariants", () => {
         );
 
       // User 2 buys different range
+      const pos2Id = await position.nextId();
       await core
         .connect(user2)
         .openPosition(
@@ -806,11 +805,8 @@ describe("CLMSR Invariants", () => {
         );
 
       // Both close
-      const pos1 = await position.getPositionsByOwner(user.address);
-      const pos2 = await position.getPositionsByOwner(user2.address);
-
-      await core.connect(user).closePosition(pos1[0], 0);
-      await core.connect(user2).closePosition(pos2[0], 0);
+      await core.connect(user).closePosition(pos1Id, 0);
+      await core.connect(user2).closePosition(pos2Id, 0);
 
       // System should be back to approximately initial state
       const finalSum = await getTotalSum(core, marketId);

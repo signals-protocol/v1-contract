@@ -53,9 +53,8 @@ describe("E2E: UUPS upgrades", () => {
 
     const quantity = 1_000n;
     const cost = await core.calculateOpenCost.staticCall(marketId, 1, 3, quantity);
+    const positionId = await position.nextId();
     await core.connect(trader).openPosition(marketId, 1, 3, quantity, cost + 1_000_000n);
-
-    const [positionId] = await position.getPositionsByOwner(trader.address);
 
     const coreV2Impl = await (await ethers.getContractFactory("SignalsCoreV2")).deploy();
     const coreUpgrader = await ethers.getContractAt(

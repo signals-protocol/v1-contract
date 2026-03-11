@@ -70,6 +70,7 @@ describe("E2E: module hot-swap", () => {
 
     const qtyA = 1_000n;
     const costA = await core.calculateOpenCost.staticCall(marketId, 1, 3, qtyA);
+    const posA = await position.nextId();
     await core.connect(userA).openPosition(marketId, 1, 3, qtyA, costA + 1_000_000n);
 
     const newTradeModule = await (
@@ -93,10 +94,8 @@ describe("E2E: module hot-swap", () => {
 
     const qtyB = 2_000n;
     const costB = await core.calculateOpenCost.staticCall(marketId, 1, 3, qtyB);
+    const posB = await position.nextId();
     await core.connect(userB).openPosition(marketId, 1, 3, qtyB, costB + 1_000_000n);
-
-    const [posA] = await position.getPositionsByOwner(userA.address);
-    const [posB] = await position.getPositionsByOwner(userB.address);
 
     await time.increaseTo(settlement);
     const payload = await buildRedstonePayload(2, settlement + 1);

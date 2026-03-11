@@ -223,6 +223,17 @@ export async function safetyCheckAction(env: Environment) {
     }
   }
 
+  const positionNextId = await position.nextId();
+  if (positionNextId < 1n) {
+    throw new Error(`Position nextId should be >= 1, got ${positionNextId}`);
+  }
+  console.log(`[safety-check] Position nextId=${positionNextId}`);
+
+  const positionName = await position.name();
+  if (positionName !== "Signals Position") {
+    throw new Error(`Position name mismatch: expected "Signals Position", got "${positionName}"`);
+  }
+
   const codeChecks = [
     "SignalsCreate2Factory",
     "SignalsDeployer",
