@@ -211,11 +211,7 @@ describe("Position Invariants", () => {
 
       const assertAllInvariants = async () => {
         // INV-P1: Balance consistency — sum of tracked alive tokens matches sum of balances
-        let expectedSum = 0n;
-        for (const [, owner] of alive) {
-          void owner; // owner tracked separately
-        }
-        expectedSum = BigInt(alive.size);
+        const expectedSum = BigInt(alive.size);
         let actualSum = 0n;
         for (const user of users) {
           actualSum += await position.balanceOf(user.address);
