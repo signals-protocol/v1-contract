@@ -104,13 +104,10 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
       const cost = await core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
       const maxCost = cost + 1_000_000n;
 
+      const positionId = await position.nextId();
       await core.connect(sponsor).openPositionFor(
         beneficiary.address, marketId, 1, 3, QUANTITY, maxCost
       );
-
-      const positions = await position.getPositionsByOwner(beneficiary.address);
-      expect(positions.length).to.equal(1);
-      const positionId = positions[0];
 
       // Beneficiary owns the NFT
       expect(await position.ownerOf(positionId)).to.equal(beneficiary.address);
@@ -167,12 +164,10 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
       const cost = await core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
       const maxCost = cost + 1_000_000n;
 
+      const positionId = await position.nextId();
       await core.connect(sponsor).openPositionFor(
         beneficiary.address, marketId, 1, 3, QUANTITY, maxCost
       );
-
-      const positions = await position.getPositionsByOwner(beneficiary.address);
-      const positionId = positions[0];
 
       const sponsoredCost = await core.getSponsoredCost(positionId);
       expect(sponsoredCost).to.be.greaterThan(0n);
@@ -248,10 +243,8 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
   describe("existing openPosition — unchanged behavior", () => {
     it("openPosition: sponsoredCost == 0, sponsorAddress == address(0)", async () => {
       const cost = await core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const positionId = await position.nextId();
       await core.connect(otherUser).openPosition(marketId, 1, 3, QUANTITY, cost + 1_000_000n);
-
-      const positions = await position.getPositionsByOwner(otherUser.address);
-      const positionId = positions[0];
 
       expect(await core.getSponsoredCost(positionId)).to.equal(0n);
       expect(await core.getSponsorAddress(positionId)).to.equal(ethers.ZeroAddress);
@@ -265,12 +258,10 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
   describe("increasePosition — blocked for sponsored positions", () => {
     it("reverts SponsoredPositionCannotIncrease for sponsored position", async () => {
       const cost = await core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const positionId = await position.nextId();
       await core.connect(sponsor).openPositionFor(
         beneficiary.address, marketId, 1, 3, QUANTITY, cost + 1_000_000n
       );
-
-      const positions = await position.getPositionsByOwner(beneficiary.address);
-      const positionId = positions[0];
 
       // Fund beneficiary for increase attempt
       await payment.transfer(beneficiary.address, FUND_AMOUNT);
@@ -283,10 +274,8 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
 
     it("increasePosition still works for regular (non-sponsored) positions", async () => {
       const cost = await core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const positionId = await position.nextId();
       await core.connect(otherUser).openPosition(marketId, 1, 3, QUANTITY, cost + 1_000_000n);
-
-      const positions = await position.getPositionsByOwner(otherUser.address);
-      const positionId = positions[0];
 
       // Regular position can increase
       await expect(
@@ -306,12 +295,10 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
       const cost = await core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
       const maxCost = cost + 1_000_000n;
 
+      sponsoredPositionId = await position.nextId();
       await core.connect(sponsor).openPositionFor(
         beneficiary.address, marketId, 1, 3, QUANTITY, maxCost
       );
-
-      const positions = await position.getPositionsByOwner(beneficiary.address);
-      sponsoredPositionId = positions[0];
     });
 
     it("profit case: user gets profit, sponsor gets principal back", async () => {
@@ -344,10 +331,8 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
 
     it("regular position close: entire proceeds go to user (no split)", async () => {
       const cost = await core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const regularPositionId = await position.nextId();
       await core.connect(otherUser).openPosition(marketId, 1, 3, QUANTITY, cost + 1_000_000n);
-
-      const positions = await position.getPositionsByOwner(otherUser.address);
-      const regularPositionId = positions[0];
 
       const sponsorBefore = await payment.balanceOf(sponsor.address);
       const userBefore = await payment.balanceOf(otherUser.address);
@@ -373,12 +358,10 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
       const cost = await core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
       const maxCost = cost + 1_000_000n;
 
+      const positionId = await position.nextId();
       await core.connect(sponsor).openPositionFor(
         beneficiary.address, marketId, 1, 3, QUANTITY, maxCost
       );
-
-      const positions = await position.getPositionsByOwner(beneficiary.address);
-      const positionId = positions[0];
 
       const sponsoredCostBefore = await core.getSponsoredCost(positionId);
       expect(sponsoredCostBefore).to.be.greaterThan(0n);
@@ -401,12 +384,10 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
 
     it("sequential partial closes: cumulative split correct", async () => {
       const cost = await core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const positionId = await position.nextId();
       await core.connect(sponsor).openPositionFor(
         beneficiary.address, marketId, 1, 3, QUANTITY, cost + 1_000_000n
       );
-
-      const positions = await position.getPositionsByOwner(beneficiary.address);
-      const positionId = positions[0];
 
       // Close 25%
       const quarter = QUANTITY / 4n;
@@ -431,12 +412,11 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
     it("WIN: user gets profit, sponsor gets principal", async () => {
       // Open sponsored position in winning range (tick 1-3, settle at tick 2)
       const cost = await core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const positionId = await position.nextId();
       await core.connect(sponsor).openPositionFor(
         beneficiary.address, marketId, 1, 3, QUANTITY, cost + 1_000_000n
       );
 
-      const positions = await position.getPositionsByOwner(beneficiary.address);
-      const positionId = positions[0];
       const sponsoredCost = await core.getSponsoredCost(positionId);
 
       // Settle at tick 2 (winning for range [1,3))
@@ -473,12 +453,10 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
     it("LOSS: user gets 0, sponsor gets 0", async () => {
       // Open position in range [1,3), settle at tick 0 (losing)
       const cost = await core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const positionId = await position.nextId();
       await core.connect(sponsor).openPositionFor(
         beneficiary.address, marketId, 1, 3, QUANTITY, cost + 1_000_000n
       );
-
-      const positions = await position.getPositionsByOwner(beneficiary.address);
-      const positionId = positions[0];
 
       // Settle at tick 0 (outside [1,3) → loss)
       await settleMarket(0);
@@ -501,10 +479,8 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
     it("regular position claim: entire payout to user", async () => {
       // Open regular position
       const cost = await core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const positionId = await position.nextId();
       await core.connect(otherUser).openPosition(marketId, 1, 3, QUANTITY, cost + 1_000_000n);
-
-      const positions = await position.getPositionsByOwner(otherUser.address);
-      const positionId = positions[0];
 
       // Settle at tick 2 (winning)
       await settleMarket(2);
@@ -533,16 +509,15 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
     it("each position settles independently and correctly", async () => {
       // Sponsored position for beneficiary
       const cost1 = await core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const sponsoredPositionId = await position.nextId();
       await core.connect(sponsor).openPositionFor(
         beneficiary.address, marketId, 1, 3, QUANTITY, cost1 + 1_000_000n
       );
 
       // Regular position for otherUser
       const cost2 = await core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const regularPositionId = await position.nextId();
       await core.connect(otherUser).openPosition(marketId, 1, 3, QUANTITY, cost2 + 1_000_000n);
-
-      const sponsoredPositions = await position.getPositionsByOwner(beneficiary.address);
-      const regularPositions = await position.getPositionsByOwner(otherUser.address);
 
       // Settle at tick 2 (winning)
       await settleMarket(2);
@@ -551,7 +526,7 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
       // Claim sponsored
       const sponsorBefore = await payment.balanceOf(sponsor.address);
       const beneficiaryBefore = await payment.balanceOf(beneficiary.address);
-      await core.connect(beneficiary).claimPayout(sponsoredPositions[0]);
+      await core.connect(beneficiary).claimPayout(sponsoredPositionId);
       const sponsorAfterClaim = await payment.balanceOf(sponsor.address);
       const beneficiaryAfterClaim = await payment.balanceOf(beneficiary.address);
 
@@ -564,7 +539,7 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
 
       // Claim regular
       const otherUserBefore = await payment.balanceOf(otherUser.address);
-      await core.connect(otherUser).claimPayout(regularPositions[0]);
+      await core.connect(otherUser).claimPayout(regularPositionId);
       const otherUserAfter = await payment.balanceOf(otherUser.address);
 
       // Regular user gets full payout, no split
@@ -585,21 +560,20 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
       const maxCost = cost + 1_000_000n;
 
       // Sponsor A opens for beneficiary
+      const posId1 = await position.nextId();
       await core.connect(sponsor).openPositionFor(
         beneficiary.address, marketId, 0, 2, QUANTITY, maxCost
       );
 
       // Sponsor B opens for same beneficiary
+      const posId2 = await position.nextId();
       await core.connect(anotherSponsor).openPositionFor(
         beneficiary.address, marketId, 2, 4, QUANTITY, maxCost
       );
 
-      const positions = await position.getPositionsByOwner(beneficiary.address);
-      expect(positions.length).to.equal(2);
-
       // Each has correct sponsor
-      const sponsor1 = await core.getSponsorAddress(positions[0]);
-      const sponsor2 = await core.getSponsorAddress(positions[1]);
+      const sponsor1 = await core.getSponsorAddress(posId1);
+      const sponsor2 = await core.getSponsorAddress(posId2);
       expect(sponsor1).to.equal(sponsor.address);
       expect(sponsor2).to.equal(anotherSponsor.address);
     });
@@ -609,14 +583,12 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
       const maxCost = cost + 1_000_000n;
 
       // Sponsor opens for themselves
+      const positionId = await position.nextId();
       await expect(
         core.connect(sponsor).openPositionFor(
           sponsor.address, marketId, 1, 3, QUANTITY, maxCost
         )
       ).to.not.be.reverted;
-
-      const positions = await position.getPositionsByOwner(sponsor.address);
-      const positionId = positions[0];
 
       // Still recorded as sponsored
       expect(await core.getSponsoredCost(positionId)).to.be.greaterThan(0n);
@@ -627,12 +599,13 @@ describe("E2E: Sponsored Position (openPositionFor)", () => {
       expect(await payment.balanceOf(beneficiary.address)).to.equal(0n);
 
       const cost = await core.calculateOpenCost.staticCall(marketId, 1, 3, QUANTITY);
+      const positionId = await position.nextId();
       await core.connect(sponsor).openPositionFor(
         beneficiary.address, marketId, 1, 3, QUANTITY, cost + 1_000_000n
       );
 
-      const positions = await position.getPositionsByOwner(beneficiary.address);
-      expect(positions.length).to.equal(1);
+      expect(await position.exists(positionId)).to.equal(true);
+      expect(await position.ownerOf(positionId)).to.equal(beneficiary.address);
     });
   });
 });

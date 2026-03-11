@@ -9,7 +9,7 @@ import "../errors/SignalsErrors.sol";
 import "../interfaces/ISignalsPosition.sol";
 import "./SignalsPositionStorage.sol";
 
-/// @notice Upgradeable ERC721 position token with core-only mint/burn/update and indexing helpers.
+/// @notice Upgradeable ERC721 position token with core-only mint/burn/update.
 contract SignalsPosition is
     Initializable,
     ERC721Upgradeable,
@@ -75,7 +75,6 @@ contract SignalsPosition is
         });
 
         _safeMint(to, positionId);
-        _addPositionToMarket(marketId, positionId);
 
         emit PositionMinted(positionId, to, marketId, lowerTick, upperTick, quantity);
     }
@@ -83,10 +82,8 @@ contract SignalsPosition is
     function burn(uint256 positionId) external onlyCore {
         if (!_exists(positionId)) revert SignalsErrors.PositionNotFound(positionId);
         address owner = ownerOf(positionId);
-        uint256 marketId = _positions[positionId].marketId;
 
         _burn(positionId);
-        _removePositionFromMarket(marketId, positionId);
         delete _positions[positionId];
 
         emit PositionBurned(positionId, owner);
@@ -111,92 +108,22 @@ contract SignalsPosition is
         return _exists(positionId);
     }
 
-    function getPositionsByOwner(address owner) external view returns (uint256[] memory positions) {
-        positions = _ownerTokenList[owner];
-    }
-
-    function getMarketTokenLength(uint256 marketId) external view returns (uint256 length) {
-        return _marketTokenList[marketId].length;
-    }
-
-    function getMarketTokenAt(uint256 marketId, uint256 index) external view returns (uint256 tokenId) {
-        return _marketTokenList[marketId][index];
-    }
-
-    function getMarketPositions(uint256 marketId) external view returns (uint256[] memory tokenIds) {
-        tokenIds = _marketTokenList[marketId];
-    }
-
-    function getUserPositionsInMarket(address owner, uint256 marketId) external view returns (uint256[] memory tokenIds) {
-        uint256[] storage list = _marketTokenList[marketId];
-        uint256 count;
-        for (uint256 i = 0; i < list.length; i++) {
-            uint256 tokenId = list[i];
-            if (tokenId != 0 && _ownerOf(tokenId) == owner) {
-                count++;
-            }
-        }
-        tokenIds = new uint256[](count);
-        uint256 idx;
-        for (uint256 i = 0; i < list.length; i++) {
-            uint256 tokenId = list[i];
-            if (tokenId != 0 && _ownerOf(tokenId) == owner) {
-                tokenIds[idx++] = tokenId;
-            }
-        }
-    }
-
     function nextId() external view returns (uint256) {
         return _nextId;
     }
 
-    // --- Internal helpers ---
+    // --- Internal helpers (no-op, indexing removed for L1 fee optimization) ---
 
-    function _addPositionToMarket(uint256 marketId, uint256 positionId) internal {
-        _marketTokenList[marketId].push(positionId);
-        _positionMarketIndex[positionId] = _marketTokenList[marketId].length; // 1-based
-    }
+    function _addPositionToMarket(uint256, uint256) internal pure {}
 
-    function _removePositionFromMarket(uint256 marketId, uint256 positionId) internal {
-        uint256 idx = _positionMarketIndex[positionId];
-        if (idx == 0) return;
-        uint256 arrIndex = idx - 1;
-        if (arrIndex < _marketTokenList[marketId].length) {
-            _marketTokenList[marketId][arrIndex] = 0;
-        }
-        delete _positionMarketIndex[positionId];
-    }
+    function _removePositionFromMarket(uint256, uint256) internal pure {}
 
-    function _addPositionToOwner(address owner, uint256 positionId) internal {
-        _ownerTokenList[owner].push(positionId);
-        _positionOwnerIndex[positionId] = _ownerTokenList[owner].length; // 1-based
-    }
+    function _addPositionToOwner(address, uint256) internal pure {}
 
-    function _removePositionFromOwner(address owner, uint256 positionId) internal {
-        uint256 idx = _positionOwnerIndex[positionId];
-        if (idx == 0) return;
-        uint256 arrIndex = idx - 1;
-        uint256[] storage list = _ownerTokenList[owner];
-        if (arrIndex < list.length) {
-            uint256 last = list[list.length - 1];
-            list[arrIndex] = last;
-            list.pop();
-            if (last != positionId) {
-                _positionOwnerIndex[last] = arrIndex + 1;
-            }
-        }
-        delete _positionOwnerIndex[positionId];
-    }
+    function _removePositionFromOwner(address, uint256) internal pure {}
 
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
-        address from = super._update(to, tokenId, auth);
-        if (from != address(0)) {
-            _removePositionFromOwner(from, tokenId);
-        }
-        if (to != address(0)) {
-            _addPositionToOwner(to, tokenId);
-        }
-        return from;
+        return super._update(to, tokenId, auth);
     }
 
     function supportsInterface(bytes4 interfaceId)

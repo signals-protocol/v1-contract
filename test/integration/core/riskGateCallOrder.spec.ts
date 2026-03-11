@@ -280,13 +280,11 @@ describe('Core-first Risk Gate Call Order', () => {
       const quantity = 100n;
       const maxCost = ethers.parseEther('1000');
 
-      await core.openPosition(marketId, 0, 50, quantity, maxCost);
-
       // Get position ID
       const positionAddr = await core.positionContract();
       const positionContract = await ethers.getContractAt('SignalsPosition', positionAddr);
-      const positions = await positionContract.getPositionsByOwner(await owner.getAddress());
-      const positionId = positions[0];
+      const positionId = await positionContract.nextId();
+      await core.openPosition(marketId, 0, 50, quantity, maxCost);
 
       // gateIncreasePosition is currently a no-op (exposure cap enforcement deferred)
       // This test verifies the gate is called without error

@@ -57,10 +57,8 @@ describe("E2E: failure path", () => {
 
     const quantity = 1_000n;
     const openCost = await core.calculateOpenCost.staticCall(marketId, 1, 3, quantity);
+    const positionId = await position.nextId();
     await core.connect(trader).openPosition(marketId, 1, 3, quantity, openCost + 1_000_000n);
-
-    const traderPositions = await position.getPositionsByOwner(trader.address);
-    const positionId = traderPositions[0];
 
     await time.increaseTo(settlement + 5);
     await core.connect(owner).markSettlementFailed(marketId);

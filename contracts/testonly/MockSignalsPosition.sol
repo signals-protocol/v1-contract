@@ -72,26 +72,6 @@ contract MockSignalsPosition is ISignalsPosition {
         return _positions[positionId].owner;
     }
 
-    function getPositionsByOwner(address) external pure returns (uint256[] memory positions_) {
-        positions_ = new uint256[](0);
-    }
-
-    function getMarketTokenLength(uint256) external pure returns (uint256 length) {
-        length = 0;
-    }
-
-    function getMarketTokenAt(uint256, uint256) external pure returns (uint256 tokenId) {
-        tokenId = 0;
-    }
-
-    function getMarketPositions(uint256) external pure returns (uint256[] memory tokenIds) {
-        tokenIds = new uint256[](0);
-    }
-
-    function getUserPositionsInMarket(address, uint256) external pure returns (uint256[] memory tokenIds) {
-        tokenIds = new uint256[](0);
-    }
-
     /// @notice Test helper to mint a position with a specific ID
     /// @dev Used in TDD tests to control position IDs
     function mockMint(

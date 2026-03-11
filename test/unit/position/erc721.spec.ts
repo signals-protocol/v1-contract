@@ -146,25 +146,6 @@ describe("SignalsPosition ERC721", () => {
       expect(await position.balanceOf(bob.address)).to.equal(2); // bobToken + aliceToken1
     });
 
-    it("updates owner token tracking on transfer", async () => {
-      const { position, alice, bob, aliceToken1 } = await loadFixture(
-        positionWithTokensFixture
-      );
-
-      const aliceTokensBefore = await position.getPositionsByOwner(alice.address);
-      expect(aliceTokensBefore).to.include(aliceToken1);
-
-      await position
-        .connect(alice)
-        .transferFrom(alice.address, bob.address, aliceToken1);
-
-      const aliceTokensAfter = await position.getPositionsByOwner(alice.address);
-      const bobTokensAfter = await position.getPositionsByOwner(bob.address);
-
-      expect(aliceTokensAfter).to.not.include(aliceToken1);
-      expect(bobTokensAfter).to.include(aliceToken1);
-    });
-
     it("handles safe transfers", async () => {
       const { position, alice, bob, aliceToken1 } = await loadFixture(
         positionWithTokensFixture

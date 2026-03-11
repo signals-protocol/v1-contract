@@ -58,11 +58,8 @@ describe("E2E: full lifecycle", () => {
     const quantity = 1_000n;
     const openCost = await core.calculateOpenCost.staticCall(marketId, 1, 3, quantity);
     const maxCost = openCost + 1_000_000n;
+    const positionId = await position.nextId();
     await core.connect(trader).openPosition(marketId, 1, 3, quantity, maxCost);
-
-    const traderPositions = await position.getPositionsByOwner(trader.address);
-    expect(traderPositions.length).to.equal(1);
-    const positionId = traderPositions[0];
 
     await position
       .connect(trader)

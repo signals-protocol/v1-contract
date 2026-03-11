@@ -28,17 +28,6 @@ interface ISignalsPosition {
 
     function ownerOf(uint256 positionId) external view returns (address);
 
-    // Extended read API
-    function getPositionsByOwner(address owner) external view returns (uint256[] memory positions);
-
-    function getMarketTokenLength(uint256 marketId) external view returns (uint256 length);
-
-    function getMarketTokenAt(uint256 marketId, uint256 index) external view returns (uint256 tokenId);
-
-    function getMarketPositions(uint256 marketId) external view returns (uint256[] memory tokenIds);
-
-    function getUserPositionsInMarket(address owner, uint256 marketId) external view returns (uint256[] memory tokenIds);
-
     function core() external view returns (address);
 
     function nextId() external view returns (uint256);

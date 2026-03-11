@@ -25,8 +25,6 @@ async function deployCoreSigner(): Promise<{ address: string; signer: Signer }> 
  * Mathematical invariants that must always hold:
  * - INV-P1: totalSupply == sum(balanceOf(all owners))
  * - INV-P2: Position IDs are unique and sequential
- * - INV-P3: ownerOf(tokenId) matches getPositionsByOwner
- * - INV-P4: Market index consistency
  * - INV-P5: Transfer preserves total supply
  * - INV-P6: Burn decreases supply by exactly 1
  */
@@ -140,101 +138,6 @@ describe("Position Invariants", () => {
     });
   });
 
-  describe("INV-P3: Owner Index Consistency", () => {
-    it("ownerOf matches getPositionsByOwner for all tokens", async () => {
-      const { position, core, alice, bob } = await loadFixture(
-        deployPositionFixture
-      );
-
-      await position.connect(core).mintPosition(alice.address, 1, 0, 10, 1000);
-      await position.connect(core).mintPosition(alice.address, 1, 10, 20, 1000);
-      await position.connect(core).mintPosition(bob.address, 1, 20, 30, 1000);
-
-      const aliceTokens = await position.getPositionsByOwner(alice.address);
-      const bobTokens = await position.getPositionsByOwner(bob.address);
-
-      for (const tokenId of aliceTokens) {
-        expect(await position.ownerOf(tokenId)).to.equal(alice.address);
-      }
-
-      for (const tokenId of bobTokens) {
-        expect(await position.ownerOf(tokenId)).to.equal(bob.address);
-      }
-    });
-
-    it("maintains consistency after transfers", async () => {
-      const { position, core, alice, bob } = await loadFixture(
-        deployPositionFixture
-      );
-
-      await position.connect(core).mintPosition(alice.address, 1, 0, 10, 1000);
-      await position.connect(core).mintPosition(alice.address, 1, 10, 20, 1000);
-
-      // Transfer one token
-      await position
-        .connect(alice)
-        ["safeTransferFrom(address,address,uint256)"](
-          alice.address,
-          bob.address,
-          1
-        );
-
-      const aliceTokens = await position.getPositionsByOwner(alice.address);
-      const bobTokens = await position.getPositionsByOwner(bob.address);
-
-      expect(aliceTokens).to.not.include(1n);
-      expect(bobTokens).to.include(1n);
-
-      for (const tokenId of aliceTokens) {
-        expect(await position.ownerOf(tokenId)).to.equal(alice.address);
-      }
-      for (const tokenId of bobTokens) {
-        expect(await position.ownerOf(tokenId)).to.equal(bob.address);
-      }
-    });
-  });
-
-  describe("INV-P4: Market Index Consistency", () => {
-    it("getMarketPositions contains all non-burned positions in market", async () => {
-      const { position, core, alice, bob } = await loadFixture(
-        deployPositionFixture
-      );
-
-      await position.connect(core).mintPosition(alice.address, 1, 0, 10, 1000);
-      await position.connect(core).mintPosition(bob.address, 1, 10, 20, 1000);
-      await position.connect(core).mintPosition(alice.address, 2, 0, 5, 500);
-
-      const market1Positions = await position.getMarketPositions(1);
-      const market2Positions = await position.getMarketPositions(2);
-
-      expect(market1Positions.filter((id) => id !== 0n)).to.deep.equal([1n, 2n]);
-      expect(market2Positions.filter((id) => id !== 0n)).to.deep.equal([3n]);
-    });
-
-    it("maintains consistency with holes after burn", async () => {
-      const { position, core, alice } = await loadFixture(deployPositionFixture);
-
-      await position.connect(core).mintPosition(alice.address, 1, 0, 10, 1000);
-      await position.connect(core).mintPosition(alice.address, 1, 10, 20, 1000);
-      await position.connect(core).mintPosition(alice.address, 1, 20, 30, 1000);
-
-      await position.connect(core).burn(2);
-
-      const positions = await position.getMarketPositions(1);
-
-      // Position at index 1 should be 0 (hole)
-      expect(positions[1]).to.equal(0n);
-
-      // Non-zero positions should have valid owners
-      for (const id of positions) {
-        if (id !== 0n) {
-          const owner = await position.ownerOf(id);
-          expect(owner).to.not.equal(ethers.ZeroAddress);
-        }
-      }
-    });
-  });
-
   describe("INV-P5: Transfer Balance Invariant", () => {
     it("transfer does not change sum of balances", async () => {
       const { position, core, alice, bob, charlie } = await loadFixture(
@@ -307,13 +210,13 @@ describe("Position Invariants", () => {
       };
 
       const assertAllInvariants = async () => {
-        // INV-P3: Owner index consistency
+        // INV-P1: Balance consistency — sum of tracked alive tokens matches sum of balances
+        const expectedSum = BigInt(alive.size);
+        let actualSum = 0n;
         for (const user of users) {
-          const userTokens = await position.getPositionsByOwner(user.address);
-          for (const tokenId of userTokens) {
-            expect(await position.ownerOf(tokenId)).to.equal(user.address);
-          }
+          actualSum += await position.balanceOf(user.address);
         }
+        expect(actualSum).to.equal(expectedSum);
       };
 
       // Run random operations

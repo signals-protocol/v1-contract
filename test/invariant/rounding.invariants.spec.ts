@@ -153,6 +153,7 @@ describe("Rounding Invariants", () => {
       );
 
       // Open position
+      const positionId = await position.nextId();
       await core.connect(user).openPosition(
         marketId,
         3,
@@ -160,9 +161,6 @@ describe("Rounding Invariants", () => {
         MEDIUM_QUANTITY,
         ethers.parseUnits("100", USDC_DECIMALS)
       );
-
-      const positions = await position.getPositionsByOwner(user.address);
-      const positionId = positions[0];
 
       const balanceBefore = await payment.balanceOf(user.address);
       await core.calculateDecreaseProceeds.staticCall(
@@ -187,6 +185,7 @@ describe("Rounding Invariants", () => {
       const balanceStart = await payment.balanceOf(user.address);
 
       // Open position
+      const positionId = await position.nextId();
       await core.connect(user).openPosition(
         marketId,
         3,
@@ -199,8 +198,7 @@ describe("Rounding Invariants", () => {
       const costPaid = balanceStart - balanceAfterOpen;
 
       // Immediately close
-      const positions = await position.getPositionsByOwner(user.address);
-      await core.connect(user).closePosition(positions[0], 0);
+      await core.connect(user).closePosition(positionId, 0);
 
       const balanceAfterClose = await payment.balanceOf(user.address);
       const proceedsReceived = balanceAfterClose - balanceAfterOpen;
@@ -220,6 +218,7 @@ describe("Rounding Invariants", () => {
       const balanceStart = await payment.balanceOf(user.address);
 
       // Execute buy and immediate sell
+      const positionId = await position.nextId();
       await core.connect(user).openPosition(
         marketId,
         2,
@@ -228,8 +227,7 @@ describe("Rounding Invariants", () => {
         ethers.parseUnits("100", USDC_DECIMALS)
       );
 
-      const positions = await position.getPositionsByOwner(user.address);
-      await core.connect(user).closePosition(positions[0], 0);
+      await core.connect(user).closePosition(positionId, 0);
 
       const balanceEnd = await payment.balanceOf(user.address);
 
