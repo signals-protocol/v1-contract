@@ -19,7 +19,7 @@ yarn test                    # Hardhat tests
 - `contracts/interfaces/` — contract interfaces (changes → SDK ABI regen)
 - `contracts/lib/` — math libraries (changes → SDK quote sync)
 - `scripts/dispatcher.ts` — deploy/upgrade entrypoint
-- `deploy/` — deployment manifests
+- `releases/` — deployment manifests (dev/prod JSON plans from prepare-safe-upgrade)
 
 ## Cross-Repo Impact
 - Event signature change → v1-subgraph schema + mappings
