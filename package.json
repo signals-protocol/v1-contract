@@ -10,7 +10,8 @@
     "test:cov": "COVERAGE=1 hardhat coverage",
     "clean": "hardhat clean",
     "lint": "tsc --noEmit --noUnusedLocals --noUnusedParameters",
-    "format": "echo \"TODO: add formatter configuration\"",
+    "format": "prettier --write \"contracts/**/*.sol\" \"test/**/*.ts\" \"scripts/**/*.ts\"",
+    "format:check": "prettier --check \"contracts/**/*.sol\" \"test/**/*.ts\" \"scripts/**/*.ts\"",
     "deploy:local": "COMMAND=deploy:local hardhat run scripts/dispatcher.ts --network local",
     "deploy:dev": "MANIFEST_DEFAULT_DIR=.openzeppelin/dev COMMAND=deploy:dev hardhat run scripts/dispatcher.ts --network dev",
     "deploy:prod": "MANIFEST_DEFAULT_DIR=.openzeppelin/prod COMMAND=deploy:prod hardhat run scripts/dispatcher.ts --network prod",
@@ -26,7 +27,8 @@
     "safety-check:prod": "MANIFEST_DEFAULT_DIR=.openzeppelin/prod COMMAND=safety-check:prod hardhat run scripts/dispatcher.ts --network prod",
     "verify:dev": "MANIFEST_DEFAULT_DIR=.openzeppelin/dev COMMAND=verify:dev hardhat run scripts/dispatcher.ts --network dev",
     "verify:prod": "MANIFEST_DEFAULT_DIR=.openzeppelin/prod STRICT_VERIFY=1 COMMAND=verify:prod hardhat run scripts/dispatcher.ts --network prod",
-    "export-abis": "node scripts/export-abis.js"
+    "export-abis": "node scripts/export-abis.js",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
@@ -58,11 +60,23 @@
     "ethers": "^6.11.1",
     "hardhat": "^2.22.3",
     "hardhat-gas-reporter": "^1.0.10",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "patch-package": "^8.0.1",
+    "prettier": "^3.8.1",
+    "prettier-plugin-solidity": "^2.3.1",
     "solidity-coverage": "^0.8.10",
     "ts-node": "^10.9.2",
     "typechain": "^8.3.1",
     "typescript": "^5.4.0"
+  },
+  "lint-staged": {
+    "*.sol": [
+      "prettier --write"
+    ],
+    "*.ts": [
+      "prettier --write"
+    ]
   },
   "dependencies": {
     "@prb/math": "^4.1.0"
