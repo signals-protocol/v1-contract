@@ -25,7 +25,8 @@
     "safety-check:dev": "MANIFEST_DEFAULT_DIR=.openzeppelin/dev COMMAND=safety-check:dev hardhat run scripts/dispatcher.ts --network dev",
     "safety-check:prod": "MANIFEST_DEFAULT_DIR=.openzeppelin/prod COMMAND=safety-check:prod hardhat run scripts/dispatcher.ts --network prod",
     "verify:dev": "MANIFEST_DEFAULT_DIR=.openzeppelin/dev COMMAND=verify:dev hardhat run scripts/dispatcher.ts --network dev",
-    "verify:prod": "MANIFEST_DEFAULT_DIR=.openzeppelin/prod STRICT_VERIFY=1 COMMAND=verify:prod hardhat run scripts/dispatcher.ts --network prod"
+    "verify:prod": "MANIFEST_DEFAULT_DIR=.openzeppelin/prod STRICT_VERIFY=1 COMMAND=verify:prod hardhat run scripts/dispatcher.ts --network prod",
+    "export-abis": "node scripts/export-abis.js"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",

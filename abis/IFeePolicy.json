@@ -1,0 +1,92 @@
+{
+  "contractName": "IFeePolicy",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "descriptor",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "name",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "trader",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "marketId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "int256",
+              "name": "lowerTick",
+              "type": "int256"
+            },
+            {
+              "internalType": "int256",
+              "name": "upperTick",
+              "type": "int256"
+            },
+            {
+              "internalType": "uint128",
+              "name": "quantity",
+              "type": "uint128"
+            },
+            {
+              "internalType": "uint256",
+              "name": "baseAmount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bool",
+              "name": "isBuy",
+              "type": "bool"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "context",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct IFeePolicy.QuoteParams",
+          "name": "params",
+          "type": "tuple"
+        }
+      ],
+      "name": "quoteFee",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "feeAmount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ]
+}
