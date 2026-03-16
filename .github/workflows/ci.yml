@@ -44,6 +44,14 @@ jobs:
       - name: Generate typechain types
         run: npx hardhat typechain
 
+      - name: Validate exported ABIs
+        run: |
+          yarn export-abis
+          git diff --exit-code abis/ || {
+            echo "::error::ABIs are stale. Run 'yarn export-abis' and commit."
+            exit 1
+          }
+
       - name: TypeScript strict check
         run: yarn lint
 
