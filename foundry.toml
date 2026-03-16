@@ -6,8 +6,10 @@ test = "test"
 cache_path = "cache/foundry"
 remappings = [
     "@openzeppelin/=node_modules/@openzeppelin/",
-    "@prb/=node_modules/@prb/"
+    "@prb/=node_modules/@prb/",
+    "@redstone-finance/=node_modules/@redstone-finance/"
 ]
+auto_detect_remappings = false
 
 bytecode_hash = "none"
 offline = false

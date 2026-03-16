@@ -29,14 +29,23 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Cache Hardhat artifacts
+      - name: Cache build artifacts
         uses: actions/cache@v4
         with:
           path: |
             cache
             artifacts
             typechain-types
-          key: hardhat-${{ runner.os }}-${{ hashFiles('yarn.lock', 'hardhat.config.ts', 'hardhat.config.js', 'contracts/**') }}
+          key: build-${{ runner.os }}-${{ hashFiles('yarn.lock', 'hardhat.config.ts', 'foundry.toml', 'contracts/**') }}
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Forge build
+        run: forge build
+
+      - name: Remove Foundry output before Hardhat build
+        run: rm -rf out
 
       - name: Compile contracts
         run: yarn hardhat compile
