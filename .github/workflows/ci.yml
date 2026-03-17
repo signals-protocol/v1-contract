@@ -19,6 +19,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - uses: actions/setup-node@v4
         with:
@@ -43,6 +45,9 @@ jobs:
 
       - name: Forge build
         run: forge build
+
+      - name: Forge test
+        run: forge test -vvv
 
       - name: Remove Foundry output before Hardhat build
         run: rm -rf out
@@ -75,6 +80,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - uses: actions/setup-node@v4
         with:

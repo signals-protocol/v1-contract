@@ -5,11 +5,18 @@ libs = ["lib", "node_modules"]
 test = "test"
 cache_path = "cache/foundry"
 remappings = [
+    "forge-std/=lib/forge-std/src/",
+    "openzeppelin-foundry-upgrades/=lib/openzeppelin-foundry-upgrades/src/",
     "@openzeppelin/=node_modules/@openzeppelin/",
     "@prb/=node_modules/@prb/",
     "@redstone-finance/=node_modules/@redstone-finance/"
 ]
 auto_detect_remappings = false
+
+ffi = true
+ast = true
+build_info = true
+extra_output = ["storageLayout"]
 
 bytecode_hash = "none"
 offline = false
