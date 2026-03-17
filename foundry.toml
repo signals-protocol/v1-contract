@@ -36,6 +36,14 @@ fs_permissions = [
     { access = "read", path = "out/" },
 ]
 
+[invariant]
+runs = 256
+depth = 64
+fail_on_revert = false
+
+[profile.coverage]
+via_ir = false
+
 [rpc_endpoints]
 dev = "${DEV_RPC_URL}"
 prod = "${PROD_RPC_URL}"
