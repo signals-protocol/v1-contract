@@ -18,5 +18,8 @@
     "test",
     "contracts",
     "typechain-types"
+  ],
+  "exclude": [
+    "scripts/_archived"
   ]
 }

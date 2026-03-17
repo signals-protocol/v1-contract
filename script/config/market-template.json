@@ -1,0 +1,53 @@
+{
+  "_comment": "Template for CreateMarket config. Copy to market-{env}.json and fill in values.",
+  "skipConfig": false,
+  "feePolicyAddress": "",
+  "vault": {
+    "seedAmountUsd": 100000,
+    "withdrawalLagBatches": 0
+  },
+  "risk": {
+    "lambda": "0.3",
+    "kDrawdown": "1.0",
+    "enforceAlpha": true
+  },
+  "feeWaterfall": {
+    "rhoBS": "0.2",
+    "phiLP": "0.7",
+    "phiBS": "0.2",
+    "phiTR": "0.1"
+  },
+  "capitalStack": {
+    "backstopNavUsd": 100000,
+    "treasuryNavUsd": 0
+  },
+  "settlement": {
+    "submitWindowSec": 600,
+    "pendingOpsWindowSec": 300,
+    "claimDelaySec": 900
+  },
+  "redstone": {
+    "feedId": "BTC",
+    "feedDecimals": 8,
+    "maxSampleDistanceSec": 600,
+    "futureToleranceSec": 60
+  },
+  "market": {
+    "minTick": 70000,
+    "maxTick": 90000,
+    "tickSpacing": 200,
+    "startDelaySec": 604800,
+    "durationSec": 86400,
+    "settlementDelaySec": 0,
+    "seedChunkSize": 50,
+    "liquidity": {
+      "mode": "manual",
+      "safetyFactor": "0.8",
+      "manualAlphaWad": 1000000000000000000000
+    },
+    "baseFactors": {
+      "mode": "uniform",
+      "customWad": []
+    }
+  }
+}

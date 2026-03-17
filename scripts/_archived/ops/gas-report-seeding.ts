@@ -1,11 +1,11 @@
-import { ethers } from "hardhat";
-import { deployFullSystem } from "../../test/helpers/fullSystem";
-import { deploySeedData } from "../../test/helpers/seed";
-import { uniformFactors, WAD } from "../../test/helpers/constants";
+import { ethers } from 'hardhat';
+import { deployFullSystem } from '../../test/helpers/fullSystem';
+import { deploySeedData } from '../../test/helpers/seed';
+import { uniformFactors, WAD } from '../../test/helpers/constants';
 
-const NUM_BINS = Number(process.env.NUM_BINS ?? "200");
-const CHUNK_SIZE = Number(process.env.CHUNK_SIZE ?? "50");
-const GAS_PRICE_GWEI = BigInt(process.env.GAS_PRICE_GWEI ?? "20");
+const NUM_BINS = Number(process.env.NUM_BINS ?? '200');
+const CHUNK_SIZE = Number(process.env.CHUNK_SIZE ?? '50');
+const GAS_PRICE_GWEI = BigInt(process.env.GAS_PRICE_GWEI ?? '20');
 
 function formatGas(label: string, gas: bigint) {
   console.log(`${label}: ${gas.toString()} gas`);
@@ -13,7 +13,9 @@ function formatGas(label: string, gas: bigint) {
 
 function formatCost(label: string, gas: bigint) {
   const wei = gas * GAS_PRICE_GWEI * 1_000_000_000n;
-  console.log(`${label}: ${ethers.formatEther(wei)} ETH @ ${GAS_PRICE_GWEI} gwei`);
+  console.log(
+    `${label}: ${ethers.formatEther(wei)} ETH @ ${GAS_PRICE_GWEI} gwei`,
+  );
 }
 
 async function main() {
@@ -32,7 +34,7 @@ async function main() {
   const seedDeployReceipt = seedDeployTx ? await seedDeployTx.wait() : null;
   const seedDeployGas = seedDeployReceipt?.gasUsed ?? 0n;
 
-  const block = await ethers.provider.getBlock("latest");
+  const block = await ethers.provider.getBlock('latest');
   const now = Number(block?.timestamp ?? Math.floor(Date.now() / 1000));
   const startTimestamp = now - 10;
   const endTimestamp = now + 3600;
@@ -49,7 +51,7 @@ async function main() {
     NUM_BINS,
     WAD,
     ethers.ZeroAddress,
-    seedData.target
+    seedData.target,
   );
   const createReceipt = await createTx.wait();
   const createGas = createReceipt?.gasUsed ?? 0n;
@@ -67,7 +69,7 @@ async function main() {
     const gasUsed = seedReceipt?.gasUsed ?? 0n;
     totalSeedGas += gasUsed;
     console.log(
-      `[seed] chunk=${chunkIndex} start=${cursor} count=${count} gas=${gasUsed.toString()}`
+      `[seed] chunk=${chunkIndex} start=${cursor} count=${count} gas=${gasUsed.toString()}`,
     );
     remaining -= count;
     cursor += count;
@@ -77,17 +79,17 @@ async function main() {
   const totalGas = seedDeployGas + createGas + totalSeedGas;
   const gasPerBin = totalSeedGas / BigInt(NUM_BINS);
 
-  console.log("--- gas summary ---");
-  formatGas("SeedData deploy", seedDeployGas);
-  formatGas("createMarket", createGas);
-  formatGas("seedNextChunks total", totalSeedGas);
-  formatGas("seedNextChunks avg/bin", gasPerBin);
-  formatGas("TOTAL (deploy + create + seed)", totalGas);
-  console.log("--- cost estimate ---");
-  formatCost("SeedData deploy", seedDeployGas);
-  formatCost("createMarket", createGas);
-  formatCost("seedNextChunks total", totalSeedGas);
-  formatCost("TOTAL", totalGas);
+  console.log('--- gas summary ---');
+  formatGas('SeedData deploy', seedDeployGas);
+  formatGas('createMarket', createGas);
+  formatGas('seedNextChunks total', totalSeedGas);
+  formatGas('seedNextChunks avg/bin', gasPerBin);
+  formatGas('TOTAL (deploy + create + seed)', totalGas);
+  console.log('--- cost estimate ---');
+  formatCost('SeedData deploy', seedDeployGas);
+  formatCost('createMarket', createGas);
+  formatCost('seedNextChunks total', totalSeedGas);
+  formatCost('TOTAL', totalGas);
 }
 
 main().catch((err) => {
