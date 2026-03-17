@@ -1,3 +1,5 @@
+forge-std/=lib/forge-std/src/
+openzeppelin-foundry-upgrades/=lib/openzeppelin-foundry-upgrades/src/
 @openzeppelin/=node_modules/@openzeppelin/
 @prb/=node_modules/@prb/
 @redstone-finance/=node_modules/@redstone-finance/
