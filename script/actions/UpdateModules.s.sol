@@ -77,8 +77,9 @@ contract UpdateModules is BaseScript {
         require(lifecycleAddr != address(0), "MarketLifecycleModule address missing");
         require(oracleAddr != address(0), "OracleModule address missing");
 
-        if (riskAddr == address(0)) riskAddr = address(0);
-        if (vaultAddr == address(0)) vaultAddr = address(0);
+        // Fallback to current on-chain module addresses if not updating and env JSON missing
+        if (riskAddr == address(0)) riskAddr = core.riskModule();
+        if (vaultAddr == address(0)) vaultAddr = core.vaultModule();
 
         core.setModules(tradeAddr, lifecycleAddr, riskAddr, vaultAddr, oracleAddr);
 

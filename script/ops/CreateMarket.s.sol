@@ -234,6 +234,7 @@ contract CreateMarket is BaseScript {
             fracPart = vm.parseUint(string(fracBytes));
         }
 
+        require(fracLen <= 18, "Too many decimal places (max 18)");
         return intPart * 1e18 + fracPart * (10 ** (18 - fracLen));
     }
 }

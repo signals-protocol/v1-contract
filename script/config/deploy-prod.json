@@ -1,0 +1,34 @@
+{
+  "_comment": "Production deploy config. PAYMENT_TOKEN_ADDRESS and OWNER_SAFE env vars are required.",
+  "settlement": {
+    "submitWindowSec": 600,
+    "pendingOpsWindowSec": 300
+  },
+  "redstone": {
+    "feedId": "BTC",
+    "feedDecimals": 8,
+    "maxSampleDistanceSec": 600,
+    "futureToleranceSec": 60
+  },
+  "risk": {
+    "lambda": "0.3",
+    "kDrawdown": "1",
+    "enforceAlpha": false
+  },
+  "feeWaterfall": {
+    "rhoBS": "0.2",
+    "phiLP": "0.7",
+    "phiBS": "0.2",
+    "phiTR": "0.1"
+  },
+  "withdrawalLagBatches": 0,
+  "lpShare": {
+    "name": "Signals LP",
+    "symbol": "SIGLP"
+  },
+  "create2": {
+    "release": "v1",
+    "vanityPrefix": "0x516",
+    "maxNonce": 1000000
+  }
+}

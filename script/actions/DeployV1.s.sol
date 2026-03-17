@@ -310,6 +310,7 @@ contract DeployV1 is BaseScript {
         }
 
         // Scale to 18 decimals
+        require(fracLen <= 18, "Too many decimal places (max 18)");
         uint256 fracScale = 10 ** (18 - fracLen);
         return intPart * 1e18 + fracPart * fracScale;
     }

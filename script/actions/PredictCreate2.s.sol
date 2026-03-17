@@ -110,10 +110,9 @@ contract PredictCreate2 is BaseScript {
     }
 
     function _matchesPrefix(address addr, bytes memory prefix) internal pure returns (bool) {
-        bytes memory addrStr = bytes(_toLowerHex(addr));
+        bytes memory addrStr = bytes(vm.toLowercase(vm.toString(addr)));
         if (addrStr.length < prefix.length) return false;
         for (uint256 i = 0; i < prefix.length; i++) {
-            // Case-insensitive comparison
             bytes1 a = prefix[i];
             bytes1 b = addrStr[i];
             if (a >= 0x41 && a <= 0x5A) a = bytes1(uint8(a) + 32);
@@ -121,9 +120,5 @@ contract PredictCreate2 is BaseScript {
             if (a != b) return false;
         }
         return true;
-    }
-
-    function _toLowerHex(address addr) internal pure returns (string memory) {
-        return vm.toLowercase(vm.toString(addr));
     }
 }

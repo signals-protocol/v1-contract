@@ -81,7 +81,7 @@ contract CloseMarket is BaseScript {
                 int256 settlementValue;
                 string memory tick = vm.parseJsonString(json, ".settlement.tick");
                 if (bytes(tick).length > 0) {
-                    settlementValue = int256(vm.parseJsonUint(json, ".settlement.tick")) * 1_000_000;
+                    settlementValue = vm.parseJsonInt(json, ".settlement.tick") * 1_000_000;
                 } else {
                     settlementValue = int256(vm.parseJsonUint(json, ".settlement.valueUsd") * 1e6);
                 }
