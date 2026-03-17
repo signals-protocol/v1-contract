@@ -6,6 +6,7 @@ import "forge-std/Vm.sol";
 /// @title RedstoneHelper
 /// @notice Builds Redstone oracle payloads in pure Solidity using vm.sign for test submissions.
 /// @dev Matches the binary format of @redstone-finance/protocol for on-chain verification.
+///      Format reference: https://docs.redstone.finance/docs/smart-contract-devs/how-it-works
 library RedstoneHelper {
     // ============================================================
     // Constants — from redstone.ts:10-13
@@ -16,6 +17,9 @@ library RedstoneHelper {
 
     // Unsigned metadata string used by Redstone protocol
     bytes internal constant UNSIGNED_METADATA = bytes("redstone-primary-prod");
+
+    // Redstone calldata marker (9 bytes) — signals start of payload when parsing from end
+    bytes9 internal constant REDSTONE_MARKER = 0x000002ed57011e0000;
 
     // ============================================================
     // Hardhat default account private keys — from OracleModuleHarness:8-10
@@ -63,9 +67,14 @@ library RedstoneHelper {
             packages = bytes.concat(packages, pkg);
         }
 
-        // Full payload = [pkg0][pkg1][pkg2][unsignedMetadata][metaBytesSize(2B)][signerCount(1B)]
-        // Note: metaBytesSize is encoded as 3 bytes in Redstone format
-        payload = bytes.concat(packages, UNSIGNED_METADATA, _toBytes3(uint24(UNSIGNED_METADATA.length)));
+        // Full payload = [pkg0][pkg1][pkg2][unsignedMetadata][metaBytesSize(3B)][dataPackagesCount(2B)][REDSTONE_MARKER(9B)]
+        payload = bytes.concat(
+            packages,
+            UNSIGNED_METADATA,
+            _toBytes3(uint24(UNSIGNED_METADATA.length)),
+            _toBytes2(uint16(3)), // 3 data packages
+            REDSTONE_MARKER
+        );
     }
 
     /// @notice Submit a settlement sample with Redstone payload appended to calldata
@@ -107,44 +116,42 @@ library RedstoneHelper {
     // Internal: Redstone binary format helpers
     // ============================================================
 
-    /// @dev Build a single signed data package for one signer
-    /// Format: [dataPointValue(32B)][dataPointFeedId(32B)][dataPointCount(3B)]
-    ///         [dataPointValueByteSize(4B)][timestampMs(6B)][dataByteSize(2B)][signature(65B)]
+    /// @dev Build a single signed data package for one signer.
+    /// DataPackage.toBytes() = [dataPoints][timestamp(6B)][valueByteSize(4B)][count(3B)]
+    /// SignedDataPackage.toBytes() = [dataBytes][signature(65B)][dataByteSize(2B)]
     function _buildSignedDataPackage(
         Vm vm_,
         uint256 signerKey,
         uint256 value8dec,
         uint256 timestampSec
     ) private returns (bytes memory) {
-        // Data point: value (32 bytes) + feedId (32 bytes) = 64 bytes per data point
+        // Data point: [value(32B)][feedId(32B)] — value first, feedId last (SDK convention)
         bytes memory dataPointValue = abi.encodePacked(value8dec);
-        // Pad to 32 bytes (Redstone data point value is always 32 bytes)
         dataPointValue = _leftPad32(dataPointValue);
-
         bytes memory dataPointFeedId = abi.encodePacked(DATA_FEED_ID);
 
         uint256 timestampMs = timestampSec * 1000;
 
-        // data bytes = [dataPointValue(32B)][dataPointFeedId(32B)] = 64 bytes total per data point
-        // dataByteSize = total bytes of all data points = dataPointCount * (32 + 32) = 64
-        bytes memory dataToSign = bytes.concat(
+        // DataPackage.toBytes() = [dataPoints][timestamp(6B)][valueByteSize(4B)][dataPointsCount(3B)]
+        bytes memory dataBytes = bytes.concat(
             dataPointValue,
             dataPointFeedId,
-            _toBytes3(1), // dataPointCount = 1
+            _toBytes6(timestampMs), // timestampMilliseconds
             _toBytes4(32), // dataPointValueByteSize = 32
-            _toBytes6(timestampMs) // timestampMilliseconds
+            _toBytes3(1) // dataPointCount = 1
         );
 
-        uint256 dataByteSize = 64; // 32 (value) + 32 (feedId) = 64
+        // dataByteSize = total length of DataPackage.toBytes()
+        // = 64 (data points) + 6 (timestamp) + 4 (valueByteSize) + 3 (count) = 77
+        uint256 dataByteSize = dataBytes.length;
 
-        // Sign the data bytes with EIP-191 personal sign
-        bytes32 messageHash = keccak256(dataToSign);
-        bytes32 ethSignedHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash));
-        (uint8 v, bytes32 r, bytes32 s) = vm_.sign(signerKey, ethSignedHash);
+        // Sign with raw keccak256 (NOT EIP-191) — matches Redstone SDK SigningKey.signDigest
+        bytes32 hash = keccak256(dataBytes);
+        (uint8 v, bytes32 r, bytes32 s) = vm_.sign(signerKey, hash);
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        // Signed data package = [dataToSign][dataByteSize(2B)][signature(65B)]
-        return bytes.concat(dataToSign, _toBytes2(uint16(dataByteSize)), signature);
+        // SignedDataPackage = [dataBytes][signature(65B)][dataByteSize(2B)]
+        return bytes.concat(dataBytes, signature, _toBytes2(uint16(dataByteSize)));
     }
 
     function _leftPad32(bytes memory data) private pure returns (bytes memory) {
