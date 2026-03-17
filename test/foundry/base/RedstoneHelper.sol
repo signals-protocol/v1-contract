@@ -67,12 +67,13 @@ library RedstoneHelper {
             packages = bytes.concat(packages, pkg);
         }
 
-        // Full payload = [pkg0][pkg1][pkg2][unsignedMetadata][metaBytesSize(3B)][dataPackagesCount(2B)][REDSTONE_MARKER(9B)]
+        // Full payload = [pkgs][pkgCount(2B)][metadata][metaBytesSize(3B)][REDSTONE_MARKER(9B)]
+        // pkgCount is part of serializeSignedDataPackages(), comes right after the packages
         payload = bytes.concat(
             packages,
+            _toBytes2(uint16(3)), // 3 data packages — part of signed packages section
             UNSIGNED_METADATA,
             _toBytes3(uint24(UNSIGNED_METADATA.length)),
-            _toBytes2(uint16(3)), // 3 data packages
             REDSTONE_MARKER
         );
     }
@@ -118,40 +119,37 @@ library RedstoneHelper {
 
     /// @dev Build a single signed data package for one signer.
     /// DataPackage.toBytes() = [dataPoints][timestamp(6B)][valueByteSize(4B)][count(3B)]
-    /// SignedDataPackage.toBytes() = [dataBytes][signature(65B)][dataByteSize(2B)]
+    /// SignedDataPackage = [dataBytes][signature(65B)]
+    /// Note: no dataByteSize trailer — on-chain extractor computes size from metadata.
     function _buildSignedDataPackage(
         Vm vm_,
         uint256 signerKey,
         uint256 value8dec,
         uint256 timestampSec
     ) private returns (bytes memory) {
-        // Data point: [value(32B)][feedId(32B)] — value first, feedId last (SDK convention)
+        // Data point: [feedId(32B)][value(32B)] — on-chain CalldataExtractor reads feedId first
+        bytes memory dataPointFeedId = abi.encodePacked(DATA_FEED_ID);
         bytes memory dataPointValue = abi.encodePacked(value8dec);
         dataPointValue = _leftPad32(dataPointValue);
-        bytes memory dataPointFeedId = abi.encodePacked(DATA_FEED_ID);
 
         uint256 timestampMs = timestampSec * 1000;
 
         // DataPackage.toBytes() = [dataPoints][timestamp(6B)][valueByteSize(4B)][dataPointsCount(3B)]
         bytes memory dataBytes = bytes.concat(
-            dataPointValue,
             dataPointFeedId,
+            dataPointValue,
             _toBytes6(timestampMs), // timestampMilliseconds
             _toBytes4(32), // dataPointValueByteSize = 32
             _toBytes3(1) // dataPointCount = 1
         );
-
-        // dataByteSize = total length of DataPackage.toBytes()
-        // = 64 (data points) + 6 (timestamp) + 4 (valueByteSize) + 3 (count) = 77
-        uint256 dataByteSize = dataBytes.length;
 
         // Sign with raw keccak256 (NOT EIP-191) — matches Redstone SDK SigningKey.signDigest
         bytes32 hash = keccak256(dataBytes);
         (uint8 v, bytes32 r, bytes32 s) = vm_.sign(signerKey, hash);
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        // SignedDataPackage = [dataBytes][signature(65B)][dataByteSize(2B)]
-        return bytes.concat(dataBytes, signature, _toBytes2(uint16(dataByteSize)));
+        // SignedDataPackage = [dataBytes][signature(65B)]
+        return bytes.concat(dataBytes, signature);
     }
 
     function _leftPad32(bytes memory data) private pure returns (bytes memory) {
