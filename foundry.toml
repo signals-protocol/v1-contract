@@ -24,3 +24,19 @@ solc_version = "0.8.28"
 via_ir = true
 optimizer = true
 optimizer_runs = 200
+
+script = "script"
+
+fs_permissions = [
+    { access = "read-write", path = "scripts/environments/" },
+    { access = "read-write", path = "releases/" },
+    { access = "read-write", path = "script-output/" },
+    { access = "read", path = "broadcast/" },
+    { access = "read", path = "script/config/" },
+    { access = "read", path = "out/" },
+]
+
+[rpc_endpoints]
+dev = "${DEV_RPC_URL}"
+prod = "${PROD_RPC_URL}"
+local = "http://127.0.0.1:8545"

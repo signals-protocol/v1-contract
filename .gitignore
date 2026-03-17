@@ -123,4 +123,8 @@ docs/
 verification/foundry/corpus/
 verification/foundry/crytic-export/
 
+# Forge script outputs
+script-output/
+broadcast/
+
 # Claude Code

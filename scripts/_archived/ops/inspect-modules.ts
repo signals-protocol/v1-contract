@@ -1,18 +1,26 @@
-import hre from "hardhat";
-import fs from "fs";
-import path from "path";
+import hre from 'hardhat';
+import fs from 'fs';
+import path from 'path';
 
 function resolveEnvName(): string {
-  const raw = (process.env.ENV || process.env.TARGET_ENV || hre.network.name || "dev").trim();
-  return raw === "hardhat" ? "local" : raw;
+  const raw = (
+    process.env.ENV ||
+    process.env.TARGET_ENV ||
+    hre.network.name ||
+    'dev'
+  ).trim();
+  return raw === 'hardhat' ? 'local' : raw;
 }
 
 const envName = resolveEnvName();
 const envPath = path.resolve(__dirname, `../environments/${envName}.json`);
-const env = JSON.parse(fs.readFileSync(envPath, "utf8"));
+const env = JSON.parse(fs.readFileSync(envPath, 'utf8'));
 
 async function main() {
-  const core = await hre.ethers.getContractAt("SignalsCore", env.contracts.SignalsCoreProxy);
+  const core = await hre.ethers.getContractAt(
+    'SignalsCore',
+    env.contracts.SignalsCoreProxy,
+  );
   const out = {
     network: hre.network.name,
     core: await core.getAddress(),

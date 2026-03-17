@@ -1,9 +1,9 @@
-import hre from "hardhat";
-import { loadEnvironment, normalizeEnvironment } from "../utils/environment";
-import type { Environment } from "../types/environment";
+import hre from 'hardhat';
+import { loadEnvironment, normalizeEnvironment } from '../utils/environment';
+import type { Environment } from '../types/environment';
 
-type LiquidityMode = "auto" | "manual";
-type PriorMode = "logReturn" | "priceDiff";
+type LiquidityMode = 'auto' | 'manual';
+type PriorMode = 'logReturn' | 'priceDiff';
 
 interface PriorConfig {
   mode: PriorMode;
@@ -37,7 +37,7 @@ interface CreateMarketConfig {
 
 const CONFIG: CreateMarketConfig = {
   skipStaticCall: false,
-  feePolicyAddress: "0x40fBd67EfD2DF8b64DE0646e4441699f38D88aA7", // dev FeePolicy10bps
+  feePolicyAddress: '0x40fBd67EfD2DF8b64DE0646e4441699f38D88aA7', // dev FeePolicy10bps
   market: {
     anchorPrice: 94_000,
     numBins: 60,
@@ -47,13 +47,13 @@ const CONFIG: CreateMarketConfig = {
     settlementDelaySec: 0,
     seedChunkSize: 50,
     liquidity: {
-      mode: "manual",
-      safetyFactor: "0.8",
-      manualAlphaWad: "300000000000000000000",
+      mode: 'manual',
+      safetyFactor: '0.8',
+      manualAlphaWad: '300000000000000000000',
     },
   },
   prior: {
-    mode: "logReturn",
+    mode: 'logReturn',
     epsilon: 0.02,
     nu: 5,
     kappa: 400,
@@ -72,24 +72,34 @@ const LANCZOS_COEFFS = [
 ];
 const LOG_SQRT_2PI = 0.9189385332046727;
 
-function computeNumBins(minTick: number, maxTick: number, tickSpacing: number): number {
+function computeNumBins(
+  minTick: number,
+  maxTick: number,
+  tickSpacing: number,
+): number {
   const range = maxTick - minTick;
   if (tickSpacing <= 0 || range <= 0 || range % tickSpacing !== 0) {
-    throw new Error("Invalid ticks: (maxTick - minTick) must be divisible by tickSpacing");
+    throw new Error(
+      'Invalid ticks: (maxTick - minTick) must be divisible by tickSpacing',
+    );
   }
   return range / tickSpacing;
 }
 
-function computeTickBounds(anchorPrice: number, tickSpacing: number, numBins: number): {
+function computeTickBounds(
+  anchorPrice: number,
+  tickSpacing: number,
+  numBins: number,
+): {
   minTick: number;
   maxTick: number;
   centerTick: number;
 } {
   if (!Number.isFinite(anchorPrice) || anchorPrice <= 0) {
-    throw new Error("Anchor price must be positive");
+    throw new Error('Anchor price must be positive');
   }
   if (tickSpacing <= 0 || numBins <= 0) {
-    throw new Error("tickSpacing and numBins must be positive");
+    throw new Error('tickSpacing and numBins must be positive');
   }
 
   const centerTick = Math.round(anchorPrice / tickSpacing) * tickSpacing;
@@ -104,7 +114,9 @@ function computeTickBounds(anchorPrice: number, tickSpacing: number, numBins: nu
     const maxTick = centerTick + binsAbove * tickSpacing;
     const computedBins = (maxTick - minTick) / tickSpacing;
     if (computedBins !== numBins) {
-      throw new Error(`Computed bin count mismatch: expected=${numBins} actual=${computedBins}`);
+      throw new Error(
+        `Computed bin count mismatch: expected=${numBins} actual=${computedBins}`,
+      );
     }
     return { minTick, maxTick, centerTick };
   }
@@ -113,7 +125,9 @@ function computeTickBounds(anchorPrice: number, tickSpacing: number, numBins: nu
   const maxTick = centerTick + binsAbove * tickSpacing;
   const computedBins = (maxTick - minTick) / tickSpacing;
   if (computedBins !== numBins) {
-    throw new Error(`Computed bin count mismatch: expected=${numBins} actual=${computedBins}`);
+    throw new Error(
+      `Computed bin count mismatch: expected=${numBins} actual=${computedBins}`,
+    );
   }
 
   return { minTick, maxTick, centerTick };
@@ -121,7 +135,9 @@ function computeTickBounds(anchorPrice: number, tickSpacing: number, numBins: nu
 
 function logGamma(z: number): number {
   if (z < 0.5) {
-    return Math.log(Math.PI) - Math.log(Math.sin(Math.PI * z)) - logGamma(1 - z);
+    return (
+      Math.log(Math.PI) - Math.log(Math.sin(Math.PI * z)) - logGamma(1 - z)
+    );
   }
 
   z -= 1;
@@ -158,13 +174,13 @@ function generatePriorFactors(args: {
   const { minTick, maxTick, tickSpacing, anchorPrice, atr, prior } = args;
   const numBins = (maxTick - minTick) / tickSpacing;
   if (!Number.isInteger(numBins) || numBins <= 0) {
-    throw new Error("Invalid bin configuration");
+    throw new Error('Invalid bin configuration');
   }
 
-  const sigma = prior.mode === "logReturn" ? atr / anchorPrice : atr;
-  assertFinite(sigma, "sigma");
+  const sigma = prior.mode === 'logReturn' ? atr / anchorPrice : atr;
+  assertFinite(sigma, 'sigma');
   if (sigma <= 0) {
-    throw new Error("Sigma must be positive");
+    throw new Error('Sigma must be positive');
   }
 
   const basePrior: number[] = [];
@@ -174,33 +190,33 @@ function generatePriorFactors(args: {
     const tickValue = minTick + i * tickSpacing;
     let density: number;
 
-    if (prior.mode === "logReturn") {
+    if (prior.mode === 'logReturn') {
       const ratio = tickValue / anchorPrice;
-      assertFinite(ratio, "ratio");
+      assertFinite(ratio, 'ratio');
       if (ratio <= 0) {
-        throw new Error("bin coord/anchor ratio must be positive");
+        throw new Error('bin coord/anchor ratio must be positive');
       }
       const r = Math.log(ratio);
-      assertFinite(r, "logReturn");
+      assertFinite(r, 'logReturn');
       const scaled = r / sigma;
-      assertFinite(scaled, "scaled log return");
+      assertFinite(scaled, 'scaled log return');
       density = studentTPdf(scaled, prior.nu) / tickValue;
     } else {
       const diff = (tickValue - anchorPrice) / sigma;
-      assertFinite(diff, "priceDiff scaled");
+      assertFinite(diff, 'priceDiff scaled');
       density = studentTPdf(diff, prior.nu);
     }
 
-    assertFinite(density, "density");
+    assertFinite(density, 'density');
     if (density < 0) {
-      throw new Error("Density cannot be negative");
+      throw new Error('Density cannot be negative');
     }
     basePrior.push(density);
     pdfSum += density;
   }
 
   if (pdfSum <= 0) {
-    throw new Error("Prior density sum must be positive");
+    throw new Error('Prior density sum must be positive');
   }
 
   for (let i = 0; i < basePrior.length; i++) {
@@ -210,8 +226,9 @@ function generatePriorFactors(args: {
   const uniformWeight = 1 / numBins;
   const blendedPrior: number[] = [];
   for (let i = 0; i < numBins; i++) {
-    const blended = (1 - prior.epsilon) * basePrior[i] + prior.epsilon * uniformWeight;
-    assertFinite(blended, "blended prior");
+    const blended =
+      (1 - prior.epsilon) * basePrior[i] + prior.epsilon * uniformWeight;
+    assertFinite(blended, 'blended prior');
     blendedPrior.push(blended);
   }
 
@@ -226,12 +243,14 @@ function generatePriorFactors(args: {
 
   for (let i = 0; i < numBins; i++) {
     const weight = blendedPrior[i] * prior.kappa;
-    assertFinite(weight, "weight");
+    assertFinite(weight, 'weight');
     const wadString = weight.toFixed(18);
     const wad = hre.ethers.parseUnits(wadString, 18);
 
     if (wad < minFactorWad || wad > maxFactorWad) {
-      throw new Error(`Factor out of allowed range at index ${i}: ${weight.toFixed(6)}`);
+      throw new Error(
+        `Factor out of allowed range at index ${i}: ${weight.toFixed(6)}`,
+      );
     }
     factorWad.push(wad);
   }
@@ -250,7 +269,7 @@ async function decodeRevert(err: unknown) {
   }
 
   try {
-    const artifact = await hre.artifacts.readArtifact("SignalsErrors");
+    const artifact = await hre.artifacts.readArtifact('SignalsErrors');
     const iface = new hre.ethers.Interface(artifact.abi);
     const parsed = iface.parseError(data);
     console.error(`[create-market-dev-prior] reverted with ${parsed?.name}`);
@@ -258,7 +277,7 @@ async function decodeRevert(err: unknown) {
       console.error(parsed.args);
     }
   } catch (parseErr) {
-    console.error("[create-market-dev-prior] revert data (unparsed)", data);
+    console.error('[create-market-dev-prior] revert data (unparsed)', data);
     console.error(parseErr);
   }
 }
@@ -272,17 +291,22 @@ async function resolveAlphaWad(params: {
   enforceAlpha: boolean;
   riskModuleAddress: string;
 }): Promise<bigint> {
-  if (CONFIG.market.liquidity.mode === "manual") {
+  if (CONFIG.market.liquidity.mode === 'manual') {
     if (!CONFIG.market.liquidity.manualAlphaWad) {
-      throw new Error("manualAlphaWad is required when liquidity.mode is manual");
+      throw new Error(
+        'manualAlphaWad is required when liquidity.mode is manual',
+      );
     }
     return BigInt(CONFIG.market.liquidity.manualAlphaWad);
   }
 
-  const riskModule = await hre.ethers.getContractAt("RiskModule", params.riskModuleAddress);
+  const riskModule = await hre.ethers.getContractAt(
+    'RiskModule',
+    params.riskModuleAddress,
+  );
   const lnN = await riskModule.lnWad(params.numBins);
   if (lnN === 0n) {
-    throw new Error("lnN returned zero; numBins too small?");
+    throw new Error('lnN returned zero; numBins too small?');
   }
 
   const alphaBase = (params.lambdaWad * params.navWad) / WAD;
@@ -294,10 +318,15 @@ async function resolveAlphaWad(params: {
     alphaLimit = (alphaBaseDiv * factor) / WAD;
   }
 
-  const safetyFactorWad = hre.ethers.parseUnits(CONFIG.market.liquidity.safetyFactor, WAD_DECIMALS);
+  const safetyFactorWad = hre.ethers.parseUnits(
+    CONFIG.market.liquidity.safetyFactor,
+    WAD_DECIMALS,
+  );
   const alphaSafe = (alphaLimit * safetyFactorWad) / WAD;
   if (alphaSafe === 0n) {
-    throw new Error("alphaWad computed as zero; adjust safetyFactor or risk config");
+    throw new Error(
+      'alphaWad computed as zero; adjust safetyFactor or risk config',
+    );
   }
   return alphaSafe;
 }
@@ -305,31 +334,38 @@ async function resolveAlphaWad(params: {
 async function main() {
   const { ethers, network } = hre;
   const env = normalizeEnvironment(network.name) as Environment;
-  console.log(`[create-market-dev-prior] environment=${env} network=${network.name}`);
+  console.log(
+    `[create-market-dev-prior] environment=${env} network=${network.name}`,
+  );
 
   const envData = loadEnvironment(env);
   const coreAddress = envData.contracts.SignalsCoreProxy;
-  if (!coreAddress) throw new Error("Missing SignalsCoreProxy in environment file");
+  if (!coreAddress)
+    throw new Error('Missing SignalsCoreProxy in environment file');
 
   const feePolicyAddress = CONFIG.feePolicyAddress;
   if (!feePolicyAddress) {
-    throw new Error("feePolicyAddress is required in CONFIG");
+    throw new Error('feePolicyAddress is required in CONFIG');
   }
 
   const [deployer] = await ethers.getSigners();
-  const core = await ethers.getContractAt("SignalsCore", coreAddress);
+  const core = await ethers.getContractAt('SignalsCore', coreAddress);
   const owner = await core.owner();
   const paused = await core.paused();
-  console.log(`[create-market-dev-prior] coreOwner=${owner} caller=${deployer.address} paused=${paused}`);
+  console.log(
+    `[create-market-dev-prior] coreOwner=${owner} caller=${deployer.address} paused=${paused}`,
+  );
 
   const { minTick, maxTick, centerTick } = computeTickBounds(
     CONFIG.market.anchorPrice,
     CONFIG.market.tickSpacing,
-    CONFIG.market.numBins
+    CONFIG.market.numBins,
   );
   const numBins = computeNumBins(minTick, maxTick, CONFIG.market.tickSpacing);
   if (numBins !== CONFIG.market.numBins) {
-    throw new Error(`numBins mismatch: expected=${CONFIG.market.numBins} actual=${numBins}`);
+    throw new Error(
+      `numBins mismatch: expected=${CONFIG.market.numBins} actual=${numBins}`,
+    );
   }
 
   const baseFactors = generatePriorFactors({
@@ -341,24 +377,33 @@ async function main() {
     prior: CONFIG.prior,
   });
   if (baseFactors.length !== numBins) {
-    throw new Error(`baseFactors length mismatch: expected ${numBins}, got ${baseFactors.length}`);
+    throw new Error(
+      `baseFactors length mismatch: expected ${numBins}, got ${baseFactors.length}`,
+    );
   }
 
-  const minFactor = baseFactors.reduce((min, value) => (value < min ? value : min), baseFactors[0]);
-  const maxFactor = baseFactors.reduce((max, value) => (value > max ? value : max), baseFactors[0]);
-  console.log(
-    `[create-market-dev-prior] ticks=[${minTick},${maxTick}) spacing=${CONFIG.market.tickSpacing} numBins=${numBins} anchor=${CONFIG.market.anchorPrice} center=${centerTick}`
+  const minFactor = baseFactors.reduce(
+    (min, value) => (value < min ? value : min),
+    baseFactors[0],
+  );
+  const maxFactor = baseFactors.reduce(
+    (max, value) => (value > max ? value : max),
+    baseFactors[0],
   );
   console.log(
-    `[create-market-dev-prior] priorFactors min=${minFactor.toString()} max=${maxFactor.toString()}`
+    `[create-market-dev-prior] ticks=[${minTick},${maxTick}) spacing=${CONFIG.market.tickSpacing} numBins=${numBins} anchor=${CONFIG.market.anchorPrice} center=${centerTick}`,
+  );
+  console.log(
+    `[create-market-dev-prior] priorFactors min=${minFactor.toString()} max=${maxFactor.toString()}`,
   );
 
   const navWad = await core.getVaultNav();
-  if (CONFIG.market.liquidity.mode === "auto" && navWad === 0n) {
-    throw new Error("Vault NAV is zero; seed vault or use manual alpha");
+  if (CONFIG.market.liquidity.mode === 'auto' && navWad === 0n) {
+    throw new Error('Vault NAV is zero; seed vault or use manual alpha');
   }
   const drawdownWad = await core.getVaultDrawdown();
-  const [lambdaOnChain, kDrawdownOnChain, enforceAlpha] = await core.getRiskConfig();
+  const [lambdaOnChain, kDrawdownOnChain, enforceAlpha] =
+    await core.getRiskConfig();
   const riskModuleAddress = await core.riskModule();
   const alphaWad = await resolveAlphaWad({
     navWad,
@@ -370,7 +415,7 @@ async function main() {
     riskModuleAddress,
   });
 
-  const latestBlock = await ethers.provider.getBlock("latest");
+  const latestBlock = await ethers.provider.getBlock('latest');
   const now = latestBlock?.timestamp ?? Math.floor(Date.now() / 1000);
   const blockGasLimit = latestBlock?.gasLimit ?? 0n;
   const startTimestamp = now + CONFIG.market.startDelaySec;
@@ -378,10 +423,12 @@ async function main() {
   const settlementTimestamp = endTimestamp + CONFIG.market.settlementDelaySec;
 
   const packedFactors = hre.ethers.solidityPacked(
-    Array(baseFactors.length).fill("uint256"),
-    baseFactors
+    Array(baseFactors.length).fill('uint256'),
+    baseFactors,
   );
-  const seedData = await (await hre.ethers.getContractFactory("SeedData")).deploy(packedFactors);
+  const seedData = await (
+    await hre.ethers.getContractFactory('SeedData')
+  ).deploy(packedFactors);
   await seedData.waitForDeployment();
   const seedDataAddress = seedData.target;
 
@@ -399,7 +446,7 @@ async function main() {
         numBins,
         alphaWad,
         feePolicyAddress,
-        seedDataAddress
+        seedDataAddress,
       );
     } catch (err) {
       await decodeRevert(err);
@@ -407,7 +454,7 @@ async function main() {
     }
   }
 
-  const txData = core.interface.encodeFunctionData("createMarket", [
+  const txData = core.interface.encodeFunctionData('createMarket', [
     minTick,
     maxTick,
     CONFIG.market.tickSpacing,
@@ -420,7 +467,8 @@ async function main() {
     seedDataAddress,
   ]);
   console.log(`[create-market-dev-prior] txDataLen=${txData.length}`);
-  const overrides = blockGasLimit > 0n ? { gasLimit: blockGasLimit - 100000n } : {};
+  const overrides =
+    blockGasLimit > 0n ? { gasLimit: blockGasLimit - 100000n } : {};
   const tx = await deployer.sendTransaction({
     to: coreAddress,
     data: txData,
@@ -429,13 +477,17 @@ async function main() {
   await tx.wait();
 
   console.log(`[create-market-dev-prior] marketId=${marketId.toString()}`);
-  console.log(`[create-market-dev-prior] start=${startTimestamp} end=${endTimestamp} settlement=${settlementTimestamp}`);
+  console.log(
+    `[create-market-dev-prior] start=${startTimestamp} end=${endTimestamp} settlement=${settlementTimestamp}`,
+  );
 
   const seedChunkSize = Math.max(1, CONFIG.market.seedChunkSize);
   let remaining = numBins;
   while (remaining > 0) {
     const count = remaining > seedChunkSize ? seedChunkSize : remaining;
-    console.log(`[create-market-dev-prior] seeding chunk count=${count} remaining=${remaining}`);
+    console.log(
+      `[create-market-dev-prior] seeding chunk count=${count} remaining=${remaining}`,
+    );
     const seedTx = await core.seedNextChunks(marketId, count);
     await seedTx.wait();
     remaining -= count;

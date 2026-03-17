@@ -1,18 +1,26 @@
-import hre from "hardhat";
-import fs from "fs";
-import path from "path";
+import hre from 'hardhat';
+import fs from 'fs';
+import path from 'path';
 
 function resolveEnvName(): string {
-  const raw = (process.env.ENV || process.env.TARGET_ENV || hre.network.name || "dev").trim();
-  return raw === "hardhat" ? "local" : raw;
+  const raw = (
+    process.env.ENV ||
+    process.env.TARGET_ENV ||
+    hre.network.name ||
+    'dev'
+  ).trim();
+  return raw === 'hardhat' ? 'local' : raw;
 }
 
 const envName = resolveEnvName();
 const envPath = path.resolve(__dirname, `../environments/${envName}.json`);
-const env = JSON.parse(fs.readFileSync(envPath, "utf8"));
+const env = JSON.parse(fs.readFileSync(envPath, 'utf8'));
 
 async function main() {
-  const core = await hre.ethers.getContractAt("SignalsCore", env.contracts.SignalsCoreProxy);
+  const core = await hre.ethers.getContractAt(
+    'SignalsCore',
+    env.contracts.SignalsCoreProxy,
+  );
   const marketId = 7n;
 
   const market = await core.markets(marketId);
@@ -24,8 +32,10 @@ async function main() {
   const batchId = tSet < OFFSET ? 0n : (tSet - OFFSET) / BATCH_SECONDS;
   const targetBatchId = currentBatchId + 1n;
 
-  const [lt, ftot, ft, gt, npre, pe, processed] = await core.getDailyPnl.staticCall(batchId);
-  const [lt2, ftot2, ft2, gt2, npre2, pe2, processed2] = await core.getDailyPnl.staticCall(targetBatchId);
+  const [lt, ftot, ft, gt, npre, pe, processed] =
+    await core.getDailyPnl.staticCall(batchId);
+  const [lt2, ftot2, ft2, gt2, npre2, pe2, processed2] =
+    await core.getDailyPnl.staticCall(targetBatchId);
 
   const [total, resolved] = await core.getBatchMarketState(batchId);
   const [total2, resolved2] = await core.getBatchMarketState(targetBatchId);
@@ -45,7 +55,10 @@ async function main() {
       snapshotChunksDone: market.snapshotChunksDone,
     },
     marketBatchId: batchId.toString(),
-    marketBatchState: { total: total.toString(), resolved: resolved.toString() },
+    marketBatchState: {
+      total: total.toString(),
+      resolved: resolved.toString(),
+    },
     marketBatchPnl: {
       lt: lt.toString(),
       ftot: ftot.toString(),
@@ -56,7 +69,10 @@ async function main() {
       processed,
     },
     targetBatchId: targetBatchId.toString(),
-    targetBatchState: { total: total2.toString(), resolved: resolved2.toString() },
+    targetBatchState: {
+      total: total2.toString(),
+      resolved: resolved2.toString(),
+    },
     targetBatchPnl: {
       lt: lt2.toString(),
       ftot: ftot2.toString(),

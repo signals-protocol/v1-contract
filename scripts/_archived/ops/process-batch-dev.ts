@@ -1,6 +1,6 @@
-import hre from "hardhat";
-import { loadEnvironment, normalizeEnvironment } from "../utils/environment";
-import type { Environment } from "../types/environment";
+import hre from 'hardhat';
+import { loadEnvironment, normalizeEnvironment } from '../utils/environment';
+import type { Environment } from '../types/environment';
 
 async function main() {
   const { ethers, network } = hre;
@@ -9,10 +9,11 @@ async function main() {
 
   const envData = loadEnvironment(env);
   const coreAddress = envData.contracts.SignalsCoreProxy;
-  if (!coreAddress) throw new Error("Missing SignalsCoreProxy in environment file");
+  if (!coreAddress)
+    throw new Error('Missing SignalsCoreProxy in environment file');
 
   const [deployer] = await ethers.getSigners();
-  const core = await ethers.getContractAt("SignalsCore", coreAddress, deployer);
+  const core = await ethers.getContractAt('SignalsCore', coreAddress, deployer);
 
   let currentBatchId = await core.currentBatchId();
 
@@ -21,18 +22,22 @@ async function main() {
     const [total, resolved] = await core.getBatchMarketState(nextBatchId);
 
     if (total === 0n) {
-      console.log(`[process-batch-dev] stop: batch ${nextBatchId.toString()} has no markets`);
+      console.log(
+        `[process-batch-dev] stop: batch ${nextBatchId.toString()} has no markets`,
+      );
       break;
     }
 
     if (resolved !== total) {
       console.log(
-        `[process-batch-dev] stop: batch ${nextBatchId.toString()} unresolved ${resolved.toString()}/${total.toString()}`
+        `[process-batch-dev] stop: batch ${nextBatchId.toString()} unresolved ${resolved.toString()}/${total.toString()}`,
       );
       break;
     }
 
-    console.log(`[process-batch-dev] processDailyBatch batchId=${nextBatchId.toString()}`);
+    console.log(
+      `[process-batch-dev] processDailyBatch batchId=${nextBatchId.toString()}`,
+    );
     await (await core.processDailyBatch(nextBatchId)).wait();
     currentBatchId = nextBatchId;
   }

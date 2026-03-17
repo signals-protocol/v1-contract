@@ -1,10 +1,10 @@
-import hre from "hardhat";
-import { loadEnvironment, normalizeEnvironment } from "../utils/environment";
-import type { Environment } from "../types/environment";
+import hre from 'hardhat';
+import { loadEnvironment, normalizeEnvironment } from '../utils/environment';
+import type { Environment } from '../types/environment';
 
-type SettlementMode = "secondary" | "primary";
-type TimingMode = "auto" | "manual" | "skip";
-type FilterMode = "active" | "unsettled";
+type SettlementMode = 'secondary' | 'primary';
+type TimingMode = 'auto' | 'manual' | 'skip';
+type FilterMode = 'active' | 'unsettled';
 
 interface CloseOpenMarketsConfig {
   targetEnv: Environment;
@@ -43,7 +43,7 @@ interface CloseOpenMarketsConfig {
   };
 }
 
-const EXECUTE = process.env.EXECUTE === "1";
+const EXECUTE = process.env.EXECUTE === '1';
 interface TimingResult {
   startTimestamp: number;
   endTimestamp: number;
@@ -54,19 +54,19 @@ interface TimingResult {
 
 // === Editable config (top-level) ============================================
 const CONFIG: CloseOpenMarketsConfig = {
-  targetEnv: "dev",
+  targetEnv: 'dev',
   filter: {
-    mode: "unsettled",
+    mode: 'unsettled',
     includeFailed: true,
     requireSeeded: true,
   },
-  mode: "secondary", // "secondary" | "primary"
+  mode: 'secondary', // "secondary" | "primary"
   settlement: {
-    valueUsd: "85000", // 6 decimals, used when settlement.tick is empty
-    tick: "", // if set, overrides valueUsd (settlementValue = tick * 1e6)
+    valueUsd: '85000', // 6 decimals, used when settlement.tick is empty
+    tick: '', // if set, overrides valueUsd (settlementValue = tick * 1e6)
   },
   timing: {
-    mode: "auto", // "auto" | "manual" | "skip"
+    mode: 'auto', // "auto" | "manual" | "skip"
     auto: {
       daysBack: 2, // move settlement into a past batch so processDailyBatch can run
       durationSec: 3600,
@@ -111,28 +111,53 @@ function toBatchId(timestamp: bigint): bigint {
   return (timestamp - BATCH_TIMEZONE_OFFSET) / BATCH_SECONDS;
 }
 
-function computeAutoTiming(now: number, submitWindowSec: number, currentBatchId: bigint): TimingResult | null {
-  const minLagSec = Math.max(submitWindowSec + 5, CONFIG.timing.auto.endOffsetSec + 1);
-  for (let daysBack = CONFIG.timing.auto.daysBack; daysBack >= 0; daysBack -= 1) {
+function computeAutoTiming(
+  now: number,
+  submitWindowSec: number,
+  currentBatchId: bigint,
+): TimingResult | null {
+  const minLagSec = Math.max(
+    submitWindowSec + 5,
+    CONFIG.timing.auto.endOffsetSec + 1,
+  );
+  for (
+    let daysBack = CONFIG.timing.auto.daysBack;
+    daysBack >= 0;
+    daysBack -= 1
+  ) {
     const settlementTimestamp =
       now - daysBack * Number(BATCH_SECONDS) - minLagSec;
     const endTimestamp = settlementTimestamp - CONFIG.timing.auto.endOffsetSec;
     const startTimestamp = endTimestamp - CONFIG.timing.auto.durationSec;
-    if (startTimestamp <= 0 || endTimestamp <= startTimestamp || endTimestamp > settlementTimestamp) {
+    if (
+      startTimestamp <= 0 ||
+      endTimestamp <= startTimestamp ||
+      endTimestamp > settlementTimestamp
+    ) {
       continue;
     }
     const batchId = toBatchId(BigInt(settlementTimestamp));
     if (batchId <= currentBatchId) {
       continue;
     }
-    return { startTimestamp, endTimestamp, settlementTimestamp, batchId, daysBack };
+    return {
+      startTimestamp,
+      endTimestamp,
+      settlementTimestamp,
+      batchId,
+      daysBack,
+    };
   }
   const nextBatchId = currentBatchId + 1n;
   const batchStart = nextBatchId * BATCH_SECONDS + BATCH_TIMEZONE_OFFSET;
   const settlementTimestamp = Number(batchStart + BigInt(minLagSec));
   const endTimestamp = now - CONFIG.timing.auto.endOffsetSec;
   const startTimestamp = endTimestamp - CONFIG.timing.auto.durationSec;
-  if (startTimestamp <= 0 || endTimestamp <= startTimestamp || endTimestamp > settlementTimestamp) {
+  if (
+    startTimestamp <= 0 ||
+    endTimestamp <= startTimestamp ||
+    endTimestamp > settlementTimestamp
+  ) {
     return null;
   }
   return {
@@ -155,7 +180,7 @@ function shouldCloseMarket(market: any, now: number): boolean {
   if (market.settled) return false;
   if (!CONFIG.filter.includeFailed && market.failed) return false;
   if (CONFIG.filter.requireSeeded && !market.isSeeded) return false;
-  if (CONFIG.filter.mode === "unsettled") return true;
+  if (CONFIG.filter.mode === 'unsettled') return true;
   return isActiveMarket(market, now);
 }
 
@@ -164,12 +189,12 @@ async function maybeUpdateTiming(
   marketId: bigint,
   now: number,
   submitWindowSec: number,
-  currentBatchId: bigint
+  currentBatchId: bigint,
 ) {
-  if (CONFIG.timing.mode === "skip") return false;
+  if (CONFIG.timing.mode === 'skip') return false;
 
   const timing: TimingResult | null =
-    CONFIG.timing.mode === "manual"
+    CONFIG.timing.mode === 'manual'
       ? {
           startTimestamp: CONFIG.timing.manual.startTimestamp,
           endTimestamp: CONFIG.timing.manual.endTimestamp,
@@ -178,44 +203,61 @@ async function maybeUpdateTiming(
       : computeAutoTiming(now, submitWindowSec, currentBatchId);
 
   if (!timing) {
-    throw new Error("[close-open-markets] no unprocessed batch available for auto timing");
+    throw new Error(
+      '[close-open-markets] no unprocessed batch available for auto timing',
+    );
   }
 
   console.log(
-    `[close-open-markets] updateMarketTiming marketId=${marketId.toString()} start=${timing.startTimestamp} end=${timing.endTimestamp} settle=${timing.settlementTimestamp} daysBack=${timing.daysBack ?? "manual"}`
+    `[close-open-markets] updateMarketTiming marketId=${marketId.toString()} start=${timing.startTimestamp} end=${timing.endTimestamp} settle=${timing.settlementTimestamp} daysBack=${timing.daysBack ?? 'manual'}`,
   );
   if (!EXECUTE) return true;
-  await (await core.updateMarketTiming(
-    marketId,
-    timing.startTimestamp,
-    timing.endTimestamp,
-    timing.settlementTimestamp
-  )).wait();
+  await (
+    await core.updateMarketTiming(
+      marketId,
+      timing.startTimestamp,
+      timing.endTimestamp,
+      timing.settlementTimestamp,
+    )
+  ).wait();
   return true;
 }
 
-async function settleMarket(core: any, marketId: bigint, market: any, settlementValue: bigint) {
+async function settleMarket(
+  core: any,
+  marketId: bigint,
+  market: any,
+  settlementValue: bigint,
+) {
   if (market.settled) {
-    console.log(`[close-open-markets] marketId=${marketId.toString()} already settled`);
+    console.log(
+      `[close-open-markets] marketId=${marketId.toString()} already settled`,
+    );
     return market;
   }
 
-  if (CONFIG.mode === "primary") {
-    console.log(`[close-open-markets] finalizePrimarySettlement marketId=${marketId.toString()}`);
+  if (CONFIG.mode === 'primary') {
+    console.log(
+      `[close-open-markets] finalizePrimarySettlement marketId=${marketId.toString()}`,
+    );
     if (!EXECUTE) return market;
     await (await core.finalizePrimarySettlement(marketId)).wait();
   } else {
     if (!market.failed) {
-      console.log(`[close-open-markets] markSettlementFailed marketId=${marketId.toString()}`);
+      console.log(
+        `[close-open-markets] markSettlementFailed marketId=${marketId.toString()}`,
+      );
       if (EXECUTE) {
         await (await core.markSettlementFailed(marketId)).wait();
       }
     }
     console.log(
-      `[close-open-markets] finalizeSecondarySettlement marketId=${marketId.toString()} value=${settlementValue.toString()}`
+      `[close-open-markets] finalizeSecondarySettlement marketId=${marketId.toString()} value=${settlementValue.toString()}`,
     );
     if (!EXECUTE) return market;
-    await (await core.finalizeSecondarySettlement(marketId, settlementValue)).wait();
+    await (
+      await core.finalizeSecondarySettlement(marketId, settlementValue)
+    ).wait();
   }
 
   if (!EXECUTE) return market;
@@ -224,20 +266,28 @@ async function settleMarket(core: any, marketId: bigint, market: any, settlement
 
 async function requestSnapshotChunks(core: any, marketId: bigint, market: any) {
   if (market.snapshotChunksDone) {
-    console.log(`[close-open-markets] snapshot chunks already done marketId=${marketId.toString()}`);
+    console.log(
+      `[close-open-markets] snapshot chunks already done marketId=${marketId.toString()}`,
+    );
     return market;
   }
   let calls = 0;
   let updated = market;
   while (!updated.snapshotChunksDone && calls < CONFIG.chunks.maxCalls) {
-    console.log(`[close-open-markets] requestSettlementChunks marketId=${marketId.toString()} call=${calls + 1}`);
+    console.log(
+      `[close-open-markets] requestSettlementChunks marketId=${marketId.toString()} call=${calls + 1}`,
+    );
     if (!EXECUTE) break;
-    await (await core.requestSettlementChunks(marketId, CONFIG.chunks.maxPerTx)).wait();
+    await (
+      await core.requestSettlementChunks(marketId, CONFIG.chunks.maxPerTx)
+    ).wait();
     updated = await core.markets(marketId);
     calls += 1;
   }
   if (!updated.snapshotChunksDone) {
-    console.warn(`[close-open-markets] snapshotChunksDone=false marketId=${marketId.toString()}`);
+    console.warn(
+      `[close-open-markets] snapshotChunksDone=false marketId=${marketId.toString()}`,
+    );
   }
   return updated;
 }
@@ -245,39 +295,42 @@ async function requestSnapshotChunks(core: any, marketId: bigint, market: any) {
 async function main() {
   const { ethers, network } = hre;
   const env = normalizeEnvironment(network.name) as Environment;
-  console.log(`[close-open-markets] environment=${env} network=${network.name} execute=${EXECUTE}`);
+  console.log(
+    `[close-open-markets] environment=${env} network=${network.name} execute=${EXECUTE}`,
+  );
   if (CONFIG.targetEnv && env !== CONFIG.targetEnv) {
     throw new Error(`Refusing to run on ${env} (expected ${CONFIG.targetEnv})`);
   }
 
   const envData = loadEnvironment(env);
   const coreAddress = envData.contracts.SignalsCoreProxy;
-  if (!coreAddress) throw new Error("Missing SignalsCoreProxy in environment file");
+  if (!coreAddress)
+    throw new Error('Missing SignalsCoreProxy in environment file');
 
   const [deployer] = await ethers.getSigners();
   if (EXECUTE && !deployer) {
-    throw new Error("Missing signer (set DEPLOYER_KEY for transactions)");
+    throw new Error('Missing signer (set DEPLOYER_KEY for transactions)');
   }
   const runner: any = EXECUTE ? deployer : ethers.provider;
-  const core = await ethers.getContractAt(
-    "SignalsCore",
-    coreAddress,
-    runner
-  );
+  const core = await ethers.getContractAt('SignalsCore', coreAddress, runner);
   const owner = await core.owner();
-  const signerAddress = deployer?.address ?? "unknown";
-  console.log(`[close-open-markets] coreOwner=${owner} signer=${signerAddress}`);
+  const signerAddress = deployer?.address ?? 'unknown';
+  console.log(
+    `[close-open-markets] coreOwner=${owner} signer=${signerAddress}`,
+  );
   if (EXECUTE && signerAddress.toLowerCase() !== owner.toLowerCase()) {
-    throw new Error("Signer is not core owner (updateMarketTiming/finalizeSecondarySettlement require owner)");
+    throw new Error(
+      'Signer is not core owner (updateMarketTiming/finalizeSecondarySettlement require owner)',
+    );
   }
 
-  const latestBlock = await ethers.provider.getBlock("latest");
+  const latestBlock = await ethers.provider.getBlock('latest');
   const now = latestBlock?.timestamp ?? Math.floor(Date.now() / 1000);
   const submitWindowSec = Number(await core.settlementSubmitWindow());
   const currentBatchId = await core.currentBatchId();
   const todayBatchId = toBatchId(BigInt(now));
   console.log(
-    `[close-open-markets] currentBatchId=${currentBatchId.toString()} todayBatchId=${todayBatchId.toString()}`
+    `[close-open-markets] currentBatchId=${currentBatchId.toString()} todayBatchId=${todayBatchId.toString()}`,
   );
 
   const nextMarketId = await core.nextMarketId();
@@ -288,7 +341,7 @@ async function main() {
     const market = await core.markets(marketId);
     const active = isActiveMarket(market, now);
     console.log(
-      `[close-open-markets] marketId=${marketId.toString()} active=${active} settled=${market.settled} failed=${market.failed} seeded=${market.isSeeded} start=${market.startTimestamp.toString()} end=${market.endTimestamp.toString()} tSet=${market.settlementTimestamp.toString()} openPositions=${market.openPositionCount.toString()}`
+      `[close-open-markets] marketId=${marketId.toString()} active=${active} settled=${market.settled} failed=${market.failed} seeded=${market.isSeeded} start=${market.startTimestamp.toString()} end=${market.endTimestamp.toString()} tSet=${market.settlementTimestamp.toString()} openPositions=${market.openPositionCount.toString()}`,
     );
     if (shouldCloseMarket(market, now)) {
       candidates.push(marketId);
@@ -296,13 +349,16 @@ async function main() {
   }
 
   if (candidates.length === 0) {
-    console.log("[close-open-markets] no markets matched filter");
+    console.log('[close-open-markets] no markets matched filter');
     return;
   }
 
-  if (CONFIG.safety.maxMarkets > 0 && candidates.length > CONFIG.safety.maxMarkets) {
+  if (
+    CONFIG.safety.maxMarkets > 0 &&
+    candidates.length > CONFIG.safety.maxMarkets
+  ) {
     throw new Error(
-      `[close-open-markets] refusing to close ${candidates.length} markets (max=${CONFIG.safety.maxMarkets})`
+      `[close-open-markets] refusing to close ${candidates.length} markets (max=${CONFIG.safety.maxMarkets})`,
     );
   }
 
@@ -311,7 +367,13 @@ async function main() {
 
   for (const marketId of candidates) {
     let market = await core.markets(marketId);
-    await maybeUpdateTiming(core, marketId, now, submitWindowSec, currentBatchId);
+    await maybeUpdateTiming(
+      core,
+      marketId,
+      now,
+      submitWindowSec,
+      currentBatchId,
+    );
     if (EXECUTE) {
       market = await core.markets(marketId);
     }
@@ -327,20 +389,26 @@ async function main() {
     for (const batchId of batchIds) {
       const [total, resolved] = await core.getBatchMarketState(batchId);
       if (total === 0n) {
-        console.warn(`[close-open-markets] skip batch ${batchId.toString()} (no markets assigned)`);
+        console.warn(
+          `[close-open-markets] skip batch ${batchId.toString()} (no markets assigned)`,
+        );
         continue;
       }
       if (resolved !== total) {
         console.warn(
-          `[close-open-markets] skip batch ${batchId.toString()} (resolved ${resolved.toString()}/${total.toString()})`
+          `[close-open-markets] skip batch ${batchId.toString()} (resolved ${resolved.toString()}/${total.toString()})`,
         );
         continue;
       }
       try {
-        console.log(`[close-open-markets] processDailyBatch batchId=${batchId.toString()}`);
+        console.log(
+          `[close-open-markets] processDailyBatch batchId=${batchId.toString()}`,
+        );
         await (await core.processDailyBatch(batchId)).wait();
       } catch (err) {
-        console.warn("[close-open-markets] processDailyBatch failed (batch not ready or not ended yet)");
+        console.warn(
+          '[close-open-markets] processDailyBatch failed (batch not ready or not ended yet)',
+        );
         console.warn(err);
       }
     }

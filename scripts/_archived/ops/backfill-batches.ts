@@ -1,7 +1,7 @@
-import hre from "hardhat";
-import { Wallet, Interface } from "ethers";
-import { loadEnvironment, normalizeEnvironment } from "../utils/environment";
-import type { Environment } from "../types/environment";
+import hre from 'hardhat';
+import { Wallet, Interface } from 'ethers';
+import { loadEnvironment, normalizeEnvironment } from '../utils/environment';
+import type { Environment } from '../types/environment';
 
 type CliOptions = {
   dryRun: boolean;
@@ -33,27 +33,29 @@ const parseArgs = (argv: string[]): CliOptions => {
   const env = (key: string) => process.env[key];
 
   return {
-    dryRun: has("--dry-run") || env("DRY_RUN") === "1",
-    execute: has("--execute") || env("EXECUTE") === "1",
-    processOnly: has("--process-only") || env("PROCESS_ONLY") === "1",
+    dryRun: has('--dry-run') || env('DRY_RUN') === '1',
+    execute: has('--execute') || env('EXECUTE') === '1',
+    processOnly: has('--process-only') || env('PROCESS_ONLY') === '1',
     targetBatchId: Number(
-      get("--target") ?? get("--target-batch") ?? env("TARGET_BATCH_ID") ?? "20482",
+      get('--target') ??
+        get('--target-batch') ??
+        env('TARGET_BATCH_ID') ??
+        '20482',
     ),
     startOffsetSec: Number(
-      get("--start-offset-sec") ?? env("START_OFFSET_SEC") ?? "3600",
+      get('--start-offset-sec') ?? env('START_OFFSET_SEC') ?? '3600',
     ),
-    numBins: Number(get("--num-bins") ?? env("NUM_BINS") ?? "1"),
-    minTick: Number(get("--min-tick") ?? env("MIN_TICK") ?? "0"),
-    maxTick: get("--max-tick") || env("MAX_TICK")
-      ? Number(get("--max-tick") ?? env("MAX_TICK"))
-      : undefined,
-    tickSpacing: Number(
-      get("--tick-spacing") ?? env("TICK_SPACING") ?? "1",
-    ),
-    alphaWad: get("--alpha-wad") ?? env("ALPHA_WAD") ?? ONE_WAD.toString(),
-    feePolicy: get("--fee-policy") ?? env("FEE_POLICY"),
+    numBins: Number(get('--num-bins') ?? env('NUM_BINS') ?? '1'),
+    minTick: Number(get('--min-tick') ?? env('MIN_TICK') ?? '0'),
+    maxTick:
+      get('--max-tick') || env('MAX_TICK')
+        ? Number(get('--max-tick') ?? env('MAX_TICK'))
+        : undefined,
+    tickSpacing: Number(get('--tick-spacing') ?? env('TICK_SPACING') ?? '1'),
+    alphaWad: get('--alpha-wad') ?? env('ALPHA_WAD') ?? ONE_WAD.toString(),
+    feePolicy: get('--fee-policy') ?? env('FEE_POLICY'),
     settlementValue:
-      get("--settlement-value") ?? env("SETTLEMENT_VALUE") ?? "0",
+      get('--settlement-value') ?? env('SETTLEMENT_VALUE') ?? '0',
   };
 };
 
@@ -94,7 +96,7 @@ const extractErrorData = (err: unknown): string | null => {
     (err as { info?: { error?: { data?: string } } })?.info?.error?.data ??
     (err as { info?: { error?: { error?: { data?: string } } } })?.info?.error
       ?.error?.data;
-  return typeof candidate === "string" && candidate.startsWith("0x")
+  return typeof candidate === 'string' && candidate.startsWith('0x')
     ? candidate
     : null;
 };
@@ -103,13 +105,15 @@ const decodeRevert = async (err: unknown) => {
   const data = extractErrorData(err);
   if (!data) return;
   try {
-    const artifact = await hre.artifacts.readArtifact("SignalsErrors");
+    const artifact = await hre.artifacts.readArtifact('SignalsErrors');
     const iface = new Interface(artifact.abi);
     const parsed = iface.parseError(data);
     if (parsed?.name) {
       console.error(`[revert] ${parsed.name}`);
       if (parsed.args?.length) {
-        console.error(parsed.args.map((arg) => arg?.toString?.() ?? String(arg)));
+        console.error(
+          parsed.args.map((arg) => arg?.toString?.() ?? String(arg)),
+        );
       }
     }
   } catch {
@@ -123,35 +127,35 @@ async function main() {
 
   if (!options.dryRun && !options.execute) {
     usage();
-    throw new Error("Choose --dry-run or --execute");
+    throw new Error('Choose --dry-run or --execute');
   }
 
   if (
     options.dryRun &&
-    network.name !== "hardhat" &&
-    network.name !== "local"
+    network.name !== 'hardhat' &&
+    network.name !== 'local'
   ) {
     throw new Error(
-      "--dry-run requires --network hardhat or --network local (forked)",
+      '--dry-run requires --network hardhat or --network local (forked)',
     );
   }
 
   if (!Number.isFinite(options.targetBatchId)) {
-    throw new Error("Invalid --target batchId");
+    throw new Error('Invalid --target batchId');
   }
 
   const envOverride = process.env.BACKFILL_ENV ?? process.env.ENVIRONMENT;
   const resolvedEnv =
     (envOverride as Environment | undefined) ??
-    (network.name === "hardhat"
-      ? "prod"
+    (network.name === 'hardhat'
+      ? 'prod'
       : (normalizeEnvironment(network.name) as Environment));
   const env = resolvedEnv;
   const envData = loadEnvironment(env);
   const coreAddress =
     process.env.CORE_ADDRESS ?? envData.contracts.SignalsCoreProxy;
   if (!coreAddress) {
-    throw new Error("Missing SignalsCoreProxy address");
+    throw new Error('Missing SignalsCoreProxy address');
   }
 
   const feePolicy =
@@ -159,7 +163,7 @@ async function main() {
     envData.contracts.FeePolicyNull ??
     envData.contracts.FeePolicy100bps;
   if (!feePolicy) {
-    throw new Error("Missing feePolicy (use --fee-policy)");
+    throw new Error('Missing feePolicy (use --fee-policy)');
   }
 
   const pk = process.env.OPERATOR_PRIVATE_KEY ?? process.env.DEPLOYER_KEY;
@@ -170,14 +174,14 @@ async function main() {
   if (options.dryRun) {
     const addr = await signer.getAddress();
     const method =
-      network.name === "hardhat" ? "hardhat_setBalance" : "anvil_setBalance";
+      network.name === 'hardhat' ? 'hardhat_setBalance' : 'anvil_setBalance';
     await hre.network.provider.send(method, [
       addr,
-      "0x3635C9ADC5DEA00000", // 1000 ETH
+      '0x3635C9ADC5DEA00000', // 1000 ETH
     ]);
   }
 
-  const core = await ethers.getContractAt("SignalsCore", coreAddress, signer);
+  const core = await ethers.getContractAt('SignalsCore', coreAddress, signer);
   const signerAddress = await signer.getAddress();
 
   const [
@@ -244,11 +248,11 @@ async function main() {
     ),
   );
 
-  if (paused) throw new Error("Core is paused");
-  if (!isVaultSeeded) throw new Error("Vault is not seeded");
+  if (paused) throw new Error('Core is paused');
+  if (!isVaultSeeded) throw new Error('Vault is not seeded');
   const isOwner = signerAddress.toLowerCase() === owner.toLowerCase();
   if (!isOperator && !isOwner) {
-    throw new Error("Signer is not owner/operator");
+    throw new Error('Signer is not owner/operator');
   }
 
   const startBatchId = Number(currentBatchId) + 1;
@@ -261,14 +265,13 @@ async function main() {
 
   const minTick = options.minTick;
   const tickSpacing = options.tickSpacing;
-  const maxTick =
-    options.maxTick ?? minTick + tickSpacing * options.numBins;
+  const maxTick = options.maxTick ?? minTick + tickSpacing * options.numBins;
   const numBins = Math.floor((maxTick - minTick) / tickSpacing);
 
-  if (tickSpacing <= 0) throw new Error("tickSpacing must be > 0");
-  if (minTick >= maxTick) throw new Error("minTick must be < maxTick");
+  if (tickSpacing <= 0) throw new Error('tickSpacing must be > 0');
+  if (minTick >= maxTick) throw new Error('minTick must be < maxTick');
   if ((maxTick - minTick) % tickSpacing !== 0) {
-    throw new Error("(maxTick - minTick) must be divisible by tickSpacing");
+    throw new Error('(maxTick - minTick) must be divisible by tickSpacing');
   }
   if (numBins !== options.numBins) {
     throw new Error(
@@ -276,21 +279,21 @@ async function main() {
     );
   }
   if (options.startOffsetSec <= 0) {
-    throw new Error("startOffsetSec must be > 0");
+    throw new Error('startOffsetSec must be > 0');
   }
 
   const alphaWad = BigInt(options.alphaWad);
-  if (alphaWad <= 0n) throw new Error("alphaWad must be > 0");
+  if (alphaWad <= 0n) throw new Error('alphaWad must be > 0');
 
   let seedDataAddress: string | null = null;
   if (!options.processOnly) {
     const factors = Array(numBins).fill(ONE_WAD);
     const packedFactors = ethers.solidityPacked(
-      Array(numBins).fill("uint256"),
+      Array(numBins).fill('uint256'),
       factors,
     );
 
-    const seedFactory = await ethers.getContractFactory("SeedData", signer);
+    const seedFactory = await ethers.getContractFactory('SeedData', signer);
     const seedData = await seedFactory.deploy(packedFactors);
     await seedData.waitForDeployment();
     seedDataAddress = await seedData.getAddress();
@@ -348,7 +351,7 @@ async function main() {
       const batchTx = await core.processDailyBatch(batchBig);
       const batchReceipt = await batchTx.wait();
       console.log(
-        `[batch ${batchId}] processDailyBatch tx=${batchTx.hash} gasUsed=${batchReceipt?.gasUsed?.toString() ?? "?"}`,
+        `[batch ${batchId}] processDailyBatch tx=${batchTx.hash} gasUsed=${batchReceipt?.gasUsed?.toString() ?? '?'}`,
       );
 
       const updatedBatchId = await core.currentBatchId();
@@ -371,7 +374,7 @@ async function main() {
       throw new Error(`startTimestamp underflow for batch ${batchId}`);
     }
 
-    const latestBlock = await ethers.provider.getBlock("latest");
+    const latestBlock = await ethers.provider.getBlock('latest');
     const now = Number(latestBlock?.timestamp ?? 0);
     const opsStart = settlementTimestamp + Number(settlementSubmitWindow);
     if (now < opsStart) {
@@ -404,7 +407,7 @@ async function main() {
     }
 
     if (!options.execute && !options.dryRun) {
-      throw new Error("Execution disabled");
+      throw new Error('Execution disabled');
     }
 
     const createTx = await core.createMarket(
@@ -421,7 +424,7 @@ async function main() {
     );
     const createReceipt = await createTx.wait();
     console.log(
-      `[batch ${batchId}] createMarket tx=${createTx.hash} gasUsed=${createReceipt?.gasUsed?.toString() ?? "?"}`,
+      `[batch ${batchId}] createMarket tx=${createTx.hash} gasUsed=${createReceipt?.gasUsed?.toString() ?? '?'}`,
     );
 
     const marketId = predictedMarketId;
@@ -436,13 +439,13 @@ async function main() {
     const failTx = await core.markSettlementFailed(marketId);
     const failReceipt = await failTx.wait();
     console.log(
-      `[batch ${batchId}] markFailed tx=${failTx.hash} gasUsed=${failReceipt?.gasUsed?.toString() ?? "?"}`,
+      `[batch ${batchId}] markFailed tx=${failTx.hash} gasUsed=${failReceipt?.gasUsed?.toString() ?? '?'}`,
     );
 
     const finalizeValue = BigInt(options.settlementValue);
     if (!isOwner && !options.dryRun) {
       const data = core.interface.encodeFunctionData(
-        "finalizeSecondarySettlement",
+        'finalizeSecondarySettlement',
         [marketId, finalizeValue],
       );
       console.log(
@@ -458,15 +461,15 @@ async function main() {
     let finalizeCore = core;
     if (!isOwner && options.dryRun) {
       const method =
-        network.name === "hardhat"
-          ? "hardhat_impersonateAccount"
-          : "anvil_impersonateAccount";
+        network.name === 'hardhat'
+          ? 'hardhat_impersonateAccount'
+          : 'anvil_impersonateAccount';
       await hre.network.provider.send(method, [owner]);
       const setBalanceMethod =
-        network.name === "hardhat" ? "hardhat_setBalance" : "anvil_setBalance";
+        network.name === 'hardhat' ? 'hardhat_setBalance' : 'anvil_setBalance';
       await hre.network.provider.send(setBalanceMethod, [
         owner,
-        "0x3635C9ADC5DEA00000",
+        '0x3635C9ADC5DEA00000',
       ]);
       const ownerSigner = await ethers.getSigner(owner);
       finalizeCore = core.connect(ownerSigner);
@@ -488,18 +491,19 @@ async function main() {
     );
     const finalizeReceipt = await finalizeTx.wait();
     console.log(
-      `[batch ${batchId}] finalizeSecondary tx=${finalizeTx.hash} gasUsed=${finalizeReceipt?.gasUsed?.toString() ?? "?"}`,
+      `[batch ${batchId}] finalizeSecondary tx=${finalizeTx.hash} gasUsed=${finalizeReceipt?.gasUsed?.toString() ?? '?'}`,
     );
 
     if (!isOwner && options.dryRun) {
       const stopMethod =
-        network.name === "hardhat"
-          ? "hardhat_stopImpersonatingAccount"
-          : "anvil_stopImpersonatingAccount";
+        network.name === 'hardhat'
+          ? 'hardhat_stopImpersonatingAccount'
+          : 'anvil_stopImpersonatingAccount';
       await hre.network.provider.send(stopMethod, [owner]);
     }
 
-    const [totalAfter, resolvedAfter] = await core.getBatchMarketState(batchBig);
+    const [totalAfter, resolvedAfter] =
+      await core.getBatchMarketState(batchBig);
     if (resolvedAfter !== totalAfter || totalAfter === 0n) {
       throw new Error(
         `Batch ${batchId} unresolved: ${resolvedAfter.toString()}/${totalAfter.toString()}`,
@@ -516,7 +520,7 @@ async function main() {
     const batchTx = await core.processDailyBatch(batchBig);
     const batchReceipt = await batchTx.wait();
     console.log(
-      `[batch ${batchId}] processDailyBatch tx=${batchTx.hash} gasUsed=${batchReceipt?.gasUsed?.toString() ?? "?"}`,
+      `[batch ${batchId}] processDailyBatch tx=${batchTx.hash} gasUsed=${batchReceipt?.gasUsed?.toString() ?? '?'}`,
     );
 
     const updatedBatchId = await core.currentBatchId();

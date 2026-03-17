@@ -1,11 +1,14 @@
-import hre from "hardhat";
-import { WrapperBuilder } from "@redstone-finance/evm-connector";
-import { getSignersForDataServiceId, type DataServiceIds } from "@redstone-finance/sdk";
-import { Contract as V5Contract } from "@ethersproject/contracts";
-import { JsonRpcProvider as V5JsonRpcProvider } from "@ethersproject/providers";
-import { Wallet as V5Wallet } from "@ethersproject/wallet";
-import { loadEnvironment, normalizeEnvironment } from "../utils/environment";
-import type { Environment } from "../types/environment";
+import hre from 'hardhat';
+import { WrapperBuilder } from '@redstone-finance/evm-connector';
+import {
+  getSignersForDataServiceId,
+  type DataServiceIds,
+} from '@redstone-finance/sdk';
+import { Contract as V5Contract } from '@ethersproject/contracts';
+import { JsonRpcProvider as V5JsonRpcProvider } from '@ethersproject/providers';
+import { Wallet as V5Wallet } from '@ethersproject/wallet';
+import { loadEnvironment, normalizeEnvironment } from '../utils/environment';
+import type { Environment } from '../types/environment';
 
 interface SettleConfig {
   marketId: number;
@@ -44,8 +47,8 @@ const CONFIG: SettleConfig = {
     claimDelaySec: 900,
   },
   redstone: {
-    dataServiceId: "redstone-primary-prod",
-    dataFeedId: "BTC",
+    dataServiceId: 'redstone-primary-prod',
+    dataFeedId: 'BTC',
     uniqueSigners: 3,
   },
   timing: {
@@ -81,21 +84,23 @@ async function main() {
 
   const envData = loadEnvironment(env);
   const coreAddress = envData.contracts.SignalsCoreProxy;
-  if (!coreAddress) throw new Error("Missing SignalsCoreProxy in environment file");
+  if (!coreAddress)
+    throw new Error('Missing SignalsCoreProxy in environment file');
 
   const [deployer] = await ethers.getSigners();
-  const core = await ethers.getContractAt("SignalsCore", coreAddress, deployer);
+  const core = await ethers.getContractAt('SignalsCore', coreAddress, deployer);
 
   const rpcUrl = (network.config as { url?: string }).url;
-  if (!rpcUrl) throw new Error("Missing RPC URL in network config");
+  if (!rpcUrl) throw new Error('Missing RPC URL in network config');
   const operatorKey = process.env.DEPLOYER_KEY;
-  if (!operatorKey) throw new Error("Missing DEPLOYER_KEY for Redstone submission");
+  if (!operatorKey)
+    throw new Error('Missing DEPLOYER_KEY for Redstone submission');
   const v5Provider = new V5JsonRpcProvider(rpcUrl);
   const v5Signer = new V5Wallet(operatorKey, v5Provider);
   const coreV5 = new V5Contract(
     coreAddress,
-    ["function submitSettlementSample(uint256)"],
-    v5Signer
+    ['function submitSettlementSample(uint256)'],
+    v5Signer,
   );
 
   if (CONFIG.timeline.enforce) {
@@ -108,13 +113,15 @@ async function main() {
       claimDelay !== BigInt(CONFIG.timeline.claimDelaySec)
     ) {
       console.log(
-        `[settle-market-dev] setSettlementTimeline submit=${CONFIG.timeline.submitWindowSec} ops=${CONFIG.timeline.pendingOpsWindowSec} claim=${CONFIG.timeline.claimDelaySec}`
+        `[settle-market-dev] setSettlementTimeline submit=${CONFIG.timeline.submitWindowSec} ops=${CONFIG.timeline.pendingOpsWindowSec} claim=${CONFIG.timeline.claimDelaySec}`,
       );
-      await (await core.setSettlementTimeline(
-        CONFIG.timeline.submitWindowSec,
-        CONFIG.timeline.pendingOpsWindowSec,
-        CONFIG.timeline.claimDelaySec
-      )).wait();
+      await (
+        await core.setSettlementTimeline(
+          CONFIG.timeline.submitWindowSec,
+          CONFIG.timeline.pendingOpsWindowSec,
+          CONFIG.timeline.claimDelaySec,
+        )
+      ).wait();
     }
   }
 
@@ -133,14 +140,17 @@ async function main() {
     throw new Error(`Market already settled: ${marketId.toString()}`);
   }
 
-  const latestBlock = await ethers.provider.getBlock("latest");
+  const latestBlock = await ethers.provider.getBlock('latest');
   const now = latestBlock?.timestamp ?? Math.floor(Date.now() / 1000);
 
   const windowLagMax = submitWindowSec - CONFIG.timing.minWindowRemainingSec;
-  const distanceLimit = maxSampleDistance > 0 ? maxSampleDistance - CONFIG.timing.lagBufferSec : windowLagMax;
+  const distanceLimit =
+    maxSampleDistance > 0
+      ? maxSampleDistance - CONFIG.timing.lagBufferSec
+      : windowLagMax;
   const lagFromTset = Math.max(1, Math.min(windowLagMax, distanceLimit));
   if (lagFromTset >= submitWindowSec) {
-    throw new Error("Settlement window too small for immediate submission");
+    throw new Error('Settlement window too small for immediate submission');
   }
   const settlementTimestamp = now - lagFromTset;
   let endTimestamp = settlementTimestamp;
@@ -149,20 +159,24 @@ async function main() {
     startTimestamp = endTimestamp - 1;
   }
   if (startTimestamp <= 0 || endTimestamp <= startTimestamp) {
-    throw new Error("Invalid timing computed for updateMarketTiming");
+    throw new Error('Invalid timing computed for updateMarketTiming');
   }
 
   console.log(
-    `[settle-market-dev] updateMarketTiming start=${startTimestamp} end=${endTimestamp} settle=${settlementTimestamp} lag=${lagFromTset}s`
+    `[settle-market-dev] updateMarketTiming start=${startTimestamp} end=${endTimestamp} settle=${settlementTimestamp} lag=${lagFromTset}s`,
   );
-  await (await core.updateMarketTiming(
-    marketId,
-    startTimestamp,
-    endTimestamp,
-    settlementTimestamp
-  )).wait();
+  await (
+    await core.updateMarketTiming(
+      marketId,
+      startTimestamp,
+      endTimestamp,
+      settlementTimestamp,
+    )
+  ).wait();
 
-  const authorizedSigners = getSignersForDataServiceId(CONFIG.redstone.dataServiceId);
+  const authorizedSigners = getSignersForDataServiceId(
+    CONFIG.redstone.dataServiceId,
+  );
   const wrapped = WrapperBuilder.wrap(coreV5).usingDataService({
     dataServiceId: CONFIG.redstone.dataServiceId,
     dataPackagesIds: [CONFIG.redstone.dataFeedId],
@@ -170,7 +184,9 @@ async function main() {
     authorizedSigners,
   });
 
-  console.log(`[settle-market-dev] submitSettlementSample marketId=${marketIdValue}`);
+  console.log(
+    `[settle-market-dev] submitSettlementSample marketId=${marketIdValue}`,
+  );
   await (await wrapped.submitSettlementSample(marketIdValue)).wait();
 
   const opsStart = settlementTimestamp + submitWindowSec;
@@ -181,20 +197,28 @@ async function main() {
     await sleep((waitSec + 1) * 1000);
   }
 
-  console.log(`[settle-market-dev] finalizePrimarySettlement marketId=${marketId.toString()}`);
+  console.log(
+    `[settle-market-dev] finalizePrimarySettlement marketId=${marketId.toString()}`,
+  );
   await (await core.finalizePrimarySettlement(marketId)).wait();
 
   if (CONFIG.chunks.run) {
     let updated = await core.markets(marketId);
     let calls = 0;
     while (!updated.snapshotChunksDone && calls < CONFIG.chunks.maxCalls) {
-      console.log(`[settle-market-dev] requestSettlementChunks call=${calls + 1}`);
-      await (await core.requestSettlementChunks(marketId, CONFIG.chunks.maxPerTx)).wait();
+      console.log(
+        `[settle-market-dev] requestSettlementChunks call=${calls + 1}`,
+      );
+      await (
+        await core.requestSettlementChunks(marketId, CONFIG.chunks.maxPerTx)
+      ).wait();
       updated = await core.markets(marketId);
       calls += 1;
     }
     if (!updated.snapshotChunksDone) {
-      console.warn("[settle-market-dev] snapshotChunksDone is still false (increase maxCalls?)");
+      console.warn(
+        '[settle-market-dev] snapshotChunksDone is still false (increase maxCalls?)',
+      );
     }
   }
 
@@ -205,22 +229,26 @@ async function main() {
     const currentBatchId = await core.currentBatchId();
     if (batchId != currentBatchId + 1n) {
       console.warn(
-        `[settle-market-dev] skip batch ${batchId.toString()} (currentBatchId=${currentBatchId.toString()})`
+        `[settle-market-dev] skip batch ${batchId.toString()} (currentBatchId=${currentBatchId.toString()})`,
       );
     } else if (total === 0n) {
-      console.warn(`[settle-market-dev] skip batch ${batchId.toString()} (no markets assigned)`);
+      console.warn(
+        `[settle-market-dev] skip batch ${batchId.toString()} (no markets assigned)`,
+      );
     } else if (resolved !== total) {
       console.warn(
-        `[settle-market-dev] skip batch ${batchId.toString()} (resolved ${resolved.toString()}/${total.toString()})`
+        `[settle-market-dev] skip batch ${batchId.toString()} (resolved ${resolved.toString()}/${total.toString()})`,
       );
     } else {
-      console.log(`[settle-market-dev] processDailyBatch batchId=${batchId.toString()}`);
+      console.log(
+        `[settle-market-dev] processDailyBatch batchId=${batchId.toString()}`,
+      );
       await (await core.processDailyBatch(batchId)).wait();
     }
   }
 
   console.log(
-    `[settle-market-dev] done submitWindow=${submitWindowSec}s pendingOps=${pendingOpsSec}s`
+    `[settle-market-dev] done submitWindow=${submitWindowSec}s pendingOps=${pendingOpsSec}s`,
   );
 }
 
