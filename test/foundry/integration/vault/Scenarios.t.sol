@@ -282,7 +282,7 @@ contract ScenariosTest is FullSystemDeployer {
 
         // Should fail - D_lag not met (eligible at batch 3)
         vm.prank(userB);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SignalsErrors.BatchNotProcessed.selector, day3));
         sys.core.claimWithdraw(0);
 
         // Process day3 - now should work
@@ -363,6 +363,40 @@ contract ScenariosTest is FullSystemDeployer {
 
         // Only dead shares remain
         assertEq(sys.core.getVaultShares(), 1000);
+    }
+
+    function test_revertsWithdrawalThatWouldBrickVault() public {
+        // Set D_lag=0 so withdrawal is eligible immediately in the next batch
+        vm.prank(owner_);
+        sys.core.setWithdrawalLagBatches(0);
+
+        uint64 day1 = _seedVault();
+
+        uint256 totalShares = sys.core.getVaultShares();
+        uint256 MIN_DEAD_SHARES = 1000;
+        uint256 userShares = totalShares - MIN_DEAD_SHARES; // seeder shares
+
+        // Mint 1 extra LP token to userA via core (onlyCore)
+        vm.prank(address(sys.core));
+        sys.lpShare.mint(userA, 1);
+
+        // Withdraw 1 more share than what would leave exactly MIN_DEAD_SHARES
+        vm.prank(userA);
+        sys.core.requestWithdraw(userShares + 1);
+
+        // Process batch — withdrawal would leave totalShares < MIN_DEAD_SHARES → revert
+        vm.prank(owner_);
+        sys.core.harnessRecordPnl(day1, 0, 0, DEFAULT_DELTA_ET);
+        advancePastBatchEnd(day1);
+        vm.prank(owner_);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SignalsErrors.WithdrawalWouldBrickVault.selector,
+                MIN_DEAD_SHARES - 1,
+                MIN_DEAD_SHARES
+            )
+        );
+        sys.core.processDailyBatch(day1);
     }
 
     // ============================================================

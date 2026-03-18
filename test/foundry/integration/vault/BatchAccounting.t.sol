@@ -432,7 +432,7 @@ contract BatchAccountingTest is FullSystemDeployer {
         assertGt(navAfter, navBefore);
 
         vm.prank(owner_);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SignalsErrors.BatchNotReady.selector, batchId));
         sys.core.processDailyBatch(batchId);
     }
 
