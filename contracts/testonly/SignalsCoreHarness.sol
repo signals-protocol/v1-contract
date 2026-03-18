@@ -54,7 +54,7 @@ contract SignalsCoreHarness is SignalsCore {
 
     /// @notice Set batch market counts for testing (bypasses lifecycle)
     function harnessSetBatchMarketState(uint64 batchId, uint64 total, uint64 resolved) external onlyOwner {
-        _batchMarketState[batchId] = BatchMarketState({ total: total, resolved: resolved });
+        _batchMarketState[batchId] = BatchMarketState({total: total, resolved: resolved});
     }
 
     // ============================================================
@@ -71,20 +71,14 @@ contract SignalsCoreHarness is SignalsCore {
     function harnessSetExposure(uint256 marketId, int256 tick, uint256 exposure) external onlyOwner {
         ISignalsCore.Market storage market = markets[marketId];
         uint32 bin = TickBinLib.tickToBin(market.minTick, market.tickSpacing, market.numBins, tick);
-        
+
         // Get current exposure via prefix sum
         int256 current = _rawPrefixSum(_exposureDiff[marketId], bin);
         int256 delta = int256(exposure) - current;
-        
+
         // Apply delta to single bin [bin, bin]
         if (delta != 0) {
-            ExposureDiffLib.rangeAdd(
-                _exposureDiff[marketId],
-                bin,
-                bin,
-                delta,
-                market.numBins
-            );
+            ExposureDiffLib.rangeAdd(_exposureDiff[marketId], bin, bin, delta, market.numBins);
         }
     }
 
@@ -103,47 +97,32 @@ contract SignalsCoreHarness is SignalsCore {
     ) external onlyOwner {
         ISignalsCore.Market storage market = markets[marketId];
         (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBins(
-            market.minTick, market.maxTick, market.tickSpacing, market.numBins,
-            lowerTick, upperTick
+            market.minTick,
+            market.maxTick,
+            market.tickSpacing,
+            market.numBins,
+            lowerTick,
+            upperTick
         );
-        
-        ExposureDiffLib.rangeAdd(
-            _exposureDiff[marketId],
-            loBin,
-            hiBin,
-            int256(quantity),
-            market.numBins
-        );
+
+        ExposureDiffLib.rangeAdd(_exposureDiff[marketId], loBin, hiBin, int256(quantity), market.numBins);
     }
 
     /// @notice Set exposure at a specific tick (Diff-based)
-    function harnessSetExposureAtTick(
-        uint256 marketId,
-        int256 tick,
-        uint256 quantity
-    ) external onlyOwner {
+    function harnessSetExposureAtTick(uint256 marketId, int256 tick, uint256 quantity) external onlyOwner {
         ISignalsCore.Market storage market = markets[marketId];
         uint32 bin = TickBinLib.tickToBin(market.minTick, market.tickSpacing, market.numBins, tick);
-        
+
         int256 current = _rawPrefixSum(_exposureDiff[marketId], bin);
         int256 delta = int256(quantity) - current;
-        
+
         if (delta != 0) {
-            ExposureDiffLib.rangeAdd(
-                _exposureDiff[marketId],
-                bin,
-                bin,
-                delta,
-                market.numBins
-            );
+            ExposureDiffLib.rangeAdd(_exposureDiff[marketId], bin, bin, delta, market.numBins);
         }
     }
 
     /// @notice Set payout reserve for a market (for testing)
-    function harnessSetPayoutReserve(
-        uint256 marketId,
-        uint256 amount
-    ) external onlyOwner {
+    function harnessSetPayoutReserve(uint256 marketId, uint256 amount) external onlyOwner {
         _payoutReserve[marketId] = amount;
         _payoutReserveRemaining[marketId] = amount;
     }
@@ -200,13 +179,11 @@ contract SignalsCoreHarness is SignalsCore {
     }
 
     /// @notice Get current LP vault state
-    function harnessGetLpVault() external view returns (
-        uint256 nav,
-        uint256 shares,
-        uint256 price,
-        uint256 pricePeak,
-        bool isSeeded
-    ) {
+    function harnessGetLpVault()
+        external
+        view
+        returns (uint256 nav, uint256 shares, uint256 price, uint256 pricePeak, bool isSeeded)
+    {
         return (lpVault.nav, lpVault.shares, lpVault.price, lpVault.pricePeak, lpVault.isSeeded);
     }
 
@@ -261,5 +238,31 @@ contract SignalsCoreHarness is SignalsCore {
     /// @dev Set market settled state for testing
     function harnessSetMarketSettled(uint256 marketId, bool settled) external onlyOwner {
         markets[marketId].settled = settled;
+    }
+
+    // ============================================================
+    // Daily PnL helpers for LP vault testing
+    // ============================================================
+
+    /// @notice Set daily P&L snapshot for testing batch processing with non-zero PnL
+    /// @dev Mirrors LPVaultModuleProxy.harnessRecordPnl behavior for FullSystem tests
+    function harnessRecordPnl(uint64 batchId, int256 lt, uint256 ftot, uint256 deltaEt) external onlyOwner {
+        DailyPnlSnapshot storage snap = _dailyPnl[batchId];
+        snap.Lt += lt;
+        snap.Ftot += ftot;
+        snap.DeltaEtSum += deltaEt;
+
+        // Default: assume one resolved market per batch unless overridden
+        if (_batchMarketState[batchId].total == 0) {
+            _batchMarketState[batchId].total = 1;
+        }
+        if (_batchMarketState[batchId].resolved < _batchMarketState[batchId].total) {
+            _batchMarketState[batchId].resolved = _batchMarketState[batchId].total;
+        }
+    }
+
+    /// @notice Set withdrawal lag batches for testing
+    function harnessSetWithdrawalLagBatches(uint64 lag) external onlyOwner {
+        withdrawalLagBatches = lag;
     }
 }
