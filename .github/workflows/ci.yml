@@ -69,9 +69,6 @@ jobs:
       - name: TypeScript strict check
         run: yarn lint
 
-      - name: Run tests
-        run: yarn test
-
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
@@ -92,30 +89,19 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
       - name: Run coverage
-        run: yarn test:cov
-        env:
-          NODE_OPTIONS: --max-old-space-size=8192
+        run: FOUNDRY_PROFILE=coverage forge coverage --report lcov
 
       - name: Coverage summary
         if: always()
         run: |
-          if [ ! -f coverage/coverage-summary.json ]; then
+          if [ ! -f lcov.info ]; then
             echo "### Coverage report not found" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          node -e "
-          const cs = require('./coverage/coverage-summary.json').total;
-          const fmt = (m) => m.pct + '%';
-          const lines = [
-            '### Solidity Coverage',
-            '',
-            '| Metric | Coverage |',
-            '|--------|----------|',
-            '| Statements | ' + fmt(cs.statements) + ' |',
-            '| Branches | ' + fmt(cs.branches) + ' |',
-            '| Functions | ' + fmt(cs.functions) + ' |',
-            '| Lines | ' + fmt(cs.lines) + ' |',
-          ];
-          console.log(lines.join('\n'));
-          " >> "$GITHUB_STEP_SUMMARY"
+          echo "### Forge Coverage" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "LCOV report generated. See artifacts for details." >> "$GITHUB_STEP_SUMMARY"

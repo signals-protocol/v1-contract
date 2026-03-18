@@ -1,8 +1,9 @@
-import { HardhatUserConfig } from "hardhat/config";
-import * as dotenv from "dotenv";
-import "@nomicfoundation/hardhat-toolbox";
-import "@openzeppelin/hardhat-upgrades";
-import "hardhat-gas-reporter";
+import { HardhatUserConfig } from 'hardhat/config';
+import * as dotenv from 'dotenv';
+import '@nomicfoundation/hardhat-ethers';
+import '@nomicfoundation/hardhat-verify';
+import '@openzeppelin/hardhat-upgrades';
+import '@typechain/hardhat';
 
 dotenv.config();
 
@@ -10,7 +11,7 @@ const hardhatForkUrl = process.env.HARDHAT_FORK_URL;
 const hardhatForkBlock = process.env.HARDHAT_FORK_BLOCK
   ? Number.parseInt(process.env.HARDHAT_FORK_BLOCK, 10)
   : undefined;
-const hardhatForkHardfork = process.env.HARDHAT_FORK_HARDFORK || "shanghai";
+const hardhatForkHardfork = process.env.HARDHAT_FORK_HARDFORK || 'shanghai';
 const hardhatForkChainId = process.env.HARDHAT_FORK_CHAIN_ID
   ? Number.parseInt(process.env.HARDHAT_FORK_CHAIN_ID, 10)
   : 4114;
@@ -28,35 +29,29 @@ const defaultAccounts = process.env.DEPLOYER_KEY
   ? [process.env.DEPLOYER_KEY]
   : [];
 const hardhatAccountCount = Number.parseInt(
-  process.env.HARDHAT_ACCOUNTS || "30",
-  10
+  process.env.HARDHAT_ACCOUNTS || '30',
+  10,
 );
-const defaultDevRpc = "https://rpc.testnet.citrea.xyz";
+const defaultDevRpc = 'https://rpc.testnet.citrea.xyz';
 const devRpc = process.env.DEV_RPC_URL || defaultDevRpc;
-const prodRpc = process.env.PROD_RPC_URL || "https://rpc.mainnet.citrea.xyz";
+const prodRpc = process.env.PROD_RPC_URL || 'https://rpc.mainnet.citrea.xyz';
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.28",
+    version: '0.8.28',
     settings: {
       optimizer: { enabled: true, runs: 200 },
       viaIR: true,
     },
   },
-  gasReporter: {
-    enabled: process.env.REPORT_GAS === "1" || process.env.REPORT_GAS === "true",
-  },
   paths: {
-    sources: "./contracts",
-    tests: "./test",
+    sources: './contracts',
   },
   networks: {
     hardhat: {
       chainId: 31337,
       accounts: {
-        count: Number.isFinite(hardhatAccountCount)
-          ? hardhatAccountCount
-          : 30,
+        count: Number.isFinite(hardhatAccountCount) ? hardhatAccountCount : 30,
       },
       forking: hardhatForkUrl
         ? {
@@ -71,7 +66,7 @@ const config: HardhatUserConfig = {
     },
     local: {
       chainId: 31337,
-      url: process.env.LOCAL_RPC_URL || "http://127.0.0.1:8545",
+      url: process.env.LOCAL_RPC_URL || 'http://127.0.0.1:8545',
     },
     dev: {
       url: devRpc,
@@ -86,30 +81,27 @@ const config: HardhatUserConfig = {
   },
   etherscan: {
     apiKey: {
-      "dev": process.env.BLOCKSCOUT_API_KEY || "placeholder",
-      "prod": process.env.BLOCKSCOUT_API_KEY || "placeholder",
+      dev: process.env.BLOCKSCOUT_API_KEY || 'placeholder',
+      prod: process.env.BLOCKSCOUT_API_KEY || 'placeholder',
     },
     customChains: [
       {
-        network: "dev",
+        network: 'dev',
         chainId: 5115,
         urls: {
-          apiURL: "https://explorer.testnet.citrea.xyz/api",
-          browserURL: "https://explorer.testnet.citrea.xyz",
+          apiURL: 'https://explorer.testnet.citrea.xyz/api',
+          browserURL: 'https://explorer.testnet.citrea.xyz',
         },
       },
       {
-        network: "prod",
+        network: 'prod',
         chainId: 4114,
         urls: {
-          apiURL: "https://explorer.mainnet.citrea.xyz/api",
-          browserURL: "https://explorer.mainnet.citrea.xyz",
+          apiURL: 'https://explorer.mainnet.citrea.xyz/api',
+          browserURL: 'https://explorer.mainnet.citrea.xyz',
         },
       },
     ],
-  },
-  mocha: {
-    timeout: process.env.COVERAGE ? 0 : 20000,
   },
 };
 
