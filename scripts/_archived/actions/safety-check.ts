@@ -1,6 +1,6 @@
-import hre from "hardhat";
-import { loadEnvironment } from "../utils/environment";
-import type { Environment } from "../types/environment";
+import hre from 'hardhat';
+import { loadEnvironment } from '../utils/environment';
+import type { Environment } from '../types/environment';
 
 function assertAddressMatch(label: string, actual: string, expected?: string) {
   if (!expected) return;
@@ -19,15 +19,15 @@ export async function safetyCheckAction(env: Environment) {
   const envData = loadEnvironment(env);
 
   const required = [
-    "SignalsCoreProxy",
-    "SignalsCoreImplementation",
-    "SignalsPositionProxy",
-    "SignalsPositionImplementation",
-    "TradeModule",
-    "MarketLifecycleModule",
-    "RiskModule",
-    "LPVaultModule",
-    "OracleModule",
+    'SignalsCoreProxy',
+    'SignalsCoreImplementation',
+    'SignalsPositionProxy',
+    'SignalsPositionImplementation',
+    'TradeModule',
+    'MarketLifecycleModule',
+    'RiskModule',
+    'LPVaultModule',
+    'OracleModule',
   ];
   for (const key of required) {
     if (!envData.contracts[key]) {
@@ -37,42 +37,62 @@ export async function safetyCheckAction(env: Environment) {
 
   const coreProxy = envData.contracts.SignalsCoreProxy;
   const positionProxy = envData.contracts.SignalsPositionProxy;
-  const lpShareProxy = envData.contracts.SignalsLPShareProxy ?? envData.contracts.SignalsLPShare;
+  const lpShareProxy =
+    envData.contracts.SignalsLPShareProxy ?? envData.contracts.SignalsLPShare;
   if (!lpShareProxy) {
-    throw new Error("Missing SignalsLPShareProxy (or SignalsLPShare) in environment file");
+    throw new Error(
+      'Missing SignalsLPShareProxy (or SignalsLPShare) in environment file',
+    );
   }
 
   const coreImpl = await upgrades.erc1967.getImplementationAddress(coreProxy);
-  const positionImpl = await upgrades.erc1967.getImplementationAddress(positionProxy);
+  const positionImpl =
+    await upgrades.erc1967.getImplementationAddress(positionProxy);
 
-  if (coreImpl.toLowerCase() !== envData.contracts.SignalsCoreImplementation.toLowerCase()) {
-    throw new Error(`Core impl mismatch: manifest=${coreImpl} env=${envData.contracts.SignalsCoreImplementation}`);
-  }
-  if (positionImpl.toLowerCase() !== envData.contracts.SignalsPositionImplementation.toLowerCase()) {
+  if (
+    coreImpl.toLowerCase() !==
+    envData.contracts.SignalsCoreImplementation.toLowerCase()
+  ) {
     throw new Error(
-      `Position impl mismatch: manifest=${positionImpl} env=${envData.contracts.SignalsPositionImplementation}`
+      `Core impl mismatch: manifest=${coreImpl} env=${envData.contracts.SignalsCoreImplementation}`,
     );
   }
-  const core = await ethers.getContractAt("SignalsCore", coreProxy);
-  const position = await ethers.getContractAt("SignalsPosition", positionProxy);
+  if (
+    positionImpl.toLowerCase() !==
+    envData.contracts.SignalsPositionImplementation.toLowerCase()
+  ) {
+    throw new Error(
+      `Position impl mismatch: manifest=${positionImpl} env=${envData.contracts.SignalsPositionImplementation}`,
+    );
+  }
+  const core = await ethers.getContractAt('SignalsCore', coreProxy);
+  const position = await ethers.getContractAt('SignalsPosition', positionProxy);
   const chainLpShareToken = await core.lpShareToken();
-  assertAddressMatch("LP share token", chainLpShareToken, lpShareProxy);
-  const lpShare = await ethers.getContractAt("SignalsLPShare", chainLpShareToken);
+  assertAddressMatch('LP share token', chainLpShareToken, lpShareProxy);
+  const lpShare = await ethers.getContractAt(
+    'SignalsLPShare',
+    chainLpShareToken,
+  );
 
   const expectedLpShareImpl = envData.contracts.SignalsLPShareImplementation;
   if (expectedLpShareImpl) {
     try {
-      const lpShareImpl = await upgrades.erc1967.getImplementationAddress(chainLpShareToken);
+      const lpShareImpl =
+        await upgrades.erc1967.getImplementationAddress(chainLpShareToken);
       if (lpShareImpl.toLowerCase() !== expectedLpShareImpl.toLowerCase()) {
-        throw new Error(`LPShare impl mismatch: manifest=${lpShareImpl} env=${expectedLpShareImpl}`);
+        throw new Error(
+          `LPShare impl mismatch: manifest=${lpShareImpl} env=${expectedLpShareImpl}`,
+        );
       }
     } catch {
       console.warn(
-        `[safety-check] LPShare at ${chainLpShareToken} is not an ERC1967 proxy; skipping LPShare impl match check`
+        `[safety-check] LPShare at ${chainLpShareToken} is not an ERC1967 proxy; skipping LPShare impl match check`,
       );
     }
   } else {
-    console.warn("[safety-check] SignalsLPShareImplementation not set; skipping LPShare impl match check");
+    console.warn(
+      '[safety-check] SignalsLPShareImplementation not set; skipping LPShare impl match check',
+    );
   }
 
   const expectedCoreOwner = envData.config?.owners?.core;
@@ -80,81 +100,98 @@ export async function safetyCheckAction(env: Environment) {
   const expectedLpShareOwner = envData.config?.owners?.lpShare;
   if (expectedCoreOwner) {
     const actual = await core.owner();
-    assertAddressMatch("Core owner", actual, expectedCoreOwner);
+    assertAddressMatch('Core owner', actual, expectedCoreOwner);
   } else {
-    console.warn("[safety-check] expected core owner not set in environment config");
+    console.warn(
+      '[safety-check] expected core owner not set in environment config',
+    );
   }
   if (expectedPositionOwner) {
     const actual = await position.owner();
-    assertAddressMatch("Position owner", actual, expectedPositionOwner);
+    assertAddressMatch('Position owner', actual, expectedPositionOwner);
   } else {
-    console.warn("[safety-check] expected position owner not set in environment config");
+    console.warn(
+      '[safety-check] expected position owner not set in environment config',
+    );
   }
   if (expectedLpShareOwner) {
     const actual = await lpShare.owner();
-    assertAddressMatch("LPShare owner", actual, expectedLpShareOwner);
+    assertAddressMatch('LPShare owner', actual, expectedLpShareOwner);
   } else {
-    console.warn("[safety-check] expected lpShare owner not set in environment config; skipping owner check");
+    console.warn(
+      '[safety-check] expected lpShare owner not set in environment config; skipping owner check',
+    );
   }
 
   const moduleChecks = [
     {
-      name: "TradeModule",
+      name: 'TradeModule',
       actual: await core.tradeModule(),
       expected: envData.contracts.TradeModule,
     },
     {
-      name: "MarketLifecycleModule",
+      name: 'MarketLifecycleModule',
       actual: await core.lifecycleModule(),
       expected: envData.contracts.MarketLifecycleModule,
     },
     {
-      name: "OracleModule",
+      name: 'OracleModule',
       actual: await core.oracleModule(),
       expected: envData.contracts.OracleModule,
     },
     {
-      name: "RiskModule",
+      name: 'RiskModule',
       actual: await core.riskModule(),
       expected: envData.contracts.RiskModule,
     },
     {
-      name: "LPVaultModule",
+      name: 'LPVaultModule',
       actual: await core.vaultModule(),
-      expected: envData.contracts.LPVaultModule ?? envData.contracts.VaultModule,
+      expected:
+        envData.contracts.LPVaultModule ?? envData.contracts.VaultModule,
     },
   ];
   for (const module of moduleChecks) {
     if (!module.expected) {
-      if (["TradeModule", "MarketLifecycleModule", "OracleModule"].includes(module.name)) {
+      if (
+        ['TradeModule', 'MarketLifecycleModule', 'OracleModule'].includes(
+          module.name,
+        )
+      ) {
         throw new Error(`Missing ${module.name} in environment file`);
       }
       continue;
     }
-    assertAddressMatch(`${module.name} address`, module.actual, module.expected);
+    assertAddressMatch(
+      `${module.name} address`,
+      module.actual,
+      module.expected,
+    );
   }
 
   const positionCore = await position.core();
-  assertAddressMatch("Position core", positionCore, coreProxy);
+  assertAddressMatch('Position core', positionCore, coreProxy);
 
   const corePosition = await core.positionContract();
-  assertAddressMatch("Core positionContract", corePosition, positionProxy);
+  assertAddressMatch('Core positionContract', corePosition, positionProxy);
 
   const paymentToken = await core.paymentToken();
   const expectedPaymentToken = envData.contracts.PaymentToken;
   if (!expectedPaymentToken) {
-    throw new Error("Missing PaymentToken (payment token) in environment file");
+    throw new Error('Missing PaymentToken (payment token) in environment file');
   }
-  assertAddressMatch("Payment token", paymentToken, expectedPaymentToken);
+  assertAddressMatch('Payment token', paymentToken, expectedPaymentToken);
 
   const lpShareCore = await lpShare.core();
-  assertAddressMatch("LPShare core", lpShareCore, coreProxy);
+  assertAddressMatch('LPShare core', lpShareCore, coreProxy);
 
   const submitWindow = envData.config?.settlementSubmitWindow;
   if (submitWindow) {
     const actual = await core.settlementSubmitWindow();
     if (toBigIntString(actual) !== submitWindow) {
-      throw new Error(`settlementSubmitWindow mismatch: chain=${actual} env=${submitWindow}`);
+      throw new Error(
+        `settlementSubmitWindow mismatch: chain=${actual} env=${submitWindow}`,
+      );
     }
   }
 
@@ -162,7 +199,9 @@ export async function safetyCheckAction(env: Environment) {
   if (finalizeDeadline) {
     const actual = await core.claimDelaySeconds();
     if (toBigIntString(actual) !== finalizeDeadline) {
-      throw new Error(`claimDelaySeconds mismatch: chain=${actual} env=${finalizeDeadline}`);
+      throw new Error(
+        `claimDelaySeconds mismatch: chain=${actual} env=${finalizeDeadline}`,
+      );
     }
   }
 
@@ -170,14 +209,16 @@ export async function safetyCheckAction(env: Environment) {
   if (pendingOpsWindow) {
     const actual = await core.pendingOpsWindow();
     if (toBigIntString(actual) !== pendingOpsWindow) {
-      throw new Error(`pendingOpsWindow mismatch: chain=${actual} env=${pendingOpsWindow}`);
+      throw new Error(
+        `pendingOpsWindow mismatch: chain=${actual} env=${pendingOpsWindow}`,
+      );
     }
   }
   if (submitWindow && pendingOpsWindow && finalizeDeadline) {
     const expectedClaim = BigInt(submitWindow) + BigInt(pendingOpsWindow);
     if (BigInt(finalizeDeadline) !== expectedClaim) {
       throw new Error(
-        `claimDelaySeconds invariant mismatch: submit=${submitWindow} ops=${pendingOpsWindow} claim=${finalizeDeadline}`
+        `claimDelaySeconds invariant mismatch: submit=${submitWindow} ops=${pendingOpsWindow} claim=${finalizeDeadline}`,
       );
     }
   }
@@ -187,7 +228,9 @@ export async function safetyCheckAction(env: Environment) {
     const expected = ethers.encodeBytes32String(redstoneFeedId);
     const actual = await core.redstoneFeedId();
     if (actual.toLowerCase() !== expected.toLowerCase()) {
-      throw new Error(`redstoneFeedId mismatch: chain=${actual} env=${expected}`);
+      throw new Error(
+        `redstoneFeedId mismatch: chain=${actual} env=${expected}`,
+      );
     }
   }
 
@@ -195,7 +238,9 @@ export async function safetyCheckAction(env: Environment) {
   if (redstoneFeedDecimals !== undefined) {
     const actual = await core.redstoneFeedDecimals();
     if (Number(actual) !== redstoneFeedDecimals) {
-      throw new Error(`redstoneFeedDecimals mismatch: chain=${actual} env=${redstoneFeedDecimals}`);
+      throw new Error(
+        `redstoneFeedDecimals mismatch: chain=${actual} env=${redstoneFeedDecimals}`,
+      );
     }
   }
 
@@ -203,7 +248,9 @@ export async function safetyCheckAction(env: Environment) {
   if (redstoneMaxSampleDistance) {
     const actual = await core.maxSampleDistance();
     if (toBigIntString(actual) !== redstoneMaxSampleDistance) {
-      throw new Error(`maxSampleDistance mismatch: chain=${actual} env=${redstoneMaxSampleDistance}`);
+      throw new Error(
+        `maxSampleDistance mismatch: chain=${actual} env=${redstoneMaxSampleDistance}`,
+      );
     }
   }
 
@@ -211,7 +258,9 @@ export async function safetyCheckAction(env: Environment) {
   if (redstoneFutureTolerance) {
     const actual = await core.futureTolerance();
     if (toBigIntString(actual) !== redstoneFutureTolerance) {
-      throw new Error(`futureTolerance mismatch: chain=${actual} env=${redstoneFutureTolerance}`);
+      throw new Error(
+        `futureTolerance mismatch: chain=${actual} env=${redstoneFutureTolerance}`,
+      );
     }
   }
 
@@ -230,34 +279,36 @@ export async function safetyCheckAction(env: Environment) {
   console.log(`[safety-check] Position nextId=${positionNextId}`);
 
   const positionName = await position.name();
-  if (positionName !== "Signals Position") {
-    throw new Error(`Position name mismatch: expected "Signals Position", got "${positionName}"`);
+  if (positionName !== 'Signals Position') {
+    throw new Error(
+      `Position name mismatch: expected "Signals Position", got "${positionName}"`,
+    );
   }
 
   const codeChecks = [
-    "SignalsCreate2Factory",
-    "SignalsDeployer",
-    "TradeModule",
-    "MarketLifecycleModule",
-    "RiskModule",
-    "LPVaultModule",
-    "OracleModule",
-    "FeePolicyNull",
-    "FeePolicy10bps",
-    "FeePolicy50bps",
-    "FeePolicy100bps",
-    "FeePolicy200bps",
-    "PaymentToken",
-    "SignalsLPShareProxy",
-    "SignalsLPShareImplementation",
-    "LazyMulSegmentTree",
+    'SignalsCreate2Factory',
+    'SignalsDeployer',
+    'TradeModule',
+    'MarketLifecycleModule',
+    'RiskModule',
+    'LPVaultModule',
+    'OracleModule',
+    'FeePolicyNull',
+    'FeePolicy10bps',
+    'FeePolicy50bps',
+    'FeePolicy100bps',
+    'FeePolicy200bps',
+    'PaymentToken',
+    'SignalsLPShareProxy',
+    'SignalsLPShareImplementation',
+    'LazyMulSegmentTree',
   ];
   for (const name of codeChecks) {
     const addr = envData.contracts[name];
     if (!addr) continue;
     const code = await ethers.provider.getCode(addr);
-    if (code === "0x") throw new Error(`${name} has no code at ${addr}`);
+    if (code === '0x') throw new Error(`${name} has no code at ${addr}`);
   }
 
-  console.log("[safety-check] OK");
+  console.log('[safety-check] OK');
 }

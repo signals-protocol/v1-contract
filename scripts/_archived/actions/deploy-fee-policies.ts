@@ -1,28 +1,44 @@
-import hre from "hardhat";
-import { loadEnvironment, recordDeployment, updateContracts } from "../utils/environment";
-import { writeReleaseSnapshot } from "../utils/release";
-import type { Environment } from "../types/environment";
+import hre from 'hardhat';
+import {
+  loadEnvironment,
+  recordDeployment,
+  updateContracts,
+} from '../utils/environment';
+import { writeReleaseSnapshot } from '../utils/release';
+import type { Environment } from '../types/environment';
 
 export async function deployFeePoliciesAction(env: Environment) {
   const { ethers, network } = hre;
-  console.log(`[deploy-fee-policies] environment=${env} network=${network.name}`);
+  console.log(
+    `[deploy-fee-policies] environment=${env} network=${network.name}`,
+  );
   const [deployer] = await ethers.getSigners();
   console.log(`Deployer: ${deployer.address}`);
   loadEnvironment(env);
 
-  const nullFeePolicy = await (await ethers.getContractFactory("NullFeePolicy")).deploy();
+  const nullFeePolicy = await (
+    await ethers.getContractFactory('NullFeePolicy')
+  ).deploy();
   await nullFeePolicy.waitForDeployment();
 
-  const feePolicy10bps = await (await ethers.getContractFactory("PercentFeePolicy10bps")).deploy();
+  const feePolicy10bps = await (
+    await ethers.getContractFactory('PercentFeePolicy10bps')
+  ).deploy();
   await feePolicy10bps.waitForDeployment();
 
-  const feePolicy50bps = await (await ethers.getContractFactory("PercentFeePolicy50bps")).deploy();
+  const feePolicy50bps = await (
+    await ethers.getContractFactory('PercentFeePolicy50bps')
+  ).deploy();
   await feePolicy50bps.waitForDeployment();
 
-  const feePolicy100bps = await (await ethers.getContractFactory("PercentFeePolicy100bps")).deploy();
+  const feePolicy100bps = await (
+    await ethers.getContractFactory('PercentFeePolicy100bps')
+  ).deploy();
   await feePolicy100bps.waitForDeployment();
 
-  const feePolicy200bps = await (await ethers.getContractFactory("PercentFeePolicy200bps")).deploy();
+  const feePolicy200bps = await (
+    await ethers.getContractFactory('PercentFeePolicy200bps')
+  ).deploy();
   await feePolicy200bps.waitForDeployment();
 
   updateContracts(env, {
@@ -34,7 +50,7 @@ export async function deployFeePoliciesAction(env: Environment) {
   });
 
   const { data: envSnapshot, record } = recordDeployment(env, {
-    action: "deploy-fee-policies",
+    action: 'deploy-fee-policies',
     deployer: deployer.address,
   });
   writeReleaseSnapshot(env, envSnapshot);

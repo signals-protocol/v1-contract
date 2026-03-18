@@ -1,16 +1,20 @@
-import fs from "fs";
-import path from "path";
-import hre from "hardhat";
-import type { Environment } from "../types/environment";
-import { loadEnvironment } from "../utils/environment";
+import fs from 'fs';
+import path from 'path';
+import hre from 'hardhat';
+import type { Environment } from '../types/environment';
+import { loadEnvironment } from '../utils/environment';
 
 const MANUAL_CONFIG = {
-  vanityPrefix: "0x516",
+  vanityPrefix: '0x516',
   maxNonce: 1_000_000,
-  release: "v1",
+  release: 'v1',
 };
 
-type Create2Component = "DEPLOYER" | "CORE_PROXY" | "POSITION_PROXY" | "LPSHARE_PROXY";
+type Create2Component =
+  | 'DEPLOYER'
+  | 'CORE_PROXY'
+  | 'POSITION_PROXY'
+  | 'LPSHARE_PROXY';
 
 export interface Create2PredictionInput {
   env: Environment;
@@ -41,10 +45,15 @@ export interface Create2Prediction {
 }
 
 function getPredictedPath(env: Environment): string {
-  return path.join("scripts", "environments", `${env}.predicted.json`);
+  return path.join('scripts', 'environments', `${env}.predicted.json`);
 }
 
-function buildBase(chainId: number, env: Environment, release: string, component: Create2Component): string {
+function buildBase(
+  chainId: number,
+  env: Environment,
+  release: string,
+  component: Create2Component,
+): string {
   return `signals-v1|${chainId}|${env}|${release}|${component}`;
 }
 
@@ -58,55 +67,81 @@ function isVanityMatch(address: string, prefix: string): boolean {
 
 function proxyInitCodeHash(proxyBytecode: string, impl: string): string {
   const encoded = hre.ethers.AbiCoder.defaultAbiCoder().encode(
-    ["address", "bytes"],
-    [impl, "0x"]
+    ['address', 'bytes'],
+    [impl, '0x'],
   );
   const initCode = hre.ethers.concat([proxyBytecode, encoded]);
   return hre.ethers.keccak256(initCode);
 }
 
-function deployerInitCodeHash(deployerBytecode: string, deployerEOA: string): string {
-  const encoded = hre.ethers.AbiCoder.defaultAbiCoder().encode(["address"], [deployerEOA]);
+function deployerInitCodeHash(
+  deployerBytecode: string,
+  deployerEOA: string,
+): string {
+  const encoded = hre.ethers.AbiCoder.defaultAbiCoder().encode(
+    ['address'],
+    [deployerEOA],
+  );
   const initCode = hre.ethers.concat([deployerBytecode, encoded]);
   return hre.ethers.keccak256(initCode);
 }
 
 async function loadProxyBytecode(): Promise<string> {
-  const proxyFactory = await hre.ethers.getContractFactory("ERC1967Proxy");
+  const proxyFactory = await hre.ethers.getContractFactory('ERC1967Proxy');
   return proxyFactory.bytecode;
 }
 
-export async function predictCreate2(input: Create2PredictionInput): Promise<Create2Prediction> {
+export async function predictCreate2(
+  input: Create2PredictionInput,
+): Promise<Create2Prediction> {
   const vanityPrefix = input.vanityPrefix ?? MANUAL_CONFIG.vanityPrefix;
   const maxNonce = input.maxNonce ?? MANUAL_CONFIG.maxNonce;
   const release = input.release ?? MANUAL_CONFIG.release;
 
   const proxyBytecode = await loadProxyBytecode();
-  const deployerFactory = await hre.ethers.getContractFactory("SignalsDeployer");
-  const deployerInitHash = deployerInitCodeHash(deployerFactory.bytecode, input.deployerEOA);
+  const deployerFactory =
+    await hre.ethers.getContractFactory('SignalsDeployer');
+  const deployerInitHash = deployerInitCodeHash(
+    deployerFactory.bytecode,
+    input.deployerEOA,
+  );
 
-  const deployerBase = buildBase(input.chainId, input.env, release, "DEPLOYER");
+  const deployerBase = buildBase(input.chainId, input.env, release, 'DEPLOYER');
   const deployerSalt = buildSalt(deployerBase, 0);
   const deployerAddress = hre.ethers.getCreate2Address(
     input.create2Factory,
     deployerSalt,
-    deployerInitHash
+    deployerInitHash,
   );
 
   const coreInitHash = proxyInitCodeHash(proxyBytecode, input.coreImpl);
   const positionInitHash = proxyInitCodeHash(proxyBytecode, input.positionImpl);
   const lpShareInitHash = proxyInitCodeHash(proxyBytecode, input.lpShareImpl);
 
-  const coreBase = buildBase(input.chainId, input.env, release, "CORE_PROXY");
-  const positionBase = buildBase(input.chainId, input.env, release, "POSITION_PROXY");
-  const lpShareBase = buildBase(input.chainId, input.env, release, "LPSHARE_PROXY");
+  const coreBase = buildBase(input.chainId, input.env, release, 'CORE_PROXY');
+  const positionBase = buildBase(
+    input.chainId,
+    input.env,
+    release,
+    'POSITION_PROXY',
+  );
+  const lpShareBase = buildBase(
+    input.chainId,
+    input.env,
+    release,
+    'LPSHARE_PROXY',
+  );
 
-  let coreSalt = "";
+  let coreSalt = '';
   let coreNonce = 0;
-  let coreAddress = "";
+  let coreAddress = '';
   for (let nonce = 0; nonce <= maxNonce; nonce++) {
     const salt = buildSalt(coreBase, nonce);
-    const address = hre.ethers.getCreate2Address(deployerAddress, salt, coreInitHash);
+    const address = hre.ethers.getCreate2Address(
+      deployerAddress,
+      salt,
+      coreInitHash,
+    );
     if (isVanityMatch(address, vanityPrefix)) {
       coreSalt = salt;
       coreNonce = nonce;
@@ -115,13 +150,23 @@ export async function predictCreate2(input: Create2PredictionInput): Promise<Cre
     }
   }
   if (!coreSalt) {
-    throw new Error(`Core vanity not found within MAX_NONCE=${maxNonce} for prefix ${vanityPrefix}`);
+    throw new Error(
+      `Core vanity not found within MAX_NONCE=${maxNonce} for prefix ${vanityPrefix}`,
+    );
   }
 
   const positionSalt = buildSalt(positionBase, 0);
   const lpShareSalt = buildSalt(lpShareBase, 0);
-  const positionAddress = hre.ethers.getCreate2Address(deployerAddress, positionSalt, positionInitHash);
-  const lpShareAddress = hre.ethers.getCreate2Address(deployerAddress, lpShareSalt, lpShareInitHash);
+  const positionAddress = hre.ethers.getCreate2Address(
+    deployerAddress,
+    positionSalt,
+    positionInitHash,
+  );
+  const lpShareAddress = hre.ethers.getCreate2Address(
+    deployerAddress,
+    lpShareSalt,
+    lpShareInitHash,
+  );
 
   return {
     network: input.env,
@@ -167,14 +212,14 @@ export async function predictCreate2Action(env: Environment) {
   const envData = loadEnvironment(env);
   const create2Factory = envData.contracts.SignalsCreate2Factory;
   if (!create2Factory) {
-    throw new Error("Missing SignalsCreate2Factory in environment file");
+    throw new Error('Missing SignalsCreate2Factory in environment file');
   }
   const coreImpl = envData.contracts.SignalsCoreImplementation;
   const positionImpl = envData.contracts.SignalsPositionImplementation;
   const lpShareImpl = envData.contracts.SignalsLPShareImplementation;
   if (!coreImpl || !positionImpl || !lpShareImpl) {
     throw new Error(
-      "Missing core/position/lpshare implementation addresses in environment file"
+      'Missing core/position/lpshare implementation addresses in environment file',
     );
   }
 
@@ -193,5 +238,7 @@ export async function predictCreate2Action(env: Environment) {
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, JSON.stringify(prediction, null, 2));
   console.log(`[predict-create2] wrote ${outputPath}`);
-  console.log(`[predict-create2] coreProxy=${prediction.contracts.SignalsCoreProxy}`);
+  console.log(
+    `[predict-create2] coreProxy=${prediction.contracts.SignalsCoreProxy}`,
+  );
 }
