@@ -73,7 +73,7 @@ contract FullLifecycleTest is FullSystemDeployer {
 
         // Claim too early should revert
         vm.prank(receiver);
-        vm.expectRevert();
+        vm.expectPartialRevert(SE.ClaimTooEarly.selector);
         sys.core.claimPayout(positionId);
 
         // Advance past claim delay
@@ -82,7 +82,7 @@ contract FullLifecycleTest is FullSystemDeployer {
 
         // Original trader cannot claim (no longer owner)
         vm.prank(trader);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.UnauthorizedCaller.selector, trader));
         sys.core.claimPayout(positionId);
 
         // Receiver claims successfully

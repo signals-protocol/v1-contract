@@ -6,6 +6,7 @@ import "../../base/RedstoneHelper.sol";
 import "../../base/SettlementHelper.sol";
 import "../../base/SeedHelper.sol";
 import {SignalsErrors as SE} from "../../../../contracts/errors/SignalsErrors.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 /// @title Sponsored Position E2E Tests
 /// @notice 27 tests covering openPositionFor, reverts, close/claim split, edge cases.
@@ -169,7 +170,7 @@ contract SponsoredPositionTest is FullSystemDeployer {
 
     function test_reverts_if_maxCost_exceeded() public {
         vm.prank(sponsor);
-        vm.expectRevert();
+        vm.expectPartialRevert(SE.CostExceedsMaximum.selector);
         sys.core.openPositionFor(beneficiary, marketId, 1, 3, QUANTITY, 1);
     }
 
@@ -178,7 +179,7 @@ contract SponsoredPositionTest is FullSystemDeployer {
         sys.core.pause();
 
         vm.prank(sponsor);
-        vm.expectRevert();
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
         sys.core.openPositionFor(beneficiary, marketId, 1, 3, QUANTITY, 10_000_000);
     }
 

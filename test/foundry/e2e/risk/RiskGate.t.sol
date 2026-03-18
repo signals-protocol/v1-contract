@@ -39,7 +39,7 @@ contract RiskGateTest is FullSystemDeployer {
 
         // Should revert: alpha = 10 WAD exceeds limit
         vm.prank(sys.owner);
-        vm.expectRevert();
+        vm.expectPartialRevert(SE.AlphaExceedsLimit.selector);
         sys.core.createMarket(0, 4, 1, start, end, settlement, 4, 10e18, address(sys.feePolicy), address(seedData));
 
         // Should succeed: alpha = 0.1 WAD is within limit
