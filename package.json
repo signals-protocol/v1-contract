@@ -44,6 +44,7 @@
     "forge:set-timeline:dev": "ENV=dev forge script script/ops/SetTimeline.s.sol --rpc-url dev --broadcast",
     "forge:create-market:dev": "ENV=dev forge script script/ops/CreateMarket.s.sol --rpc-url dev --broadcast",
     "forge:close-market:dev": "ENV=dev forge script script/ops/CloseMarket.s.sol --rpc-url dev --broadcast",
+    "forge:deploy:integration": "forge script script/actions/DeployIntegration.s.sol --rpc-url local --broadcast",
     "post-deploy": "ts-node scripts/utils/post-deploy.ts",
     "prepare": "husky"
   },

@@ -1,0 +1,7 @@
+{
+  "settlement": { "submitWindowSec": 60, "pendingOpsWindowSec": 30 },
+  "redstone": { "feedId": "BTC", "feedDecimals": 8, "maxSampleDistanceSec": 600, "futureToleranceSec": 60 },
+  "risk": { "lambda": "0.3", "kDrawdown": "1", "enforceAlpha": true },
+  "feeWaterfall": { "rhoBS": "0.2", "phiLP": "0.7", "phiBS": "0.2", "phiTR": "0.1" },
+  "withdrawalLagBatches": 1
+}
