@@ -1,15 +1,15 @@
-import fs from "fs";
-import path from "path";
-import hre from "hardhat";
+import fs from 'fs';
+import path from 'path';
+import hre from 'hardhat';
 import {
   loadEnvironment,
   recordDeployment,
   updateConfig,
   updateContracts,
-} from "../utils/environment";
-import { writeReleaseSnapshot } from "../utils/release";
-import type { Environment } from "../types/environment";
-import { predictCreate2 } from "./predict-create2";
+} from '../utils/environment';
+import { writeReleaseSnapshot } from '../utils/release';
+import type { Environment } from '../types/environment';
+import { predictCreate2 } from './predict-create2';
 
 const CHAIN_ID_GUARD: Partial<Record<Environment, number>> = {
   dev: 5115,
@@ -17,39 +17,39 @@ const CHAIN_ID_GUARD: Partial<Record<Environment, number>> = {
 };
 
 const MANUAL_INPUTS = {
-  ownerSafe: "0x0e5ed8B5Be63bf1f92Cc9A516B7cAADa1AeA6Bf8",
-  paymentTokenAddress: "0x8D82c4E3c936C7B5724A382a9c5a4E6Eb7aB6d5D",
-  operatorAllowlist: "0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD",
+  ownerSafe: '0x0e5ed8B5Be63bf1f92Cc9A516B7cAADa1AeA6Bf8',
+  paymentTokenAddress: '0x8D82c4E3c936C7B5724A382a9c5a4E6Eb7aB6d5D',
+  operatorAllowlist: '0xe0785a8cDc92bAe49Ae7aA6C99B602e3CC43F7eD',
   settlement: {
-    submitWindowSec: "600",
-    pendingOpsWindowSec: "300",
+    submitWindowSec: '600',
+    pendingOpsWindowSec: '300',
   },
   redstone: {
-    feedId: "BTC",
-    feedDecimals: "8",
-    maxSampleDistanceSec: "600",
-    futureToleranceSec: "60",
+    feedId: 'BTC',
+    feedDecimals: '8',
+    maxSampleDistanceSec: '600',
+    futureToleranceSec: '60',
   },
   risk: {
-    lambda: "0.3",
-    kDrawdown: "1",
-    enforceAlpha: "0",
+    lambda: '0.3',
+    kDrawdown: '1',
+    enforceAlpha: '0',
   },
   feeWaterfall: {
-    rhoBS: "0.2",
-    phiLP: "0.7",
-    phiBS: "0.2",
-    phiTR: "0.1",
+    rhoBS: '0.2',
+    phiLP: '0.7',
+    phiBS: '0.2',
+    phiTR: '0.1',
   },
-  withdrawalLagBatches: "0",
+  withdrawalLagBatches: '0',
   lpShare: {
-    name: "Signals LP",
-    symbol: "SIGLP",
+    name: 'Signals LP',
+    symbol: 'SIGLP',
   },
   create2: {
-    release: "v1",
-    vanityPrefix: "0x516",
-    maxNonce: "1000000",
+    release: 'v1',
+    vanityPrefix: '0x516',
+    maxNonce: '1000000',
   },
 };
 
@@ -58,7 +58,7 @@ const INPUTS = MANUAL_INPUTS;
 function parseAddressList(value: string): string[] {
   if (!value) return [];
   return value
-    .split(",")
+    .split(',')
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
 }
@@ -84,7 +84,11 @@ function wad(value: string): bigint {
 }
 
 function writePredicted(env: Environment, prediction: unknown) {
-  const outputPath = path.join("scripts", "environments", `${env}.predicted.json`);
+  const outputPath = path.join(
+    'scripts',
+    'environments',
+    `${env}.predicted.json`,
+  );
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, JSON.stringify(prediction, null, 2));
   return outputPath;
@@ -102,31 +106,31 @@ export async function deployAction(env: Environment) {
   const expectedChainId = CHAIN_ID_GUARD[env];
   if (expectedChainId && Number(chainId) !== expectedChainId) {
     throw new Error(
-      `ChainId mismatch: expected=${expectedChainId} got=${chainId}`
+      `ChainId mismatch: expected=${expectedChainId} got=${chainId}`,
     );
   }
 
   const submitWindow = parseBigInt(
     INPUTS.settlement.submitWindowSec,
-    "SETTLEMENT_SUBMIT_WINDOW"
+    'SETTLEMENT_SUBMIT_WINDOW',
   );
   const pendingOpsWindow = parseBigInt(
     INPUTS.settlement.pendingOpsWindowSec,
-    "SETTLEMENT_PENDING_OPS_WINDOW"
+    'SETTLEMENT_PENDING_OPS_WINDOW',
   );
   const claimDelay = submitWindow + pendingOpsWindow;
 
   const redstoneFeedDecimals = parseNumber(
     INPUTS.redstone.feedDecimals,
-    "REDSTONE_FEED_DECIMALS"
+    'REDSTONE_FEED_DECIMALS',
   );
   const redstoneMaxSampleDistance = parseBigInt(
     INPUTS.redstone.maxSampleDistanceSec,
-    "REDSTONE_MAX_SAMPLE_DISTANCE"
+    'REDSTONE_MAX_SAMPLE_DISTANCE',
   );
   const redstoneFutureTolerance = parseBigInt(
     INPUTS.redstone.futureToleranceSec,
-    "REDSTONE_FUTURE_TOLERANCE"
+    'REDSTONE_FUTURE_TOLERANCE',
   );
 
   const ownerSafe = INPUTS.ownerSafe || deployer.address;
@@ -137,32 +141,32 @@ export async function deployAction(env: Environment) {
 
   const withdrawalLagBatches = parseNumber(
     INPUTS.withdrawalLagBatches,
-    "WITHDRAWAL_LAG_BATCHES"
+    'WITHDRAWAL_LAG_BATCHES',
   );
   if (withdrawalLagBatches < 0) {
-    throw new Error("WITHDRAWAL_LAG_BATCHES must be >= 0");
+    throw new Error('WITHDRAWAL_LAG_BATCHES must be >= 0');
   }
 
   const riskLambda = wad(INPUTS.risk.lambda);
   const riskKDrawdown = wad(INPUTS.risk.kDrawdown);
   const riskEnforceAlpha =
-    INPUTS.risk.enforceAlpha === "1" || INPUTS.risk.enforceAlpha === "true";
+    INPUTS.risk.enforceAlpha === '1' || INPUTS.risk.enforceAlpha === 'true';
   const rhoBS = wad(INPUTS.feeWaterfall.rhoBS);
   const phiLP = wad(INPUTS.feeWaterfall.phiLP);
   const phiBS = wad(INPUTS.feeWaterfall.phiBS);
   const phiTR = wad(INPUTS.feeWaterfall.phiTR);
 
   let paymentAddress = INPUTS.paymentTokenAddress;
-  if (env === "prod" && !paymentAddress) {
+  if (env === 'prod' && !paymentAddress) {
     throw new Error(
-      "PAYMENT_TOKEN_ADDRESS is required for prod (no mock payment token deployment)"
+      'PAYMENT_TOKEN_ADDRESS is required for prod (no mock payment token deployment)',
     );
   }
   if (paymentAddress) {
     console.log(`[deploy] using existing payment token=${paymentAddress}`);
   } else {
     const payment = await (
-      await ethers.getContractFactory("SignalsUSDToken")
+      await ethers.getContractFactory('SignalsUSDToken')
     ).deploy();
     await payment.waitForDeployment();
     paymentAddress = payment.target.toString();
@@ -170,18 +174,22 @@ export async function deployAction(env: Environment) {
 
   const decimalsContract = new ethers.Contract(
     paymentAddress,
-    ["function decimals() view returns (uint8)"],
-    deployer
+    ['function decimals() view returns (uint8)'],
+    deployer,
   );
   const paymentDecimals = Number(await decimalsContract.decimals());
   if (paymentDecimals !== 6) {
     throw new Error(`paymentToken.decimals must be 6 (got ${paymentDecimals})`);
   }
 
-  async function resolveImpl(label: string, contractName: string, existing?: string): Promise<string> {
+  async function resolveImpl(
+    label: string,
+    contractName: string,
+    existing?: string,
+  ): Promise<string> {
     if (existing) {
       const code = await ethers.provider.getCode(existing);
-      if (code !== "0x") {
+      if (code !== '0x') {
         console.log(`[deploy] reusing ${label}=${existing}`);
         return existing;
       }
@@ -195,78 +203,78 @@ export async function deployAction(env: Environment) {
   }
 
   const nullFeePolicy = await (
-    await ethers.getContractFactory("NullFeePolicy")
+    await ethers.getContractFactory('NullFeePolicy')
   ).deploy();
   await nullFeePolicy.waitForDeployment();
 
   const feePolicy10bps = await (
-    await ethers.getContractFactory("PercentFeePolicy10bps")
+    await ethers.getContractFactory('PercentFeePolicy10bps')
   ).deploy();
   await feePolicy10bps.waitForDeployment();
 
   const feePolicy50bps = await (
-    await ethers.getContractFactory("PercentFeePolicy50bps")
+    await ethers.getContractFactory('PercentFeePolicy50bps')
   ).deploy();
   await feePolicy50bps.waitForDeployment();
 
   const feePolicy100bps = await (
-    await ethers.getContractFactory("PercentFeePolicy100bps")
+    await ethers.getContractFactory('PercentFeePolicy100bps')
   ).deploy();
   await feePolicy100bps.waitForDeployment();
 
   const feePolicy200bps = await (
-    await ethers.getContractFactory("PercentFeePolicy200bps")
+    await ethers.getContractFactory('PercentFeePolicy200bps')
   ).deploy();
   await feePolicy200bps.waitForDeployment();
 
   const lazy = await (
-    await ethers.getContractFactory("LazyMulSegmentTree")
+    await ethers.getContractFactory('LazyMulSegmentTree')
   ).deploy();
   await lazy.waitForDeployment();
 
   const tradeModule = await (
-    await ethers.getContractFactory("TradeModule", {
+    await ethers.getContractFactory('TradeModule', {
       libraries: { LazyMulSegmentTree: lazy.target },
     })
   ).deploy();
   await tradeModule.waitForDeployment();
 
   const lifecycleModule = await (
-    await ethers.getContractFactory("MarketLifecycleModule", {
+    await ethers.getContractFactory('MarketLifecycleModule', {
       libraries: { LazyMulSegmentTree: lazy.target },
     })
   ).deploy();
   await lifecycleModule.waitForDeployment();
 
   const oracleModule = await (
-    await ethers.getContractFactory("OracleModule")
+    await ethers.getContractFactory('OracleModule')
   ).deploy();
   await oracleModule.waitForDeployment();
 
   const riskModule = await (
-    await ethers.getContractFactory("RiskModule")
+    await ethers.getContractFactory('RiskModule')
   ).deploy();
   await riskModule.waitForDeployment();
 
   const vaultModule = await (
-    await ethers.getContractFactory("LPVaultModule")
+    await ethers.getContractFactory('LPVaultModule')
   ).deploy();
   await vaultModule.waitForDeployment();
 
   const coreImplAddress = await resolveImpl(
-    "SignalsCoreImplementation",
-    "SignalsCore",
-    envData.contracts.SignalsCoreImplementation
+    'SignalsCoreImplementation',
+    'SignalsCore',
+    envData.contracts.SignalsCoreImplementation,
   );
   const positionImplAddress = await resolveImpl(
-    "SignalsPositionImplementation",
-    "SignalsPosition",
-    envData.contracts.SignalsPositionImplementation
+    'SignalsPositionImplementation',
+    'SignalsPosition',
+    envData.contracts.SignalsPositionImplementation,
   );
   const lpShareImplAddress = await resolveImpl(
-    "SignalsLPShareImplementation",
-    "SignalsLPShare",
-    envData.contracts.SignalsLPShareImplementation
+    'SignalsLPShareImplementation',
+    'SignalsLPShare',
+    envData.contracts.SignalsLPShareImplementation,
   );
 
   const create2FactoryAddress = await (async () => {
@@ -275,31 +283,31 @@ export async function deployAction(env: Environment) {
       envData.contracts.Create2Factory;
     if (existing) {
       const code = await ethers.provider.getCode(existing);
-      if (code !== "0x") {
+      if (code !== '0x') {
         return existing;
       }
-      if (env === "prod") {
+      if (env === 'prod') {
         throw new Error(`SignalsCreate2Factory has no code at ${existing}`);
       }
       console.warn(
-        `[deploy] SignalsCreate2Factory not found at ${existing}; redeploying`
+        `[deploy] SignalsCreate2Factory not found at ${existing}; redeploying`,
       );
     }
     const factory = await (
-      await ethers.getContractFactory("SignalsCreate2Factory")
+      await ethers.getContractFactory('SignalsCreate2Factory')
     ).deploy(deployer.address);
     await factory.waitForDeployment();
     return factory.target.toString();
   })();
 
   const factoryContract = await ethers.getContractAt(
-    "SignalsCreate2Factory",
-    create2FactoryAddress
+    'SignalsCreate2Factory',
+    create2FactoryAddress,
   );
   const allowedDeployer = await factoryContract.allowedDeployer();
   if (allowedDeployer.toLowerCase() !== deployer.address.toLowerCase()) {
     throw new Error(
-      `SignalsCreate2Factory allowedDeployer mismatch: expected ${deployer.address} got ${allowedDeployer}`
+      `SignalsCreate2Factory allowedDeployer mismatch: expected ${deployer.address} got ${allowedDeployer}`,
     );
   }
 
@@ -313,30 +321,30 @@ export async function deployAction(env: Environment) {
     lpShareImpl: lpShareImplAddress,
     release: INPUTS.create2.release,
     vanityPrefix: INPUTS.create2.vanityPrefix,
-    maxNonce: parseNumber(INPUTS.create2.maxNonce, "CORE_VANITY_MAX_NONCE"),
+    maxNonce: parseNumber(INPUTS.create2.maxNonce, 'CORE_VANITY_MAX_NONCE'),
   });
 
   const predictedPath = writePredicted(env, prediction);
   console.log(`[deploy] predicted addresses written to ${predictedPath}`);
 
   const deployerAddress = prediction.contracts.SignalsDeployer;
-  const deployerFactory = await ethers.getContractFactory("SignalsDeployer");
+  const deployerFactory = await ethers.getContractFactory('SignalsDeployer');
   const deployerInitCode = ethers.concat([
     deployerFactory.bytecode,
-    ethers.AbiCoder.defaultAbiCoder().encode(["address"], [deployer.address]),
+    ethers.AbiCoder.defaultAbiCoder().encode(['address'], [deployer.address]),
   ]);
 
   const deployerCode = await ethers.provider.getCode(deployerAddress);
-  if (deployerCode === "0x") {
+  if (deployerCode === '0x') {
     const deployTx = await factoryContract.deploy(
       prediction.create2.salts.DEPLOYER.salt,
-      deployerInitCode
+      deployerInitCode,
     );
     await deployTx.wait();
   }
 
   const deployerCodeAfter = await ethers.provider.getCode(deployerAddress);
-  if (deployerCodeAfter === "0x") {
+  if (deployerCodeAfter === '0x') {
     throw new Error(`SignalsDeployer was not deployed at ${deployerAddress}`);
   }
 
@@ -369,8 +377,8 @@ export async function deployAction(env: Environment) {
   };
 
   const deployerContract = await ethers.getContractAt(
-    "SignalsDeployer",
-    deployerAddress
+    'SignalsDeployer',
+    deployerAddress,
   );
   const deployAllTx = await deployerContract.deployAllDeterministic(
     coreImplAddress,
@@ -384,11 +392,11 @@ export async function deployAction(env: Environment) {
     prediction.contracts.SignalsLPShareProxy,
     coreParams,
     INPUTS.lpShare.name,
-    INPUTS.lpShare.symbol
+    INPUTS.lpShare.symbol,
   );
   const deployReceipt = await deployAllTx.wait();
   console.log(
-    `[deploy] deployAllDeterministic tx=${deployAllTx.hash} block=${deployReceipt?.blockNumber}`
+    `[deploy] deployAllDeterministic tx=${deployAllTx.hash} block=${deployReceipt?.blockNumber}`,
   );
 
   updateContracts(env, {
@@ -435,7 +443,7 @@ export async function deployAction(env: Environment) {
   });
 
   const { data: envSnapshot, record } = recordDeployment(env, {
-    action: "deploy",
+    action: 'deploy',
     deployer: deployer.address,
   });
   writeReleaseSnapshot(env, envSnapshot);

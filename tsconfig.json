@@ -13,11 +13,7 @@
     "types": ["node"]
   },
   "include": [
-    "hardhat.config.ts",
-    "scripts",
-    "test",
-    "contracts",
-    "typechain-types"
+    "scripts"
   ],
   "exclude": [
     "scripts/_archived"

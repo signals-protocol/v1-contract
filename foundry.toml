@@ -48,3 +48,7 @@ via_ir = false
 dev = "${DEV_RPC_URL}"
 prod = "${PROD_RPC_URL}"
 local = "http://127.0.0.1:8545"
+
+[etherscan]
+dev = { key = "${BLOCKSCOUT_API_KEY}", url = "https://explorer.testnet.citrea.xyz/api", chain = 5115 }
+prod = { key = "${BLOCKSCOUT_API_KEY}", url = "https://explorer.mainnet.citrea.xyz/api", chain = 4114 }

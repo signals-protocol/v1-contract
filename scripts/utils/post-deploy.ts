@@ -4,11 +4,11 @@
  * environment JSON via existing environment.ts / release.ts functions.
  *
  * Usage:
- *   ts-node scripts/utils/post-deploy.ts <env> <action> [--broadcast-dir <path>]
+ *   tsx scripts/utils/post-deploy.ts <env> <action> [--broadcast-dir <path>]
  *
  * Example:
- *   ts-node scripts/utils/post-deploy.ts dev deploy-fee-policies
- *   ts-node scripts/utils/post-deploy.ts dev deploy --broadcast-dir broadcast/DeployV1.s.sol/5115
+ *   tsx scripts/utils/post-deploy.ts dev deploy-fee-policies
+ *   tsx scripts/utils/post-deploy.ts dev deploy --broadcast-dir broadcast/DeployV1.s.sol/5115
  */
 import fs from 'fs';
 import path from 'path';
@@ -52,7 +52,7 @@ function parseArgs(): {
   const args = process.argv.slice(2);
   if (args.length < 2) {
     console.error(
-      'Usage: ts-node scripts/utils/post-deploy.ts <env> <action> [--broadcast-dir <path>]',
+      'Usage: tsx scripts/utils/post-deploy.ts <env> <action> [--broadcast-dir <path>]',
     );
     process.exit(1);
   }

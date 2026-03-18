@@ -36,9 +36,8 @@ jobs:
         with:
           path: |
             cache
-            artifacts
-            typechain-types
-          key: build-${{ runner.os }}-${{ hashFiles('yarn.lock', 'hardhat.config.ts', 'foundry.toml', 'contracts/**') }}
+            out
+          key: build-${{ runner.os }}-${{ hashFiles('yarn.lock', 'foundry.toml', 'contracts/**') }}
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
@@ -48,15 +47,6 @@ jobs:
 
       - name: Forge test
         run: forge test -vvv
-
-      - name: Remove Foundry output before Hardhat build
-        run: rm -rf out
-
-      - name: Compile contracts
-        run: yarn hardhat compile
-
-      - name: Generate typechain types
-        run: npx hardhat typechain
 
       - name: Validate exported ABIs
         run: |

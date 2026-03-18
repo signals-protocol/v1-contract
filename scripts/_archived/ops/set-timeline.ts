@@ -1,5 +1,5 @@
-import hre from "hardhat";
-import { loadEnvironment, normalizeEnvironment } from "../utils/environment";
+import hre from 'hardhat';
+import { loadEnvironment, normalizeEnvironment } from '../utils/environment';
 
 async function main() {
   const { ethers, network } = hre;
@@ -15,7 +15,9 @@ async function main() {
   const opsRaw = envData.config?.pendingOpsWindow;
   const claimRaw = envData.config?.settlementFinalizeDeadline;
   if (!submitRaw || !opsRaw || !claimRaw) {
-    throw new Error(`Missing settlement timeline config in ${env} environment file`);
+    throw new Error(
+      `Missing settlement timeline config in ${env} environment file`,
+    );
   }
 
   const submitWindow = BigInt(submitRaw);
@@ -24,15 +26,19 @@ async function main() {
 
   if (claimDelay !== submitWindow + opsWindow) {
     throw new Error(
-      `Invalid timeline invariant: submit=${submitWindow} ops=${opsWindow} claim=${claimDelay}`
+      `Invalid timeline invariant: submit=${submitWindow} ops=${opsWindow} claim=${claimDelay}`,
     );
   }
 
-  const core = await ethers.getContractAt("SignalsCore", coreAddress);
-  const tx = await core.setSettlementTimeline(submitWindow, opsWindow, claimDelay);
+  const core = await ethers.getContractAt('SignalsCore', coreAddress);
+  const tx = await core.setSettlementTimeline(
+    submitWindow,
+    opsWindow,
+    claimDelay,
+  );
   await tx.wait();
   console.log(
-    `[set-timeline] env=${env} submit=${submitWindow} ops=${opsWindow} claim=${claimDelay}`
+    `[set-timeline] env=${env} submit=${submitWindow} ops=${opsWindow} claim=${claimDelay}`,
   );
 }
 

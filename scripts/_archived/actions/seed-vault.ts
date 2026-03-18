@@ -1,12 +1,14 @@
-import hre from "hardhat";
-import { loadEnvironment } from "../utils/environment";
-import type { Environment } from "../types/environment";
+import hre from 'hardhat';
+import { loadEnvironment } from '../utils/environment';
+import type { Environment } from '../types/environment';
 
-const AMOUNT_ENV = "SEED_VAULT_AMOUNT_USD";
+const AMOUNT_ENV = 'SEED_VAULT_AMOUNT_USD';
 
 function parseAmount(value?: string): bigint {
   if (!value) {
-    throw new Error(`Missing ${AMOUNT_ENV} (expected human USD amount, 6 decimals)`);
+    throw new Error(
+      `Missing ${AMOUNT_ENV} (expected human USD amount, 6 decimals)`,
+    );
   }
   return hre.ethers.parseUnits(value, 6);
 }
@@ -18,28 +20,34 @@ export async function seedVaultAction(env: Environment) {
 
   const envData = loadEnvironment(env);
   const coreAddress = envData.contracts.SignalsCoreProxy;
-  if (!coreAddress) throw new Error("Missing SignalsCoreProxy in environment file");
+  if (!coreAddress)
+    throw new Error('Missing SignalsCoreProxy in environment file');
 
   const paymentTokenAddress = envData.contracts.PaymentToken;
-  if (!paymentTokenAddress) throw new Error("Missing PaymentToken (payment token) in environment file");
+  if (!paymentTokenAddress)
+    throw new Error('Missing PaymentToken (payment token) in environment file');
 
   const amount6 = parseAmount(process.env[AMOUNT_ENV]);
   if (amount6 <= 0n) throw new Error(`${AMOUNT_ENV} must be > 0`);
 
   const payment = new ethers.Contract(
     paymentTokenAddress,
-    ["function decimals() view returns (uint8)", "function allowance(address,address) view returns (uint256)", "function approve(address,uint256) returns (bool)"],
-    deployer
+    [
+      'function decimals() view returns (uint8)',
+      'function allowance(address,address) view returns (uint256)',
+      'function approve(address,uint256) returns (bool)',
+    ],
+    deployer,
   );
   const decimals = Number(await payment.decimals());
   if (decimals !== 6) {
     throw new Error(`paymentToken.decimals must be 6 (got ${decimals})`);
   }
 
-  const core = await ethers.getContractAt("SignalsCore", coreAddress);
+  const core = await ethers.getContractAt('SignalsCore', coreAddress);
   const seeded = await core.isVaultSeeded();
   if (seeded) {
-    console.log("[seed-vault] vault already seeded; skipping");
+    console.log('[seed-vault] vault already seeded; skipping');
     return;
   }
 

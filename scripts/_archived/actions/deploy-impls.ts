@@ -1,7 +1,11 @@
-import hre from "hardhat";
-import { loadEnvironment, recordDeployment, updateContracts } from "../utils/environment";
-import { writeReleaseSnapshot } from "../utils/release";
-import type { Environment } from "../types/environment";
+import hre from 'hardhat';
+import {
+  loadEnvironment,
+  recordDeployment,
+  updateContracts,
+} from '../utils/environment';
+import { writeReleaseSnapshot } from '../utils/release';
+import type { Environment } from '../types/environment';
 
 export async function deployImplsAction(env: Environment) {
   const { ethers, network } = hre;
@@ -15,26 +19,32 @@ export async function deployImplsAction(env: Environment) {
     envData.contracts.SignalsCreate2Factory ?? envData.contracts.Create2Factory;
   if (!create2FactoryAddress) {
     const factory = await (
-      await ethers.getContractFactory("SignalsCreate2Factory")
+      await ethers.getContractFactory('SignalsCreate2Factory')
     ).deploy(deployer.address);
     await factory.waitForDeployment();
     create2FactoryAddress = factory.target.toString();
   }
 
   const factoryCode = await ethers.provider.getCode(create2FactoryAddress);
-  if (factoryCode === "0x") {
-    throw new Error(`SignalsCreate2Factory has no code at ${create2FactoryAddress}`);
+  if (factoryCode === '0x') {
+    throw new Error(
+      `SignalsCreate2Factory has no code at ${create2FactoryAddress}`,
+    );
   }
 
-  const coreImpl = await (await ethers.getContractFactory("SignalsCore")).deploy();
+  const coreImpl = await (
+    await ethers.getContractFactory('SignalsCore')
+  ).deploy();
   await coreImpl.waitForDeployment();
 
   const positionImpl = await (
-    await ethers.getContractFactory("SignalsPosition")
+    await ethers.getContractFactory('SignalsPosition')
   ).deploy();
   await positionImpl.waitForDeployment();
 
-  const lpShareImpl = await (await ethers.getContractFactory("SignalsLPShare")).deploy();
+  const lpShareImpl = await (
+    await ethers.getContractFactory('SignalsLPShare')
+  ).deploy();
   await lpShareImpl.waitForDeployment();
 
   updateContracts(env, {
@@ -45,7 +55,7 @@ export async function deployImplsAction(env: Environment) {
   });
 
   const { data: envSnapshot, record } = recordDeployment(env, {
-    action: "deploy-impls",
+    action: 'deploy-impls',
     deployer: deployer.address,
   });
   writeReleaseSnapshot(env, envSnapshot);
