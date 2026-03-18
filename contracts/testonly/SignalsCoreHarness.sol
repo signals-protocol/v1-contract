@@ -160,6 +160,45 @@ contract SignalsCoreHarness is SignalsCore {
     }
 
     // ============================================================
+    // LP Vault P&L + batch helpers for testing
+    // ============================================================
+
+    /// @notice Directly set daily P&L snapshot for testing (bypasses settlement flow)
+    /// @dev Accumulates Lt, Ftot, DeltaEtSum (same behavior as LPVaultModuleProxy.harnessRecordPnl)
+    function harnessRecordPnl(uint64 batchId, int256 lt, uint256 ftot, uint256 deltaEt) external onlyOwner {
+        DailyPnlSnapshot storage snap = _dailyPnl[batchId];
+        snap.Lt += lt;
+        snap.Ftot += ftot;
+        snap.DeltaEtSum += deltaEt;
+
+        // Default: assume one resolved market per batch unless overridden
+        if (_batchMarketState[batchId].total == 0) {
+            _batchMarketState[batchId].total = 1;
+        }
+        if (_batchMarketState[batchId].resolved < _batchMarketState[batchId].total) {
+            _batchMarketState[batchId].resolved = _batchMarketState[batchId].total;
+        }
+    }
+
+    /// @notice Get pending batch totals for testing
+    function harnessGetPendingBatchTotals(uint64 batchId) external view returns (uint256 deposits, uint256 withdraws) {
+        PendingBatchTotal storage totals = _pendingBatchTotals[batchId];
+        return (totals.deposits, totals.withdraws);
+    }
+
+    /// @notice Get batch aggregation for testing
+    function harnessGetBatchAggregation(
+        uint64 batchId
+    )
+        external
+        view
+        returns (uint256 totalDepositAssets, uint256 totalWithdrawShares, uint256 batchPrice, bool processed)
+    {
+        BatchAggregation storage agg = _batchAggregations[batchId];
+        return (agg.totalDepositAssets, agg.totalWithdrawShares, agg.batchPrice, agg.processed);
+    }
+
+    // ============================================================
     // LP Vault state helpers for testing
     // ============================================================
 
@@ -238,27 +277,6 @@ contract SignalsCoreHarness is SignalsCore {
     /// @dev Set market settled state for testing
     function harnessSetMarketSettled(uint256 marketId, bool settled) external onlyOwner {
         markets[marketId].settled = settled;
-    }
-
-    // ============================================================
-    // Daily PnL helpers for LP vault testing
-    // ============================================================
-
-    /// @notice Set daily P&L snapshot for testing batch processing with non-zero PnL
-    /// @dev Mirrors LPVaultModuleProxy.harnessRecordPnl behavior for FullSystem tests
-    function harnessRecordPnl(uint64 batchId, int256 lt, uint256 ftot, uint256 deltaEt) external onlyOwner {
-        DailyPnlSnapshot storage snap = _dailyPnl[batchId];
-        snap.Lt += lt;
-        snap.Ftot += ftot;
-        snap.DeltaEtSum += deltaEt;
-
-        // Default: assume one resolved market per batch unless overridden
-        if (_batchMarketState[batchId].total == 0) {
-            _batchMarketState[batchId].total = 1;
-        }
-        if (_batchMarketState[batchId].resolved < _batchMarketState[batchId].total) {
-            _batchMarketState[batchId].resolved = _batchMarketState[batchId].total;
-        }
     }
 
     /// @notice Set withdrawal lag batches for testing
