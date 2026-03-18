@@ -344,7 +344,7 @@ contract OperatorSecurityTest is FullSystemDeployer {
 
         // requestDeposit is guarded by whenNotPaused
         vm.prank(operator);
-        vm.expectRevert(); // EnforcedPause
+        vm.expectRevert(abi.encodeWithSelector(bytes4(0xd93c0665))); // EnforcedPause()
         sys.core.requestDeposit(10e6);
 
         // claimWithdraw must remain available during pause

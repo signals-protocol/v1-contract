@@ -6,6 +6,7 @@ import "../base/VaultHelper.sol";
 import {SignalsErrors as SE} from "../../../contracts/errors/SignalsErrors.sol";
 import {TradeModule} from "../../../contracts/modules/TradeModule.sol";
 import {ISignalsCore} from "../../../contracts/interfaces/ISignalsCore.sol";
+import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 
 /// @title Core Security Tests
 /// @notice Foundry port of test/security/core.security.spec.ts (12 tests)
@@ -94,7 +95,7 @@ contract CoreSecurityTest is FullSystemDeployer {
         sys.core.openPosition(marketId, 10, 20, uint128(SMALL_QUANTITY), 1_000e6);
 
         vm.prank(attacker);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721InsufficientApproval.selector, attacker, 1));
         sys.position.transferFrom(user, attacker, 1);
     }
 
@@ -126,31 +127,32 @@ contract CoreSecurityTest is FullSystemDeployer {
 
     function test_reverts_on_zero_quantity() public {
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.InvalidQuantity.selector, 0));
         sys.core.openPosition(marketId, 10, 20, 0, 1_000e6);
     }
 
     function test_reverts_on_invalid_tick_range() public {
         // Same tick (point bet not allowed)
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.InvalidTickRange.selector, int256(10), int256(10)));
         sys.core.openPosition(marketId, 10, 10, uint128(SMALL_QUANTITY), 1_000e6);
 
         // Inverted range
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.InvalidTickRange.selector, int256(20), int256(10)));
         sys.core.openPosition(marketId, 20, 10, uint128(SMALL_QUANTITY), 1_000e6);
     }
 
     function test_reverts_on_out_of_bounds_tick() public {
+        // upperTick=200 exceeds maxTick(100) + tickSpacing(1) = 101
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.InvalidTick.selector, int256(200), int256(0), int256(100)));
         sys.core.openPosition(marketId, 0, 200, uint128(SMALL_QUANTITY), 1_000e6);
     }
 
     function test_reverts_on_non_existent_market() public {
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.MarketNotFound.selector, 999));
         sys.core.openPosition(999, 10, 20, uint128(SMALL_QUANTITY), 1_000e6);
     }
 
@@ -160,7 +162,7 @@ contract CoreSecurityTest is FullSystemDeployer {
 
     function test_reverts_when_cost_exceeds_maxCost() public {
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectPartialRevert(SE.CostExceedsMaximum.selector);
         sys.core.openPosition(marketId, 10, 50, uint128(SMALL_QUANTITY), 1);
     }
 

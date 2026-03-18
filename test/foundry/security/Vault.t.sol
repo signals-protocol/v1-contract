@@ -221,6 +221,54 @@ contract VaultSecurityTest is FullSystemDeployer {
         }
     }
 
+    function test_reverts_WithdrawalWouldBrickVault_when_shares_drop_below_minimum() public {
+        _seedVault();
+
+        uint256 minDeadShares = LPVaultModule(address(sys.vaultModule)).MIN_DEAD_SHARES();
+
+        // UserA withdraws all their shares (totalShares - MIN_DEAD_SHARES)
+        uint256 userAShares = sys.lpShare.balanceOf(userA);
+        assertGt(userAShares, 0);
+
+        vm.prank(userA);
+        sys.core.requestWithdraw(userAShares);
+
+        // Process first batch so withdrawal is eligible (lag=1)
+        _recordPnlAndProcess(firstBatchId);
+
+        uint64 withdrawBatchId = firstBatchId + 1;
+
+        // Artificially reduce lpVault.shares so that after withdrawal,
+        // remaining shares < MIN_DEAD_SHARES. This simulates a scenario where
+        // the vault share accounting has been manipulated or an edge case occurs.
+        // Current state: lpVault.shares = totalShares, pending withdrawal = userAShares
+        // After withdrawal: currentShares = lpVault.shares - userAShares
+        // We need: lpVault.shares - userAShares < MIN_DEAD_SHARES
+        // So set lpVault.shares = userAShares + MIN_DEAD_SHARES - 1
+        uint256 manipulatedShares = userAShares + minDeadShares - 1;
+        (, , uint256 price, uint256 pricePeak, ) = sys.core.harnessGetLpVault();
+        vm.prank(sys.owner);
+        sys.core.harnessSetLpVault(
+            (manipulatedShares * price) / WAD, // NAV proportional to shares
+            manipulatedShares,
+            price,
+            pricePeak,
+            true
+        );
+
+        // Record PnL and set batch state for withdrawal batch
+        vm.prank(sys.owner);
+        sys.core.harnessRecordPnl(withdrawBatchId, 0, 0, 500e18);
+        vm.prank(sys.owner);
+        sys.core.harnessSetBatchMarketState(withdrawBatchId, 1, 1);
+        vm.warp(batchEndTimestamp(withdrawBatchId) + 1);
+
+        // Processing should revert because withdrawal would reduce shares below MIN_DEAD_SHARES
+        vm.prank(sys.owner);
+        vm.expectPartialRevert(SE.WithdrawalWouldBrickVault.selector);
+        sys.core.processDailyBatch(withdrawBatchId);
+    }
+
     // ============================================================
     // Deposit residual refund
     // ============================================================

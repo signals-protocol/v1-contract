@@ -377,7 +377,7 @@ contract VaultEscrowSecurityTest is FullSystemDeployer {
 
         // Try to claim again - should revert (not Pending)
         vm.prank(user1);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.RequestNotPending.selector, uint64(0)));
         sys.core.claimWithdraw(0);
     }
 }
