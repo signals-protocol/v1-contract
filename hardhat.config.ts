@@ -1,7 +1,9 @@
 import { HardhatUserConfig } from 'hardhat/config';
 import * as dotenv from 'dotenv';
 import '@nomicfoundation/hardhat-ethers';
+import '@nomicfoundation/hardhat-verify';
 import '@openzeppelin/hardhat-upgrades';
+import '@typechain/hardhat';
 
 dotenv.config();
 

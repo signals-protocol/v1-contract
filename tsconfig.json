@@ -10,7 +10,7 @@
     "skipLibCheck": true,
     "outDir": "dist",
     "noImplicitReturns": true,
-    "types": ["node", "mocha", "chai"]
+    "types": ["node"]
   },
   "include": [
     "hardhat.config.ts",
