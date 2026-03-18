@@ -2,91 +2,91 @@
   "contractName": "IFeePolicy",
   "abi": [
     {
-      "type": "function",
+      "inputs": [],
       "name": "descriptor",
-      "inputs": [],
       "outputs": [
         {
+          "internalType": "string",
           "name": "",
-          "type": "string",
-          "internalType": "string"
+          "type": "string"
         }
       ],
-      "stateMutability": "view"
+      "stateMutability": "view",
+      "type": "function"
     },
     {
-      "type": "function",
+      "inputs": [],
       "name": "name",
-      "inputs": [],
       "outputs": [
         {
+          "internalType": "string",
           "name": "",
-          "type": "string",
-          "internalType": "string"
+          "type": "string"
         }
       ],
-      "stateMutability": "view"
+      "stateMutability": "view",
+      "type": "function"
     },
     {
-      "type": "function",
-      "name": "quoteFee",
       "inputs": [
         {
-          "name": "params",
-          "type": "tuple",
-          "internalType": "struct IFeePolicy.QuoteParams",
           "components": [
             {
+              "internalType": "address",
               "name": "trader",
-              "type": "address",
-              "internalType": "address"
+              "type": "address"
             },
             {
+              "internalType": "uint256",
               "name": "marketId",
-              "type": "uint256",
-              "internalType": "uint256"
+              "type": "uint256"
             },
             {
+              "internalType": "int256",
               "name": "lowerTick",
-              "type": "int256",
-              "internalType": "int256"
+              "type": "int256"
             },
             {
+              "internalType": "int256",
               "name": "upperTick",
-              "type": "int256",
-              "internalType": "int256"
+              "type": "int256"
             },
             {
+              "internalType": "uint128",
               "name": "quantity",
-              "type": "uint128",
-              "internalType": "uint128"
+              "type": "uint128"
             },
             {
+              "internalType": "uint256",
               "name": "baseAmount",
-              "type": "uint256",
-              "internalType": "uint256"
+              "type": "uint256"
             },
             {
+              "internalType": "bool",
               "name": "isBuy",
-              "type": "bool",
-              "internalType": "bool"
+              "type": "bool"
             },
             {
+              "internalType": "bytes32",
               "name": "context",
-              "type": "bytes32",
-              "internalType": "bytes32"
+              "type": "bytes32"
             }
-          ]
+          ],
+          "internalType": "struct IFeePolicy.QuoteParams",
+          "name": "params",
+          "type": "tuple"
         }
       ],
+      "name": "quoteFee",
       "outputs": [
         {
+          "internalType": "uint256",
           "name": "feeAmount",
-          "type": "uint256",
-          "internalType": "uint256"
+          "type": "uint256"
         }
       ],
-      "stateMutability": "view"
+      "stateMutability": "view",
+      "type": "function"
     }
   ]
 }

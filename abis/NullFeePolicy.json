@@ -2,93 +2,93 @@
   "contractName": "NullFeePolicy",
   "abi": [
     {
-      "type": "function",
+      "inputs": [],
       "name": "descriptor",
-      "inputs": [],
       "outputs": [
         {
+          "internalType": "string",
           "name": "",
-          "type": "string",
-          "internalType": "string"
+          "type": "string"
         }
       ],
-      "stateMutability": "pure"
+      "stateMutability": "pure",
+      "type": "function"
     },
     {
-      "type": "function",
+      "inputs": [],
       "name": "name",
-      "inputs": [],
       "outputs": [
         {
+          "internalType": "string",
           "name": "",
-          "type": "string",
-          "internalType": "string"
+          "type": "string"
         }
       ],
-      "stateMutability": "pure"
+      "stateMutability": "pure",
+      "type": "function"
     },
     {
-      "type": "function",
-      "name": "quoteFee",
       "inputs": [
         {
-          "name": "",
-          "type": "tuple",
-          "internalType": "struct IFeePolicy.QuoteParams",
           "components": [
             {
+              "internalType": "address",
               "name": "trader",
-              "type": "address",
-              "internalType": "address"
+              "type": "address"
             },
             {
+              "internalType": "uint256",
               "name": "marketId",
-              "type": "uint256",
-              "internalType": "uint256"
+              "type": "uint256"
             },
             {
+              "internalType": "int256",
               "name": "lowerTick",
-              "type": "int256",
-              "internalType": "int256"
+              "type": "int256"
             },
             {
+              "internalType": "int256",
               "name": "upperTick",
-              "type": "int256",
-              "internalType": "int256"
+              "type": "int256"
             },
             {
+              "internalType": "uint128",
               "name": "quantity",
-              "type": "uint128",
-              "internalType": "uint128"
+              "type": "uint128"
             },
             {
+              "internalType": "uint256",
               "name": "baseAmount",
-              "type": "uint256",
-              "internalType": "uint256"
+              "type": "uint256"
             },
             {
+              "internalType": "bool",
               "name": "isBuy",
-              "type": "bool",
-              "internalType": "bool"
+              "type": "bool"
             },
             {
+              "internalType": "bytes32",
               "name": "context",
-              "type": "bytes32",
-              "internalType": "bytes32"
+              "type": "bytes32"
             }
-          ]
+          ],
+          "internalType": "struct IFeePolicy.QuoteParams",
+          "name": "",
+          "type": "tuple"
         }
       ],
+      "name": "quoteFee",
       "outputs": [
         {
+          "internalType": "uint256",
           "name": "",
-          "type": "uint256",
-          "internalType": "uint256"
+          "type": "uint256"
         }
       ],
-      "stateMutability": "pure"
+      "stateMutability": "pure",
+      "type": "function"
     }
   ],
-  "bytecode": "0x60808060405234601557610181908161001a8239f35b5f80fdfe60806040526004361015610011575f80fd5b5f3560e01c806306fdde03146100f6578063303e74df1461005a5763436f6e211461003a575f80fd5b34610056576101003660031901126100565760206040515f8152f35b5f80fd5b34610056575f36600319011261005657604051606081019080821067ffffffffffffffff8311176100e2576100de91604052603381527f7b22706f6c696379223a226e756c6c222c22706172616d73223a7b226e616d65602082015272223a224e756c6c466565506f6c696379227d7d60681b60408201526040519182918261014a565b0390f35b634e487b7160e01b5f52604160045260245ffd5b34610056575f36600319011261005657604051604081019080821067ffffffffffffffff8311176100e2576100de91604052600d81526c4e756c6c466565506f6c69637960981b6020820152604051918291825b602060409281835280519182918282860152018484015e5f828201840152601f01601f191601019056fea164736f6c634300081c000a",
-  "deployedBytecode": "0x60806040526004361015610011575f80fd5b5f3560e01c806306fdde03146100f6578063303e74df1461005a5763436f6e211461003a575f80fd5b34610056576101003660031901126100565760206040515f8152f35b5f80fd5b34610056575f36600319011261005657604051606081019080821067ffffffffffffffff8311176100e2576100de91604052603381527f7b22706f6c696379223a226e756c6c222c22706172616d73223a7b226e616d65602082015272223a224e756c6c466565506f6c696379227d7d60681b60408201526040519182918261014a565b0390f35b634e487b7160e01b5f52604160045260245ffd5b34610056575f36600319011261005657604051604081019080821067ffffffffffffffff8311176100e2576100de91604052600d81526c4e756c6c466565506f6c69637960981b6020820152604051918291825b602060409281835280519182918282860152018484015e5f828201840152601f01601f191601019056fea164736f6c634300081c000a"
+  "bytecode": "0x608080604052346015576101d2908161001b8239f35b600080fdfe6080604052600436101561001257600080fd5b60003560e01c806306fdde03146100fe578063303e74df1461005f5763436f6e211461003d57600080fd5b3461005a5761010036600319011261005a57602060405160008152f35b600080fd5b3461005a57600036600319011261005a57604051606081019080821067ffffffffffffffff8311176100e8576100e491604052603381527f7b22706f6c696379223a226e756c6c222c22706172616d73223a7b226e616d65602082015272223a224e756c6c466565506f6c696379227d7d60681b604082015260405191829182610153565b0390f35b634e487b7160e01b600052604160045260246000fd5b3461005a57600036600319011261005a57604051604081019080821067ffffffffffffffff8311176100e8576100e491604052600d81526c4e756c6c466565506f6c69637960981b6020820152604051918291825b91909160208152825180602083015260005b818110610186575060409293506000838284010152601f8019910116010190565b806020809287010151604082860101520161016556fea2646970667358221220b2e0092d9f3188bdcb394f6cc08db77c7bc7d673c3353dd40491f4a90adcb28564736f6c634300081c0033",
+  "deployedBytecode": "0x6080604052600436101561001257600080fd5b60003560e01c806306fdde03146100fe578063303e74df1461005f5763436f6e211461003d57600080fd5b3461005a5761010036600319011261005a57602060405160008152f35b600080fd5b3461005a57600036600319011261005a57604051606081019080821067ffffffffffffffff8311176100e8576100e491604052603381527f7b22706f6c696379223a226e756c6c222c22706172616d73223a7b226e616d65602082015272223a224e756c6c466565506f6c696379227d7d60681b604082015260405191829182610153565b0390f35b634e487b7160e01b600052604160045260246000fd5b3461005a57600036600319011261005a57604051604081019080821067ffffffffffffffff8311176100e8576100e491604052600d81526c4e756c6c466565506f6c69637960981b6020820152604051918291825b91909160208152825180602083015260005b818110610186575060409293506000838284010152601f8019910116010190565b806020809287010151604082860101520161016556fea2646970667358221220b2e0092d9f3188bdcb394f6cc08db77c7bc7d673c3353dd40491f4a90adcb28564736f6c634300081c0033"
 }
