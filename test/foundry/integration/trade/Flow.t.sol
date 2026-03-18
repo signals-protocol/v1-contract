@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import "../../base/TradeModuleDeployer.sol";
 import {SignalsErrors as SE} from "../../../../contracts/errors/SignalsErrors.sol";
+import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 
 /// @title FlowTest
 /// @notice Integration: open -> increase -> decrease -> close lifecycle, slippage, claim flows.
@@ -51,7 +52,7 @@ contract FlowTest is TradeModuleDeployer {
 
     function test_rejectsZeroQuantity() public {
         vm.prank(sys.users[0]);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.InvalidQuantity.selector, uint128(0)));
         sys.core.openPosition(1, 0, 4, 0, 1_000_000);
     }
 
@@ -76,7 +77,7 @@ contract FlowTest is TradeModuleDeployer {
             })
         );
         vm.prank(sys2.users[0]);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.InvalidTickSpacing.selector, int256(1), int256(2)));
         sys2.core.openPosition(1, 1, 3, 1_000, 5_000_000);
     }
 
@@ -108,13 +109,13 @@ contract FlowTest is TradeModuleDeployer {
         sys2.core.setMarket(1, m);
 
         vm.prank(sys2.users[0]);
-        vm.expectRevert();
+        vm.expectRevert(SE.MarketNotSeeded.selector);
         sys2.core.openPosition(1, 0, 4, 1_000, 5_000_000);
     }
 
     function test_revertsOnInvalidTicks() public {
         vm.prank(sys.users[0]);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.RangeBinsOutOfBounds.selector, uint32(0), uint32(4), uint32(4)));
         sys.core.openPosition(1, 0, 5, 1_000, 5_000_000);
     }
 
@@ -168,7 +169,7 @@ contract FlowTest is TradeModuleDeployer {
 
         // Not settled yet
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.MarketNotSettled.selector, uint256(1)));
         sys.core.claimPayout(1);
 
         // Settle but future timestamps (too early)
@@ -179,7 +180,7 @@ contract FlowTest is TradeModuleDeployer {
         sys.core.setMarket(1, m);
 
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectPartialRevert(SE.ClaimTooEarly.selector);
         sys.core.claimPayout(1);
 
         // Make claimable - set to far past
@@ -194,7 +195,7 @@ contract FlowTest is TradeModuleDeployer {
 
         // Double claim → burned position reverts
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.PositionNotFound.selector, uint256(1)));
         sys.core.claimPayout(1);
     }
 
@@ -233,7 +234,7 @@ contract FlowTest is TradeModuleDeployer {
 
         // maxCost too low
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectPartialRevert(SE.CostExceedsMaximum.selector);
         sys2.core.openPosition(1, 0, 4, 1_000, 1);
 
         // Open with generous maxCost
@@ -243,7 +244,7 @@ contract FlowTest is TradeModuleDeployer {
 
         // minProceeds too high
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectPartialRevert(SE.ProceedsBelowMinimum.selector);
         sys2.core.decreasePosition(1, 500, quote);
 
         // Close with minProceeds=0
@@ -256,7 +257,7 @@ contract FlowTest is TradeModuleDeployer {
         vm.prank(user);
         sys.payment.approve(address(sys.core), 0);
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectPartialRevert(IERC20Errors.ERC20InsufficientAllowance.selector);
         sys.core.openPosition(1, 0, 4, 1_000, 5_000_000);
     }
 
@@ -298,7 +299,7 @@ contract FlowTest is TradeModuleDeployer {
 
         vm.warp(uint256(m.endTimestamp) + 1);
         vm.prank(sys2.users[0]);
-        vm.expectRevert();
+        vm.expectRevert(SE.MarketExpired.selector);
         sys2.core.openPosition(1, 0, 4, 1_000, 5_000_000);
     }
 
@@ -328,7 +329,7 @@ contract FlowTest is TradeModuleDeployer {
         sys2.core.setMarket(1, m);
 
         vm.prank(sys2.users[0]);
-        vm.expectRevert();
+        vm.expectRevert(SE.MarketNotStarted.selector);
         sys2.core.openPosition(1, 0, 4, 1_000, 5_000_000);
     }
 
@@ -348,15 +349,15 @@ contract FlowTest is TradeModuleDeployer {
         address user = sys.users[0];
 
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.PositionNotFound.selector, uint256(999)));
         sys.core.increasePosition(999, 500, 5_000_000);
 
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.PositionNotFound.selector, uint256(999)));
         sys.core.decreasePosition(999, 500, 0);
 
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.PositionNotFound.selector, uint256(999)));
         sys.core.closePosition(999, 0);
     }
 }

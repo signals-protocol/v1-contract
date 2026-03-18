@@ -113,7 +113,7 @@ contract PayoutReserveTest is FullSystemDeployer {
         vm.warp(claimOpen - 1);
 
         vm.prank(sys.users[0]);
-        vm.expectRevert();
+        vm.expectPartialRevert(SE.ClaimTooEarly.selector);
         sys.core.claimPayout(1);
     }
 
@@ -267,7 +267,7 @@ contract PayoutReserveTest is FullSystemDeployer {
 
         // Second claim reverts (burned)
         vm.prank(sys.users[0]);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.PositionNotFound.selector, uint256(1)));
         sys.core.claimPayout(1);
     }
 
@@ -286,7 +286,7 @@ contract PayoutReserveTest is FullSystemDeployer {
 
         // Non-owner tries to claim
         vm.prank(sys.users[1]);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.UnauthorizedCaller.selector, sys.users[1]));
         sys.core.claimPayout(1);
     }
 
@@ -299,7 +299,7 @@ contract PayoutReserveTest is FullSystemDeployer {
         vm.warp(block.timestamp + 86400);
 
         vm.prank(sys.users[0]);
-        vm.expectRevert();
+        vm.expectPartialRevert(SE.MarketNotSettled.selector);
         sys.core.claimPayout(1);
     }
 

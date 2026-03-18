@@ -165,7 +165,7 @@ contract BatchClaimTest is TradeModuleDeployer {
     function test_revertsOnEmptyArray() public {
         uint256[] memory ids = new uint256[](0);
         vm.prank(sys.users[0]);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.BatchClaimTooLarge.selector, uint256(0), uint256(100)));
         sys.core.batchClaimPayout(ids);
     }
 
@@ -173,7 +173,7 @@ contract BatchClaimTest is TradeModuleDeployer {
         uint256[] memory ids = new uint256[](101);
         for (uint256 i = 0; i < 101; i++) ids[i] = i + 1;
         vm.prank(sys.users[0]);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.BatchClaimTooLarge.selector, uint256(101), uint256(100)));
         sys.core.batchClaimPayout(ids);
     }
 
@@ -187,7 +187,7 @@ contract BatchClaimTest is TradeModuleDeployer {
         uint256[] memory ids = new uint256[](1);
         ids[0] = p1;
         vm.prank(other);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.UnauthorizedCaller.selector, other));
         sys.core.batchClaimPayout(ids);
     }
 
@@ -199,7 +199,7 @@ contract BatchClaimTest is TradeModuleDeployer {
         uint256[] memory ids = new uint256[](1);
         ids[0] = p1;
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.MarketNotSettled.selector, uint256(1)));
         sys.core.batchClaimPayout(ids);
     }
 
@@ -219,7 +219,7 @@ contract BatchClaimTest is TradeModuleDeployer {
         uint256[] memory ids = new uint256[](1);
         ids[0] = p1;
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectPartialRevert(SE.ClaimTooEarly.selector);
         sys.core.batchClaimPayout(ids);
     }
 
@@ -274,7 +274,7 @@ contract BatchClaimTest is TradeModuleDeployer {
         uint256 p1 = _openPos(user, 1, 0, 2, 1_000);
 
         vm.prank(user);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.MarketNotSettled.selector, uint256(1)));
         sys.core.claimPayout(p1);
     }
 

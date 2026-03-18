@@ -69,7 +69,7 @@ contract ChunksTest is FullSystemDeployer {
     function test_revertsRequestSettlementChunksBeforeSettled() public {
         uint256 marketId = _createMarket();
 
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.MarketNotSettled.selector, marketId));
         vm.prank(sys.owner);
         sys.core.requestSettlementChunks(marketId, 10);
     }

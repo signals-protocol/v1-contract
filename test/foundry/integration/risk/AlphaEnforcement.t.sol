@@ -97,7 +97,7 @@ contract AlphaEnforcementTest is FullSystemDeployer {
 
     function test_revertsMarketCreation_whenAlphaGtAlphaLimit() public {
         vm.prank(sys.owner);
-        vm.expectRevert();
+        vm.expectPartialRevert(SE.AlphaExceedsLimit.selector);
         sys.core.createMarketUniform(
             0,
             1000,
@@ -225,7 +225,7 @@ contract AlphaEnforcementTest is FullSystemDeployer {
 
         // Same alpha=500 should now fail
         vm.prank(sys.owner);
-        vm.expectRevert();
+        vm.expectPartialRevert(SE.AlphaExceedsLimit.selector);
         sys.core.createMarketUniform(
             0,
             1000,
@@ -266,7 +266,7 @@ contract AlphaEnforcementTest is FullSystemDeployer {
 
         // Even alpha=1 should fail
         vm.prank(sys.owner);
-        vm.expectRevert();
+        vm.expectPartialRevert(SE.AlphaExceedsLimit.selector);
         sys.core.createMarketUniform(
             0,
             1000,
@@ -308,7 +308,7 @@ contract AlphaEnforcementTest is FullSystemDeployer {
 
     function test_revertsMarketCreationWithNumBins1() public {
         vm.prank(sys.owner);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.InvalidNumBins.selector, uint256(1)));
         sys.core.createMarketUniform(
             0,
             10,
@@ -375,7 +375,7 @@ contract AlphaEnforcementTest is FullSystemDeployer {
         _setBackstopNav(1_000e18);
 
         vm.prank(sys.owner);
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.InvalidFactor.selector, uint256(0)));
         sys.core.createMarket(
             0,
             100,
@@ -422,7 +422,7 @@ contract AlphaEnforcementTest is FullSystemDeployer {
         _setBackstopNav(50e18);
 
         vm.prank(sys.owner);
-        vm.expectRevert();
+        vm.expectPartialRevert(SE.PriorNotAdmissible.selector);
         sys.core.createMarket(
             0,
             100,
