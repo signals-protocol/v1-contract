@@ -11,6 +11,7 @@ contract FuzzTest is TradeModuleDeployer {
     // Fuzz: openPositionCount invariant across random ops
     // ============================================================
 
+    /// forge-config: default.fuzz.runs = 256
     function testFuzz_maintainsOpenPositionCountAcrossRandomOps(uint64 fuzzSeed) public {
         TradeModuleSystem memory sys = deployMultiMarketSystem();
 
@@ -109,6 +110,7 @@ contract FuzzTest is TradeModuleDeployer {
     // Fuzz: position quantity after random increase/decrease
     // ============================================================
 
+    /// forge-config: default.fuzz.runs = 256
     function testFuzz_preservesPositionQuantity(uint64 fuzzSeed) public {
         TradeModuleSystem memory sys = deployMinimalTradeSystem();
         address user = sys.users[0];

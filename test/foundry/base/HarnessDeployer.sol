@@ -12,6 +12,7 @@ import "../../../contracts/testonly/SeedDataLibHarness.sol";
 import "../../../contracts/testonly/TickBinLibHarness.sol";
 import "../../../contracts/testonly/VaultAccountingLibHarness.sol";
 import "../../../contracts/testonly/SignalsDistributionMathHarness.sol";
+import "../../../contracts/testonly/RiskMathHarness.sol";
 
 /// @title HarnessDeployer
 /// @notice Deploys individual library harness contracts for isolated unit testing.
@@ -56,5 +57,9 @@ abstract contract HarnessDeployer is SignalsBaseTest {
     // Note: file is SignalsDistributionMathHarness.sol, contract name is ClmsrMathCostHarness
     function deployClmsrMathCostHarness() internal returns (ClmsrMathCostHarness) {
         return new ClmsrMathCostHarness();
+    }
+
+    function deployRiskMathHarness() internal returns (RiskMathHarness) {
+        return new RiskMathHarness();
     }
 }
