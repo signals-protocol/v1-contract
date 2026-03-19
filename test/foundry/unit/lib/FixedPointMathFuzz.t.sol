@@ -4,7 +4,6 @@ pragma solidity ^0.8.28;
 import "../../base/HarnessDeployer.sol";
 import "../../../../contracts/testonly/FixedPointMathHarness.sol";
 import {SignalsErrors as SE} from "../../../../contracts/errors/SignalsErrors.sol";
-import {UD60x18, ud, unwrap, ln} from "@prb/math/src/UD60x18.sol";
 
 /// @title FixedPointMathFuzz
 /// @notice Fuzz tests for FixedPointMathU library — covers arithmetic properties,
