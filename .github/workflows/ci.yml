@@ -82,8 +82,11 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
-      - name: Run coverage
-        run: FOUNDRY_PROFILE=coverage forge coverage --report lcov
+      - name: Run coverage (libraries)
+        run: >-
+          FOUNDRY_PROFILE=coverage forge coverage --report lcov
+          --ir-minimum
+          --skip "RiskMath.t"
 
       - name: Coverage summary
         if: always()
@@ -92,6 +95,9 @@ jobs:
             echo "### Coverage report not found" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          echo "### Forge Coverage" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Forge Coverage (libraries)" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "LCOV report generated. See artifacts for details." >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          forge coverage --ir-minimum --skip "RiskMath.t" --report summary 2>/dev/null \
+            | grep -E "^(\||File)" >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

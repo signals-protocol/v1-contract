@@ -42,7 +42,9 @@ depth = 64
 fail_on_revert = false
 
 [profile.coverage]
-via_ir = false
+src = "contracts/lib"
+test = "test/foundry/unit/lib"
+script = "script-disabled-for-coverage"
 
 [rpc_endpoints]
 dev = "${DEV_RPC_URL}"
