@@ -1,0 +1,52 @@
+name: Fork Tests
+
+on:
+  push:
+    branches-ignore: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: fork-test-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  fork-test:
+    name: Fork Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # On push: only run when commit message contains [fork-test]
+    # On workflow_dispatch: always run
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, '[fork-test]')
+    # Advisory only — Citrea public RPC instability shouldn't block PRs.
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: yarn.lock
+      - run: yarn install --frozen-lockfile
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Fork tests (dev)
+        env:
+          FOUNDRY_PROFILE: fork
+          FORK_ENV: dev
+          DEV_RPC_URL: ${{ secrets.DEV_RPC_URL }}
+        run: forge test -vvv
+
+      - name: Fork tests (prod)
+        env:
+          FOUNDRY_PROFILE: fork
+          FORK_ENV: prod
+          PROD_RPC_URL: ${{ secrets.PROD_RPC_URL }}
+        run: forge test -vvv
