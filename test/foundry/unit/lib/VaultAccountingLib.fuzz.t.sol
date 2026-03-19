@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import "../../base/HarnessDeployer.sol";
 import "../../../../contracts/testonly/VaultAccountingLibHarness.sol";
+import {SignalsErrors as SE} from "../../../../contracts/errors/SignalsErrors.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title VaultAccountingLibFuzzTest
@@ -81,8 +82,9 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
 
         // Loss strictly exceeds navPrev (fees=0, grant=0)
         int256 pnl = -int256(navPrev) - 1;
+        uint256 loss = navPrev + 1;
 
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.NAVUnderflow.selector, navPrev, loss));
         lib.computePreBatch(navPrev, sharesPrev, pnl, 0, 0);
     }
 
@@ -90,7 +92,7 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
     function testFuzz_computePreBatch_revertsOnZeroShares(uint256 navPrev) public {
         navPrev = bound(navPrev, 0, 1e27);
 
-        vm.expectRevert();
+        vm.expectRevert(SE.ZeroSharesNotAllowed.selector);
         lib.computePreBatch(navPrev, 0, int256(0), 0, 0);
     }
 
@@ -184,7 +186,7 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
         shares = bound(shares, 1e18, 1e27);
         depositAmount = bound(depositAmount, 1, 1e27);
 
-        vm.expectRevert();
+        vm.expectRevert(SE.ZeroPriceNotAllowed.selector);
         lib.applyDeposit(nav, shares, 0, depositAmount);
     }
 
@@ -264,7 +266,7 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
         // Need withdrawAmount > nav for the revert
         vm.assume(withdrawAmount > nav);
 
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(SE.InsufficientNAV.selector, withdrawAmount, nav));
         lib.applyWithdraw(nav, shares, price, shares);
     }
 
