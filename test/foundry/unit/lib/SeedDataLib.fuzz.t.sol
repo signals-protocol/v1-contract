@@ -5,6 +5,7 @@ import "../../base/HarnessDeployer.sol";
 import "../../base/SeedHelper.sol";
 import "../../../../contracts/testonly/SeedDataLibHarness.sol";
 import "../../../../contracts/utils/SeedData.sol";
+import {SignalsErrors as SE} from "../../../../contracts/errors/SignalsErrors.sol";
 
 contract SeedDataLibFuzzTest is HarnessDeployer {
     SeedDataLibHarness harness;
@@ -88,7 +89,7 @@ contract SeedDataLibFuzzTest is HarnessDeployer {
             wrongBins = numBins == 32 ? 1 : numBins + 1;
         }
 
-        vm.expectRevert();
+        vm.expectPartialRevert(SE.SeedDataLengthMismatch.selector);
         harness.validateSeedData(address(seedData), wrongBins);
     }
 
@@ -181,7 +182,7 @@ contract SeedDataLibFuzzTest is HarnessDeployer {
         factors[zeroIdx] = 0;
         SeedData seedData = SeedHelper.deploySeedData(factors);
 
-        vm.expectRevert();
+        vm.expectPartialRevert(SE.InvalidFactor.selector);
         harness.computeSeedStats(address(seedData), numBins, alpha);
     }
 

@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import "../../base/HarnessDeployer.sol";
 import "../../../../contracts/testonly/TickBinLibHarness.sol";
+import {SignalsErrors as SE} from "../../../../contracts/errors/SignalsErrors.sol";
 
 contract TickBinLibFuzzTest is HarnessDeployer {
     TickBinLibHarness harness;
@@ -84,7 +85,7 @@ contract TickBinLibFuzzTest is HarnessDeployer {
 
         int256 tick = minTick + int256(uint256(binIdx)) * tickSpacing + misalignment;
 
-        vm.expectRevert();
+        vm.expectPartialRevert(SE.InvalidTickSpacing.selector);
         harness.tickToBin(minTick, tickSpacing, numBins, tick);
     }
 
@@ -97,7 +98,7 @@ contract TickBinLibFuzzTest is HarnessDeployer {
         // tick at bin index == numBins (one past the last valid bin)
         int256 tick = minTick + int256(uint256(numBins)) * tickSpacing;
 
-        vm.expectRevert();
+        vm.expectPartialRevert(SE.RangeBinsOutOfBounds.selector);
         harness.tickToBin(minTick, tickSpacing, numBins, tick);
     }
 
@@ -291,7 +292,7 @@ contract TickBinLibFuzzTest is HarnessDeployer {
             }
         }
 
-        vm.expectRevert();
+        vm.expectPartialRevert(SE.InvalidTickRange.selector);
         harness.ticksToBins(minTick, maxTick, tickSpacing, numBins, lowerTick, upperTick);
     }
 }
