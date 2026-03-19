@@ -47,6 +47,29 @@ jobs:
 
       - name: Forge test
         run: forge test -vvv
+        env:
+          FOUNDRY_PROFILE: ci
+
+      - name: Gas snapshot check
+        id: gas-check
+        continue-on-error: true
+        run: |
+          forge snapshot \
+            --no-match-test "testFuzz|invariant_" \
+            --check \
+            --tolerance 15 \
+            2>&1 | tee /tmp/gas-diff.txt
+
+      - name: Gas diff summary
+        if: always() && steps.gas-check.outcome == 'failure'
+        run: |
+          echo "### ⛽ Gas Snapshot Diff" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Gas changes detected (>15% tolerance). Run \`yarn snapshot\` to update." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          head -100 /tmp/gas-diff.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Validate exported ABIs
         run: |

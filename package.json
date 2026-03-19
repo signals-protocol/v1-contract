@@ -7,6 +7,8 @@
   "scripts": {
     "postinstall": "patch-package",
     "test": "forge test",
+    "snapshot": "forge snapshot --no-match-test 'testFuzz|invariant_'",
+    "snapshot:check": "forge snapshot --no-match-test 'testFuzz|invariant_' --check --tolerance 15",
     "test:cov": "FOUNDRY_PROFILE=coverage forge coverage --report lcov",
     "lint": "tsc --noEmit --noUnusedLocals --noUnusedParameters",
     "format": "prettier --write \"contracts/**/*.sol\" \"scripts/**/*.ts\"",
