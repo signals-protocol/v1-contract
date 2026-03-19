@@ -84,9 +84,11 @@ jobs:
 
       - name: Run coverage (libraries)
         run: >-
-          FOUNDRY_PROFILE=coverage forge coverage --report lcov
+          FOUNDRY_PROFILE=coverage forge coverage
+          --report lcov --report summary
           --ir-minimum
           --skip "RiskMath.t"
+          | tee /tmp/coverage-summary.txt
 
       - name: Coverage summary
         if: always()
@@ -98,6 +100,5 @@ jobs:
           echo "### Forge Coverage (libraries)" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          forge coverage --ir-minimum --skip "RiskMath.t" --report summary 2>/dev/null \
-            | grep -E "^(\||File)" >> "$GITHUB_STEP_SUMMARY" || true
+          grep -E "^(\||File)" /tmp/coverage-summary.txt >> "$GITHUB_STEP_SUMMARY" || true
           echo '```' >> "$GITHUB_STEP_SUMMARY"
