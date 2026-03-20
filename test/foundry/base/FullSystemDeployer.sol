@@ -59,6 +59,8 @@ abstract contract FullSystemDeployer is SignalsBaseTest {
         // 1. Deploy tokens
         sys.payment = new SignalsUSDToken();
         sys.feePolicy = new MockFeePolicy(0);
+        vm.label(address(sys.payment), "SignalsUSDToken");
+        vm.label(address(sys.feePolicy), "MockFeePolicy");
 
         // 2. Deploy modules (TradeModule and MarketLifecycleModule auto-link LazyMulSegmentTree)
         sys.tradeModule = new TradeModule();
@@ -66,12 +68,20 @@ abstract contract FullSystemDeployer is SignalsBaseTest {
         sys.oracleModule = new OracleModuleHarness();
         sys.riskModule = new RiskModule();
         sys.vaultModule = new LPVaultModule();
+        vm.label(address(sys.tradeModule), "TradeModule");
+        vm.label(address(sys.lifecycleModule), "MarketLifecycleModule");
+        vm.label(address(sys.oracleModule), "OracleModuleHarness");
+        vm.label(address(sys.riskModule), "RiskModule");
+        vm.label(address(sys.vaultModule), "LPVaultModule");
 
         // 3. Deploy implementations
         // SignalsCoreHarness extends SignalsCore — auto-links LazyMulSegmentTree
         SignalsPosition positionImpl = new SignalsPosition();
         SignalsLPShare lpShareImpl = new SignalsLPShare();
         SignalsCoreHarness coreImpl = new SignalsCoreHarness();
+        vm.label(address(positionImpl), "SignalsPosition (impl)");
+        vm.label(address(lpShareImpl), "SignalsLPShare (impl)");
+        vm.label(address(coreImpl), "SignalsCoreHarness (impl)");
 
         // 4. Deploy proxies with empty init data (matching fullSystem.ts:106-108)
         TestERC1967Proxy positionProxy = new TestERC1967Proxy(address(positionImpl), "");
@@ -82,6 +92,9 @@ abstract contract FullSystemDeployer is SignalsBaseTest {
         sys.position = SignalsPosition(address(positionProxy));
         sys.lpShare = SignalsLPShare(address(lpShareProxy));
         sys.core = SignalsCoreHarness(address(coreProxy));
+        vm.label(address(sys.position), "SignalsPosition (proxy)");
+        vm.label(address(sys.lpShare), "SignalsLPShare (proxy)");
+        vm.label(address(sys.core), "SignalsCore (proxy)");
 
         // 6. Initialize core — initializer modifier (one-time call, no prank needed)
         SignalsCore.InitParams memory params = SignalsCore.InitParams({

@@ -20,46 +20,56 @@ import "../../../contracts/testonly/RiskMathHarness.sol";
 abstract contract HarnessDeployer is SignalsBaseTest {
     // From deploy.ts — 3 existing harness deployers
 
-    function deployFixedPointMathHarness() internal returns (FixedPointMathHarness) {
-        return new FixedPointMathHarness();
+    function deployFixedPointMathHarness() internal returns (FixedPointMathHarness h) {
+        h = new FixedPointMathHarness();
+        vm.label(address(h), "FixedPointMathHarness");
     }
 
-    function deployLazyMulSegmentTreeHarness() internal returns (LazyMulSegmentTreeHarness) {
-        return new LazyMulSegmentTreeHarness();
+    function deployLazyMulSegmentTreeHarness() internal returns (LazyMulSegmentTreeHarness h) {
+        h = new LazyMulSegmentTreeHarness();
+        vm.label(address(h), "LazyMulSegmentTreeHarness");
     }
 
-    function deployClmsrMathHarness() internal returns (ClmsrMathHarness) {
-        return new ClmsrMathHarness();
+    function deployClmsrMathHarness() internal returns (ClmsrMathHarness h) {
+        h = new ClmsrMathHarness();
+        vm.label(address(h), "ClmsrMathHarness");
     }
 
     // Consolidated from individual test files
 
-    function deployFeeWaterfallLibHarness() internal returns (FeeWaterfallLibHarness) {
-        return new FeeWaterfallLibHarness();
+    function deployFeeWaterfallLibHarness() internal returns (FeeWaterfallLibHarness h) {
+        h = new FeeWaterfallLibHarness();
+        vm.label(address(h), "FeeWaterfallLibHarness");
     }
 
-    function deployExposureDiffLibHarness() internal returns (ExposureDiffLibHarness) {
-        return new ExposureDiffLibHarness();
+    function deployExposureDiffLibHarness() internal returns (ExposureDiffLibHarness h) {
+        h = new ExposureDiffLibHarness();
+        vm.label(address(h), "ExposureDiffLibHarness");
     }
 
-    function deploySeedDataLibHarness() internal returns (SeedDataLibHarness) {
-        return new SeedDataLibHarness();
+    function deploySeedDataLibHarness() internal returns (SeedDataLibHarness h) {
+        h = new SeedDataLibHarness();
+        vm.label(address(h), "SeedDataLibHarness");
     }
 
-    function deployTickBinLibHarness() internal returns (TickBinLibHarness) {
-        return new TickBinLibHarness();
+    function deployTickBinLibHarness() internal returns (TickBinLibHarness h) {
+        h = new TickBinLibHarness();
+        vm.label(address(h), "TickBinLibHarness");
     }
 
-    function deployVaultAccountingLibHarness() internal returns (VaultAccountingLibHarness) {
-        return new VaultAccountingLibHarness();
+    function deployVaultAccountingLibHarness() internal returns (VaultAccountingLibHarness h) {
+        h = new VaultAccountingLibHarness();
+        vm.label(address(h), "VaultAccountingLibHarness");
     }
 
     // Note: file is SignalsDistributionMathHarness.sol, contract name is ClmsrMathCostHarness
-    function deployClmsrMathCostHarness() internal returns (ClmsrMathCostHarness) {
-        return new ClmsrMathCostHarness();
+    function deployClmsrMathCostHarness() internal returns (ClmsrMathCostHarness h) {
+        h = new ClmsrMathCostHarness();
+        vm.label(address(h), "ClmsrMathCostHarness");
     }
 
-    function deployRiskMathHarness() internal returns (RiskMathHarness) {
-        return new RiskMathHarness();
+    function deployRiskMathHarness() internal returns (RiskMathHarness h) {
+        h = new RiskMathHarness();
+        vm.label(address(h), "RiskMathHarness");
     }
 }
