@@ -60,18 +60,24 @@ abstract contract TradeModuleDeployer is SignalsBaseTest {
         // Deploy tokens and fee policy
         sys.payment = new SignalsUSDToken();
         sys.feePolicy = new MockFeePolicy(0);
+        vm.label(address(sys.payment), "SignalsUSDToken");
+        vm.label(address(sys.feePolicy), "MockFeePolicy");
 
         // Deploy TradeModule (auto-links LazyMulSegmentTree)
         sys.tradeModule = new TradeModule();
+        vm.label(address(sys.tradeModule), "TradeModule");
 
         // Deploy TradeModuleProxy (also uses LazyMulSegmentTree)
         sys.core = new TradeModuleProxy(address(sys.tradeModule));
+        vm.label(address(sys.core), "TradeModuleProxy");
 
         // Deploy SignalsPosition with UUPS proxy
         SignalsPosition positionImpl = new SignalsPosition();
         bytes memory positionInit = abi.encodeCall(SignalsPosition.initialize, (address(sys.core), sys.owner));
         TestERC1967Proxy positionProxy = new TestERC1967Proxy(address(positionImpl), positionInit);
         sys.position = SignalsPosition(address(positionProxy));
+        vm.label(address(positionImpl), "SignalsPosition (impl)");
+        vm.label(address(sys.position), "SignalsPosition (proxy)");
 
         // Configure addresses (no access control on TradeModuleProxy)
         sys.core.setAddresses(address(sys.payment), address(sys.position), opts.submitWindow, opts.settlementWindow);

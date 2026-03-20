@@ -70,6 +70,18 @@ abstract contract SignalsBaseTest is Test {
     }
 
     // ============================================================
+    // State snapshot helpers — for mid-test checkpoint/restore
+    // ============================================================
+
+    function snapshotHere() internal returns (uint256) {
+        return vm.snapshotState();
+    }
+
+    function revertHere(uint256 snapshotId) internal {
+        require(vm.revertToState(snapshotId), "revertHere: invalid snapshot");
+    }
+
+    // ============================================================
     // Batch helpers — from constants.ts:42-53
     // ============================================================
 
