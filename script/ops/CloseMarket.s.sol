@@ -136,33 +136,8 @@ contract CloseMarket is BaseScript {
         vm.stopBroadcast();
     }
 
-    function _getMarket(SignalsCore core, uint256 marketId) internal view returns (ISignalsCore.Market memory m) {
-        (
-            m.isSeeded,
-            m.settled,
-            m.snapshotChunksDone,
-            m.failed,
-            m.numBins,
-            m.openPositionCount,
-            m.snapshotChunkCursor,
-            m.seedCursor,
-            m.startTimestamp,
-            m.endTimestamp,
-            m.settlementTimestamp,
-            m.settlementFinalizedAt,
-            m.minTick,
-            m.maxTick,
-            m.tickSpacing,
-            m.settlementTick,
-            m.settlementValue,
-            m.liquidityParameter,
-            m.feePolicy,
-            m.seedData,
-            m.initialRootSum,
-            m.accumulatedFees,
-            m.minFactor,
-            m.deltaEt
-        ) = core.markets(marketId);
+    function _getMarket(SignalsCore core, uint256 marketId) internal view returns (ISignalsCore.Market memory) {
+        return ISignalsCore(address(core)).getMarket(marketId);
     }
 
     function _toBatchId(uint64 timestamp) internal pure returns (uint64) {

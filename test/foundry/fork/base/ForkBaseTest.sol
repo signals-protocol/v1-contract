@@ -12,6 +12,10 @@ import "../../../../contracts/tokens/SignalsLPShare.sol";
 abstract contract ForkBaseTest is Test {
     bytes32 internal constant ERC1967_IMPL_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
+    /// @dev Hardcoded selector for markets(uint256) — deployed proxy still exposes
+    ///      the auto getter. Switch to core.getMarket() after on-chain upgrade.
+    bytes4 private constant MARKETS_SELECTOR = bytes4(keccak256("markets(uint256)"));
+
     string internal envName;
     string internal envJsonPath;
 
@@ -103,7 +107,7 @@ abstract contract ForkBaseTest is Test {
     ///      avoiding stack-too-deep from destructuring the 24-field Market tuple.
     function _readMarket(uint256 marketId) internal view returns (MarketSnapshot memory snap) {
         (bool success, bytes memory data) = address(core).staticcall(
-            abi.encodeWithSelector(core.markets.selector, marketId)
+            abi.encodeWithSelector(MARKETS_SELECTOR, marketId)
         );
         require(success, "markets() staticcall failed");
 
