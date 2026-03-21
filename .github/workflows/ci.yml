@@ -105,12 +105,14 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
-      - name: Run coverage (libraries)
+      - name: Run coverage
         run: >-
           FOUNDRY_PROFILE=coverage forge coverage
           --report lcov --report summary
           --ir-minimum
           --skip "RiskMath.t"
+          --skip "SignalsDeployer"
+          --skip "TradeModule"
           | tee /tmp/coverage-summary.txt
 
       - name: Coverage summary
@@ -120,7 +122,7 @@ jobs:
             echo "### Coverage report not found" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          echo "### Forge Coverage (libraries)" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Forge Coverage" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           grep -E "^(\||File)" /tmp/coverage-summary.txt >> "$GITHUB_STEP_SUMMARY" || true

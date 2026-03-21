@@ -4,38 +4,11 @@ pragma solidity ^0.8.28;
 import "@openzeppelin/contracts/utils/Strings.sol";
 
 import "../interfaces/IFeePolicy.sol";
+import "../interfaces/ISignalsCore.sol";
 
-/// @dev Minimal interface to read endTimestamp from core.markets(marketId)
+/// @dev Minimal interface to read market data from core.getMarket(marketId)
 interface ICoreMarkets {
-    function markets(uint256 marketId)
-        external
-        view
-        returns (
-            bool isSeeded,
-            bool settled,
-            bool snapshotChunksDone,
-            bool failed,
-            uint32 numBins,
-            uint32 openPositionCount,
-            uint32 snapshotChunkCursor,
-            uint32 seedCursor,
-            uint64 startTimestamp,
-            uint64 endTimestamp,
-            uint64 settlementTimestamp,
-            uint64 settlementFinalizedAt,
-            int256 minTick,
-            int256 maxTick,
-            int256 tickSpacing,
-            int256 settlementTick,
-            int256 settlementValue,
-            uint256 liquidityParameter,
-            address feePolicy,
-            address seedData,
-            uint256 initialRootSum,
-            uint256 accumulatedFees,
-            uint256 minFactor,
-            uint256 deltaEt
-        );
+    function getMarket(uint256 marketId) external view returns (ISignalsCore.Market memory);
 }
 
 /// @notice Base + Theta(time-to-end) fee policy (symmetric for buy/sell)
@@ -52,13 +25,7 @@ contract ThetaTimeFeePolicy is IFeePolicy {
     uint256 public immutable baseRateWad;
     uint256 public immutable thetaMaxRateWad;
 
-    constructor(
-        address core_,
-        uint256 baseBps_,
-        uint256 thetaMaxBps_,
-        uint32 thetaWindowSeconds_,
-        uint8 beta_
-    ) {
+    constructor(address core_, uint256 baseBps_, uint256 thetaMaxBps_, uint32 thetaWindowSeconds_, uint8 beta_) {
         require(core_ != address(0), "core=0");
         require(thetaWindowSeconds_ > 0, "window=0");
         require(beta_ >= 1, "beta<1");
@@ -79,32 +46,27 @@ contract ThetaTimeFeePolicy is IFeePolicy {
     }
 
     function descriptor() external view override returns (string memory) {
-        return string(
-            abi.encodePacked(
-                '{"policy":"theta-time","params":{"baseBps":"',
-                Strings.toString(baseBps),
-                '","thetaMaxBps":"',
-                Strings.toString(thetaMaxBps),
-                '","windowSec":"',
-                Strings.toString(thetaWindowSeconds),
-                '","beta":"',
-                Strings.toString(beta),
-                '","name":"ThetaTimeFeePolicy"},"name":"ThetaTimeFeePolicy"}'
-            )
-        );
+        return
+            string(
+                abi.encodePacked(
+                    '{"policy":"theta-time","params":{"baseBps":"',
+                    Strings.toString(baseBps),
+                    '","thetaMaxBps":"',
+                    Strings.toString(thetaMaxBps),
+                    '","windowSec":"',
+                    Strings.toString(thetaWindowSeconds),
+                    '","beta":"',
+                    Strings.toString(beta),
+                    '","name":"ThetaTimeFeePolicy"},"name":"ThetaTimeFeePolicy"}'
+                )
+            );
     }
 
-    function quoteFee(QuoteParams calldata params)
-        external
-        view
-        override
-        returns (uint256 feeAmount)
-    {
+    function quoteFee(QuoteParams calldata params) external view override returns (uint256 feeAmount) {
         uint256 baseAmount = params.baseAmount;
         if (baseAmount == 0) return 0;
 
-        (, , , , , , , , , uint64 endTimestamp, , , , , , , , , , , , , , ) =
-            ICoreMarkets(core).markets(params.marketId);
+        uint64 endTimestamp = ICoreMarkets(core).getMarket(params.marketId).endTimestamp;
 
         uint256 tau = 0;
         if (endTimestamp > block.timestamp) {

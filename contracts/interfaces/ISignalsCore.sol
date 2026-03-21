@@ -13,13 +13,11 @@ interface ISignalsCore {
         uint32 openPositionCount;
         uint32 snapshotChunkCursor;
         uint32 seedCursor;
-
         // timing
         uint64 startTimestamp;
         uint64 endTimestamp;
         uint64 settlementTimestamp; // Market day key (PST day boundary)
         uint64 settlementFinalizedAt; // Actual finalization timestamp
-
         // ticks / math
         int256 minTick;
         int256 maxTick;
@@ -27,23 +25,19 @@ interface ISignalsCore {
         int256 settlementTick;
         int256 settlementValue;
         uint256 liquidityParameter;
-
         // policy
         address feePolicy;
         address seedData;
-
         // Fee tracking and P&L calculation
         // Initial root sum for P&L calculation: C_start = α * ln(Z_start)
         uint256 initialRootSum;
         // Gross fees collected from trades, stored in WAD units
         uint256 accumulatedFees;
-
         // Prior-based ΔEₜ calculation
         // minFactor = min(baseFactors) at market creation (WAD)
         // Used to compute ΔEₜ = α * ln(rootSum / (n * minFactor))
         // Uniform prior: minFactor = 1 WAD → ΔEₜ = 0
         uint256 minFactor;
-
         // Tail budget (ΔEₜ) calculated at market creation (WAD)
         // ΔEₜ := E_ent(q₀,t) - αₜ ln n
         // Used in batch processing: grantNeed > ΔEₜ → revert
@@ -68,22 +62,11 @@ interface ISignalsCore {
         uint256 maxCost
     ) external returns (uint256 positionId);
 
-    function increasePosition(
-        uint256 positionId,
-        uint128 quantity,
-        uint256 maxCost
-    ) external;
+    function increasePosition(uint256 positionId, uint128 quantity, uint256 maxCost) external;
 
-    function decreasePosition(
-        uint256 positionId,
-        uint128 quantity,
-        uint256 minProceeds
-    ) external;
+    function decreasePosition(uint256 positionId, uint128 quantity, uint256 minProceeds) external;
 
-    function closePosition(
-        uint256 positionId,
-        uint256 minProceeds
-    ) external;
+    function closePosition(uint256 positionId, uint256 minProceeds) external;
 
     function claimPayout(uint256 positionId) external;
 
@@ -97,15 +80,9 @@ interface ISignalsCore {
         uint128 quantity
     ) external returns (uint256 cost);
 
-    function calculateIncreaseCost(
-        uint256 positionId,
-        uint128 quantity
-    ) external returns (uint256 cost);
+    function calculateIncreaseCost(uint256 positionId, uint128 quantity) external returns (uint256 cost);
 
-    function calculateDecreaseProceeds(
-        uint256 positionId,
-        uint128 quantity
-    ) external returns (uint256 proceeds);
+    function calculateDecreaseProceeds(uint256 positionId, uint128 quantity) external returns (uint256 proceeds);
 
     function calculateCloseProceeds(uint256 positionId) external returns (uint256 proceeds);
 
@@ -174,11 +151,7 @@ interface ISignalsCore {
     ) external;
 
     /// @notice Set settlement timeline parameters
-    function setSettlementTimeline(
-        uint64 sampleWindow,
-        uint64 opsWindow,
-        uint64 claimDelay
-    ) external;
+    function setSettlementTimeline(uint64 sampleWindow, uint64 opsWindow, uint64 claimDelay) external;
 
     // Capital stack funding
     function fundBackstop(uint256 amount6) external;
@@ -186,16 +159,16 @@ interface ISignalsCore {
     function fundTreasury(uint256 amount6) external;
     function withdrawTreasury(uint256 amount6) external;
 
+    /// @notice Get full market struct
+    function getMarket(uint256 marketId) external view returns (Market memory);
+
     /// @notice Get market state (derived from timestamps)
     function getMarketState(uint256 marketId) external returns (uint8 state);
 
     /// @notice Get settlement windows for a market
-    function getSettlementWindows(uint256 marketId) external returns (
-        uint64 tSet,
-        uint64 settleEnd,
-        uint64 opsEnd,
-        uint64 claimOpen
-    );
+    function getSettlementWindows(
+        uint256 marketId
+    ) external returns (uint64 tSet, uint64 settleEnd, uint64 opsEnd, uint64 claimOpen);
 
     /// @notice Get current batch ID
     function getCurrentBatchId() external view returns (uint64);
@@ -209,10 +182,7 @@ interface ISignalsCore {
 
     /// @notice Finalize secondary settlement for a failed market
     /// @dev Owner-only on a market marked as failed
-    function finalizeSecondarySettlement(
-        uint256 marketId,
-        int256 settlementValue
-    ) external;
+    function finalizeSecondarySettlement(uint256 marketId, int256 settlementValue) external;
 
     /// @notice Returns the settlement price candidate for a market
     /// @dev This is a simple getter for the most recent candidate, not a historical lookup
@@ -220,7 +190,5 @@ interface ISignalsCore {
     /// @param marketId The market ID to query
     /// @return price The settlement value
     /// @return priceTimestamp The timestamp when the price was submitted
-    function getSettlementPrice(uint256 marketId)
-        external
-        returns (int256 price, uint64 priceTimestamp);
+    function getSettlementPrice(uint256 marketId) external returns (int256 price, uint64 priceTimestamp);
 }

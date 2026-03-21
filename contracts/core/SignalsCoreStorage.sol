@@ -35,7 +35,7 @@ abstract contract SignalsCoreStorage {
     // Settlement Timeline Configuration
     // ============================================================
     // Timeline: Trading → SettlementOpen → PendingOps → Finalized
-    // 
+    //
     // settlementSubmitWindow (Δsettle): [Tset, Tset + Δsettle) = SettlementOpen
     //   - Anyone can submit oracle samples during this window
     // pendingOpsWindow (Δops): [Tset + Δsettle, Tset + Δsettle + Δops) = PendingOps
@@ -48,26 +48,26 @@ abstract contract SignalsCoreStorage {
     /// @notice Δsettle: Duration of SettlementOpen window (seconds)
     /// @dev Anyone can submit oracle samples during [Tset, Tset + settlementSubmitWindow)
     uint64 public settlementSubmitWindow;
-    
+
     /// @notice Δclaim: Delay before claims open after Tset (seconds)
     /// @dev Claims open at settlementTimestamp + claimDelaySeconds
     uint64 public claimDelaySeconds;
-    
+
     /// @notice Δops: Duration of PendingOps window (seconds)
     /// @dev Operations can mark failed during [Tset + Δsettle, Tset + Δsettle + Δops)
     uint64 public pendingOpsWindow;
-    
+
     /// @notice Δmax: Maximum allowed |priceTimestamp - Tset| for samples (seconds)
     /// @dev Samples with distance > maxSampleDistance are rejected
     uint64 public maxSampleDistance;
-    
+
     /// @notice δfuture: Future tolerance for price timestamps (seconds, default 0)
     /// @dev Samples with priceTimestamp > block.timestamp + futureTolerance are rejected
     uint64 public futureTolerance;
-    
+
     /// @notice Redstone data feed ID (e.g., bytes32("BTC"))
     bytes32 public redstoneFeedId;
-    
+
     /// @notice Redstone feed decimals (e.g., 8 for BTC/USD)
     uint8 public redstoneFeedDecimals;
 
@@ -79,12 +79,12 @@ abstract contract SignalsCoreStorage {
 
     IERC20 public paymentToken;
     ISignalsPosition public positionContract;
-    
+
     /// @notice LP Share token (ERC-4626 compatible)
     address public lpShareToken;
 
-    mapping(uint256 => ISignalsCore.Market) public markets;
-    mapping(uint256 => LazyMulSegmentTree.Tree) public marketTrees;
+    mapping(uint256 => ISignalsCore.Market) internal markets;
+    mapping(uint256 => LazyMulSegmentTree.Tree) internal marketTrees;
     uint256 public nextMarketId;
 
     struct SettlementOracleState {
@@ -99,17 +99,17 @@ abstract contract SignalsCoreStorage {
     // ============================================================
     // LP Vault State
     // ============================================================
-    
+
     /// @notice LP Vault accounting state
     struct VaultState {
-        uint256 nav;           // N_t: current NAV (WAD)
-        uint256 shares;        // S_t: current total shares (WAD)
-        uint256 price;         // P_t: current price (WAD)
-        uint256 pricePeak;     // P^peak_t: running peak price (WAD)
+        uint256 nav; // N_t: current NAV (WAD)
+        uint256 shares; // S_t: current total shares (WAD)
+        uint256 price; // P_t: current price (WAD)
+        uint256 pricePeak; // P^peak_t: running peak price (WAD)
         uint64 lastBatchTimestamp; // Timestamp of last batch
-        bool isSeeded;         // Has vault been seeded
+        bool isSeeded; // Has vault been seeded
     }
-    
+
     VaultState internal lpVault;
 
     // ============================================================
@@ -118,17 +118,17 @@ abstract contract SignalsCoreStorage {
 
     /// @notice Capital stack configuration (Backstop + Treasury)
     struct CapitalStackState {
-        uint256 backstopNav;     // B_t: Backstop NAV (WAD)
-        uint256 treasuryNav;     // T_t: Treasury NAV (WAD)
+        uint256 backstopNav; // B_t: Backstop NAV (WAD)
+        uint256 treasuryNav; // T_t: Treasury NAV (WAD)
     }
 
     /// @notice Fee waterfall configuration parameters
     struct FeeWaterfallConfig {
-        int256 pdd;              // NAV loss floor (negative WAD, pdd := -lambda, e.g., -0.3e18 = -30%)
-        uint256 rhoBS;           // ρ_BS: Backstop coverage target ratio (WAD)
-        uint256 phiLP;           // ϕ_LP: LP residual fee share (WAD)
-        uint256 phiBS;           // ϕ_BS: Backstop residual fee share (WAD)
-        uint256 phiTR;           // ϕ_TR: Treasury residual fee share (WAD)
+        int256 pdd; // NAV loss floor (negative WAD, pdd := -lambda, e.g., -0.3e18 = -30%)
+        uint256 rhoBS; // ρ_BS: Backstop coverage target ratio (WAD)
+        uint256 phiLP; // ϕ_LP: LP residual fee share (WAD)
+        uint256 phiBS; // ϕ_BS: Backstop residual fee share (WAD)
+        uint256 phiTR; // ϕ_TR: Treasury residual fee share (WAD)
         // NOTE: ΔEₜ is now stored per-market in Market.deltaEt and summed per-batch
         //       in DailyPnlSnapshot.DeltaEtSum. Global config field removed.
     }
@@ -136,30 +136,26 @@ abstract contract SignalsCoreStorage {
     /// @notice Daily P&L snapshot for batch processing
     struct DailyPnlSnapshot {
         // Input values
-        int256 Lt;               // CLMSR P&L (signed)
-        uint256 Ftot;            // Total gross fees
-        uint256 DeltaEtSum;      // Sum of ΔEₜ from all settled markets in this batch
-        
+        int256 Lt; // CLMSR P&L (signed)
+        uint256 Ftot; // Total gross fees
+        uint256 DeltaEtSum; // Sum of ΔEₜ from all settled markets in this batch
         // Fee Waterfall intermediate values
-        uint256 Floss;           // Loss compensation: min(Ftot, |L^-|)
-        uint256 Fpool;           // Remaining pool: Ftot - Floss
-        uint256 Nraw;            // NAV after loss comp: N_{t-1} + Lt + Floss
-        uint256 Gt;              // Grant from Backstop
-        uint256 Ffill;           // Backstop coverage fill
-        
+        uint256 Floss; // Loss compensation: min(Ftot, |L^-|)
+        uint256 Fpool; // Remaining pool: Ftot - Floss
+        uint256 Nraw; // NAV after loss comp: N_{t-1} + Lt + Floss
+        uint256 Gt; // Grant from Backstop
+        uint256 Ffill; // Backstop coverage fill
         // Fee splits
-        uint256 FLP;             // Fee to LP: Floss + F_core_LP + dust
-        uint256 FBS;             // Fee to Backstop: F_fill + F_core_BS
-        uint256 FTR;             // Fee to Treasury: F_core_TR
-        uint256 Fdust;           // Rounding dust (to LP)
-        
+        uint256 FLP; // Fee to LP: Floss + F_core_LP + dust
+        uint256 FBS; // Fee to Backstop: F_fill + F_core_BS
+        uint256 FTR; // Fee to Treasury: F_core_TR
+        uint256 Fdust; // Rounding dust (to LP)
         // Output values
-        uint256 Ft;              // Total fee credited to LP NAV
-        uint256 Npre;            // Pre-batch NAV
-        uint256 Pe;              // Batch equity price: Npre / S_{t-1}
-        
+        uint256 Ft; // Total fee credited to LP NAV
+        uint256 Npre; // Pre-batch NAV
+        uint256 Pe; // Batch equity price: Npre / S_{t-1}
         // State
-        bool processed;          // Whether this batch has been processed
+        bool processed; // Whether this batch has been processed
     }
 
     /// @notice Unified capital stack state
@@ -203,16 +199,16 @@ abstract contract SignalsCoreStorage {
 
     /// @notice Batch aggregation result
     struct BatchAggregation {
-        uint256 totalDepositAssets;   // Sum of all eligible deposit amounts
-        uint256 totalWithdrawShares;  // Sum of all eligible withdraw shares
-        uint256 batchPrice;           // P^e_t used for this batch
-        bool processed;               // Whether batch has been processed
+        uint256 totalDepositAssets; // Sum of all eligible deposit amounts
+        uint256 totalWithdrawShares; // Sum of all eligible withdraw shares
+        uint256 batchPrice; // P^e_t used for this batch
+        bool processed; // Whether batch has been processed
     }
 
     /// @notice Pending aggregation for batch (pre-processing)
     struct PendingBatchTotal {
-        uint256 deposits;    // Sum of pending deposit amounts for this batch
-        uint256 withdraws;   // Sum of pending withdraw shares for this batch
+        uint256 deposits; // Sum of pending deposit amounts for this batch
+        uint256 withdraws; // Sum of pending withdraw shares for this batch
     }
 
     // ============================================================
@@ -292,9 +288,9 @@ abstract contract SignalsCoreStorage {
 
     /// @notice Risk parameters for α Safety Bounds
     struct RiskConfig {
-        uint256 lambda;      // λ: NAV loss limit per batch (WAD); sets pdd := -lambda
-        uint256 kDrawdown;   // k: Peak drawdown sensitivity for alpha limit (WAD)
-        bool enforceAlpha;   // Whether to enforce α bounds at market creation time
+        uint256 lambda; // λ: NAV loss limit per batch (WAD); sets pdd := -lambda
+        uint256 kDrawdown; // k: Peak drawdown sensitivity for alpha limit (WAD)
+        bool enforceAlpha; // Whether to enforce α bounds at market creation time
     }
 
     /// @notice Risk configuration
@@ -302,7 +298,7 @@ abstract contract SignalsCoreStorage {
 
     /// @notice Batch market counts (one-to-many)
     struct BatchMarketState {
-        uint64 total;    // Total markets assigned to this batch
+        uint64 total; // Total markets assigned to this batch
         uint64 resolved; // Markets that are settled or failed
     }
 

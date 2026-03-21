@@ -18,12 +18,7 @@ contract TradeModuleProxy is SignalsCoreStorage {
     }
 
     // setters for tests
-    function setAddresses(
-        address payment,
-        address position,
-        uint64 submitWindow,
-        uint64 finalizeDeadline
-    ) external {
+    function setAddresses(address payment, address position, uint64 submitWindow, uint64 finalizeDeadline) external {
         paymentToken = IERC20(payment);
         positionContract = ISignalsPosition(position);
         settlementSubmitWindow = submitWindow;
@@ -62,18 +57,23 @@ contract TradeModuleProxy is SignalsCoreStorage {
     }
 
     // trade entrypoints
-    function openPosition(uint256 marketId, int256 lowerTick, int256 upperTick, uint128 quantity, uint256 maxCost)
-        external
-        returns (uint256 positionId)
-    {
-        bytes memory ret = _delegate(abi.encodeWithSignature(
-            "openPosition(uint256,int256,int256,uint128,uint256)",
-            marketId,
-            lowerTick,
-            upperTick,
-            quantity,
-            maxCost
-        ));
+    function openPosition(
+        uint256 marketId,
+        int256 lowerTick,
+        int256 upperTick,
+        uint128 quantity,
+        uint256 maxCost
+    ) external returns (uint256 positionId) {
+        bytes memory ret = _delegate(
+            abi.encodeWithSignature(
+                "openPosition(uint256,int256,int256,uint128,uint256)",
+                marketId,
+                lowerTick,
+                upperTick,
+                quantity,
+                maxCost
+            )
+        );
         if (ret.length > 0) positionId = abi.decode(ret, (uint256));
     }
 
@@ -82,7 +82,9 @@ contract TradeModuleProxy is SignalsCoreStorage {
     }
 
     function decreasePosition(uint256 positionId, uint128 quantity, uint256 minProceeds) external {
-        _delegate(abi.encodeWithSignature("decreasePosition(uint256,uint128,uint256)", positionId, quantity, minProceeds));
+        _delegate(
+            abi.encodeWithSignature("decreasePosition(uint256,uint128,uint256)", positionId, quantity, minProceeds)
+        );
     }
 
     function closePosition(uint256 positionId, uint256 minProceeds) external {
@@ -98,23 +100,28 @@ contract TradeModuleProxy is SignalsCoreStorage {
     }
 
     // views
-    function calculateOpenCost(uint256 marketId, int256 lowerTick, int256 upperTick, uint128 quantity) external returns (uint256) {
-        bytes memory ret = _delegateView(abi.encodeWithSignature(
-            "calculateOpenCost(uint256,int256,int256,uint128)",
-            marketId,
-            lowerTick,
-            upperTick,
-            quantity
-        ));
+    function calculateOpenCost(
+        uint256 marketId,
+        int256 lowerTick,
+        int256 upperTick,
+        uint128 quantity
+    ) external returns (uint256) {
+        bytes memory ret = _delegateView(
+            abi.encodeWithSignature(
+                "calculateOpenCost(uint256,int256,int256,uint128)",
+                marketId,
+                lowerTick,
+                upperTick,
+                quantity
+            )
+        );
         return abi.decode(ret, (uint256));
     }
 
     function calculateDecreaseProceeds(uint256 positionId, uint128 quantity) external returns (uint256) {
-        bytes memory ret = _delegateView(abi.encodeWithSignature(
-            "calculateDecreaseProceeds(uint256,uint128)",
-            positionId,
-            quantity
-        ));
+        bytes memory ret = _delegateView(
+            abi.encodeWithSignature("calculateDecreaseProceeds(uint256,uint128)", positionId, quantity)
+        );
         return abi.decode(ret, (uint256));
     }
 
@@ -129,7 +136,12 @@ contract TradeModuleProxy is SignalsCoreStorage {
         return tree.totalSum();
     }
 
-    /// @notice Retrieve market struct for testing
+    /// @notice Get full market struct (matches SignalsCore.getMarket)
+    function getMarket(uint256 marketId) external view returns (ISignalsCore.Market memory) {
+        return markets[marketId];
+    }
+
+    /// @notice Retrieve market struct for testing (alias)
     function harnessGetMarket(uint256 marketId) external view returns (ISignalsCore.Market memory) {
         return markets[marketId];
     }
