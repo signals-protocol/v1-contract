@@ -31,16 +31,20 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Cache build artifacts
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          cache: true
+
+      - name: Cache Forge build
         uses: actions/cache@v4
         with:
           path: |
-            cache
+            cache/foundry
             out
-          key: build-${{ runner.os }}-${{ hashFiles('yarn.lock', 'foundry.toml', 'contracts/**') }}
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+          key: forge-build-${{ runner.os }}-${{ hashFiles('foundry.toml', 'contracts/**/*.sol', 'test/**/*.sol', 'lib/**') }}
+          restore-keys: |
+            forge-build-${{ runner.os }}-
 
       - name: Forge build
         run: forge build
@@ -63,9 +67,9 @@ jobs:
       - name: Gas diff summary
         if: always() && steps.gas-check.outcome == 'failure'
         run: |
-          echo "### ⛽ Gas Snapshot Diff" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Gas Snapshot Diff" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Gas changes detected (>15% tolerance). Run \`yarn snapshot\` to update." >> "$GITHUB_STEP_SUMMARY"
+          echo "Gas changes detected (>15% tolerance). Run yarn snapshot to update." >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           head -100 /tmp/gas-diff.txt >> "$GITHUB_STEP_SUMMARY"
@@ -104,6 +108,8 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          cache: true
 
       - name: Run coverage
         run: >-
