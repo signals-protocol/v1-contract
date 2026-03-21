@@ -22,7 +22,13 @@
 import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
-import { createPublicClient, http, defineChain, type PublicClient } from 'viem';
+import {
+  createPublicClient,
+  createWalletClient,
+  http,
+  defineChain,
+  type PublicClient,
+} from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import Safe from '@safe-global/protocol-kit';
 import SafeApiKit from '@safe-global/api-kit';
@@ -579,9 +585,76 @@ async function handleProposeUpgrade(config: Config, args: string[]) {
   }
 }
 
+// ── Delegate Management ─────────────────────────────────────
+
+async function handleDelegateAdd(config: Config, args: string[]) {
+  const delegateAddr = parseFlag(args, 'address');
+  if (!delegateAddr)
+    throw new Error('--address <delegate-address> is required');
+  const label = parseFlag(args, 'label') || 'safe-cli';
+
+  // The signer must be an owner. Use SAFE_PROPOSER_KEY / DEPLOYER_KEY.
+  const signerKey = resolveProposerKey();
+  const signerAccount = privateKeyToAccount(signerKey as `0x${string}`);
+  const chain = config.env === 'dev' ? citreaDev : citreaProd;
+  const walletClient = createWalletClient({
+    account: signerAccount,
+    chain,
+    transport: http(config.rpcUrl),
+  });
+
+  const apiKit = initApiKit(config);
+
+  console.log(`Adding delegate ${delegateAddr} (label: "${label}")...`);
+  console.log(`Delegator (signer): ${signerAccount.address}`);
+
+  await apiKit.addSafeDelegate({
+    safeAddress: config.safeAddress,
+    delegateAddress: delegateAddr,
+    delegatorAddress: signerAccount.address,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- viem version mismatch between project and api-kit
+    signer: walletClient as any,
+    label,
+  });
+
+  console.log('Delegate added successfully.');
+}
+
+async function handleDelegateList(config: Config, args: string[]) {
+  const apiKit = initApiKit(config);
+  const delegates = await apiKit.getSafeDelegates({
+    safeAddress: config.safeAddress,
+  });
+
+  if (hasFlag(args, 'json')) {
+    console.log(JSON.stringify(delegates.results, null, 2));
+    return;
+  }
+
+  if (!delegates.results.length) {
+    console.log('No delegates registered.');
+    return;
+  }
+
+  console.log(`Delegates (${delegates.results.length}):\n`);
+  for (const d of delegates.results) {
+    console.log(
+      `  ${d.delegate} (label: "${d.label}", delegator: ${d.delegator})`,
+    );
+  }
+}
+
 // ── Main ────────────────────────────────────────────────────
 
-const COMMANDS = ['info', 'pending', 'propose', 'reject', 'propose-upgrade'];
+const COMMANDS = [
+  'info',
+  'pending',
+  'propose',
+  'reject',
+  'propose-upgrade',
+  'delegate-add',
+  'delegate-list',
+];
 
 async function main() {
   const args = process.argv.slice(2);
@@ -622,6 +695,10 @@ async function main() {
       return handleReject(config, flags);
     case 'propose-upgrade':
       return handleProposeUpgrade(config, flags);
+    case 'delegate-add':
+      return handleDelegateAdd(config, flags);
+    case 'delegate-list':
+      return handleDelegateList(config, flags);
   }
 }
 
