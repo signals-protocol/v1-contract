@@ -164,9 +164,10 @@ async function initProtocolKit(
   const proposer = privateKeyToAccount(proposerKey as `0x${string}`);
   const isOwner = await protocolKit.isOwner(proposer.address);
   if (!isOwner) {
-    const info = await initApiKit(config).getSafeInfo(config.safeAddress);
-    throw new Error(
-      `Address ${proposer.address} is not a Safe owner.\nOwners: ${info.owners.join(', ')}`,
+    // TX Service accepts proposals from both owners and delegates.
+    // Warn but don't block — the service will reject if unauthorized.
+    console.warn(
+      `Warning: ${proposer.address} is not a Safe owner (may be a delegate).`,
     );
   }
 
