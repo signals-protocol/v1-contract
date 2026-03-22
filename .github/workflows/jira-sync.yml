@@ -26,6 +26,15 @@ jobs:
           KEY=$(echo "$BRANCH_NAME" | grep -oE 'SIG-[0-9]+' | head -1)
           [ -z "$KEY" ] && echo "No SIG-N in branch name" && exit 0
 
+          # Skip Epics — only transition Tasks
+          ISSUE_TYPE=$(curl -su "$JIRA_EMAIL:$JIRA_TOKEN" \
+            "$JIRA_URL/rest/api/3/issue/$KEY?fields=issuetype" \
+            | jq -r '.fields.issuetype.name')
+          if [ "$ISSUE_TYPE" = "Epic" ]; then
+            echo "$KEY is an Epic — skipping transition"
+            exit 0
+          fi
+
           TARGET="In Progress"
           TID=$(curl -su "$JIRA_EMAIL:$JIRA_TOKEN" \
             "$JIRA_URL/rest/api/3/issue/$KEY/transitions" \
@@ -55,6 +64,15 @@ jobs:
         run: |
           KEY=$(echo "$PR_TITLE" | grep -oE 'SIG-[0-9]+' | head -1)
           [ -z "$KEY" ] && echo "No SIG-N in title" && exit 0
+
+          # Skip Epics — only transition Tasks
+          ISSUE_TYPE=$(curl -su "$JIRA_EMAIL:$JIRA_TOKEN" \
+            "$JIRA_URL/rest/api/3/issue/$KEY?fields=issuetype" \
+            | jq -r '.fields.issuetype.name')
+          if [ "$ISSUE_TYPE" = "Epic" ]; then
+            echo "$KEY is an Epic — skipping transition"
+            exit 0
+          fi
 
           TARGET="In Review"
           TID=$(curl -su "$JIRA_EMAIL:$JIRA_TOKEN" \
@@ -88,6 +106,15 @@ jobs:
         run: |
           KEY=$(echo "$PR_TITLE" | grep -oE 'SIG-[0-9]+' | head -1)
           [ -z "$KEY" ] && echo "No SIG-N in title" && exit 0
+
+          # Skip Epics — only transition Tasks
+          ISSUE_TYPE=$(curl -su "$JIRA_EMAIL:$JIRA_TOKEN" \
+            "$JIRA_URL/rest/api/3/issue/$KEY?fields=issuetype" \
+            | jq -r '.fields.issuetype.name')
+          if [ "$ISSUE_TYPE" = "Epic" ]; then
+            echo "$KEY is an Epic — skipping transition"
+            exit 0
+          fi
 
           case "$REVIEW_STATE" in
             approved)           TARGET="Approved" ;;
@@ -124,6 +151,15 @@ jobs:
           KEY=$(echo "$PR_TITLE" | grep -oE 'SIG-[0-9]+' | head -1)
           [ -z "$KEY" ] && echo "No SIG-N in title" && exit 0
           [ -z "$JIRA_EMAIL" ] && echo "No Jira credentials" && exit 0
+
+          # Skip Epics — only transition Tasks
+          ISSUE_TYPE=$(curl -su "$JIRA_EMAIL:$JIRA_TOKEN" \
+            "$JIRA_URL/rest/api/3/issue/$KEY?fields=issuetype" \
+            | jq -r '.fields.issuetype.name')
+          if [ "$ISSUE_TYPE" = "Epic" ]; then
+            echo "$KEY is an Epic — skipping transition"
+            exit 0
+          fi
 
           # CD repos get "Deploying", others get "Done"
           CD_REPOS="signals-app v1-server v1-admin v1-docs v1-mcp v1-binance-proxy signals.wtf"
