@@ -1,15 +1,74 @@
 name: Jira Sync
 on:
+  create:
   pull_request_review:
     types: [submitted]
   pull_request:
-    types: [closed]
+    types: [opened, closed]
 
 permissions:
   contents: read
   pull-requests: read
 
 jobs:
+  sync-branch-status:
+    if: github.event_name == 'create' && github.event.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Transition Jira on branch creation
+        env:
+          JIRA_URL: ${{ secrets.JIRA_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+          BRANCH_NAME: ${{ github.event.ref }}
+        run: |
+          KEY=$(echo "$BRANCH_NAME" | grep -oE 'SIG-[0-9]+' | head -1)
+          [ -z "$KEY" ] && echo "No SIG-N in branch name" && exit 0
+
+          TARGET="In Progress"
+          TID=$(curl -su "$JIRA_EMAIL:$JIRA_TOKEN" \
+            "$JIRA_URL/rest/api/3/issue/$KEY/transitions" \
+            | jq -r --arg t "$TARGET" '.transitions[] | select(.name==$t) | .id')
+
+          [ -z "$TID" ] && echo "$KEY: no '$TARGET' transition available" && exit 0
+
+          curl -su "$JIRA_EMAIL:$JIRA_TOKEN" -X POST \
+            -H "Content-Type: application/json" \
+            -d "{\"transition\":{\"id\":\"$TID\"}}" \
+            "$JIRA_URL/rest/api/3/issue/$KEY/transitions"
+          echo "Transitioned $KEY → $TARGET"
+
+  sync-pr-opened-status:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Transition Jira on PR open
+        env:
+          JIRA_URL: ${{ secrets.JIRA_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          KEY=$(echo "$PR_TITLE" | grep -oE 'SIG-[0-9]+' | head -1)
+          [ -z "$KEY" ] && echo "No SIG-N in title" && exit 0
+
+          TARGET="In Review"
+          TID=$(curl -su "$JIRA_EMAIL:$JIRA_TOKEN" \
+            "$JIRA_URL/rest/api/3/issue/$KEY/transitions" \
+            | jq -r --arg t "$TARGET" '.transitions[] | select(.name==$t) | .id')
+
+          [ -z "$TID" ] && echo "$KEY: no '$TARGET' transition available" && exit 0
+
+          curl -su "$JIRA_EMAIL:$JIRA_TOKEN" -X POST \
+            -H "Content-Type: application/json" \
+            -d "{\"transition\":{\"id\":\"$TID\"}}" \
+            "$JIRA_URL/rest/api/3/issue/$KEY/transitions"
+          echo "Transitioned $KEY → $TARGET"
+
   sync-review-status:
     if: >-
       github.event_name == 'pull_request_review' && (
@@ -67,7 +126,7 @@ jobs:
           [ -z "$JIRA_EMAIL" ] && echo "No Jira credentials" && exit 0
 
           # CD repos get "Deploying", others get "Done"
-          CD_REPOS="signals-app v1-server v1-admin v1-docs"
+          CD_REPOS="signals-app v1-server v1-admin v1-docs v1-mcp v1-binance-proxy signals.wtf"
           if echo "$CD_REPOS" | grep -qw "$REPO_NAME"; then
             TARGET="Deploying"
           else
