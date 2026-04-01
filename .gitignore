@@ -127,4 +127,9 @@ verification/foundry/crytic-export/
 script-output/
 broadcast/
 
-# Claude Code
+# AI agent config
+CLAUDE.md
+AGENTS.md
+.claude/
+.codex/
+.agents/
