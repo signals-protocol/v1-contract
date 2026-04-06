@@ -48,6 +48,8 @@ depth = 64
 fail_on_revert = false
 
 [profile.coverage]
+src = "contracts/lib"
+test = "test/foundry/unit/lib"
 script = "script-disabled-for-coverage"
 
 [profile.ci.fuzz]
