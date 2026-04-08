@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {LazyMulSegmentTree} from "../lib/LazyMulSegmentTree.sol";
-import {FixedPointMathU} from "../lib/FixedPointMathU.sol";
+import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
 
 /// @notice Test harness for LazyMulSegmentTree library.
 /// @dev Exposes all tree operations for unit testing.
@@ -10,6 +10,7 @@ contract LazyMulSegmentTreeHarness {
     using LazyMulSegmentTree for LazyMulSegmentTree.Tree;
 
     error EmptyFactors();
+    error SparseTreePath(uint32 binPosition);
 
     LazyMulSegmentTree.Tree private tree;
 
@@ -62,7 +63,44 @@ contract LazyMulSegmentTreeHarness {
     function propagateLazy(uint32 lo, uint32 hi) external returns (uint256) {
         return tree.propagateLazy(lo, hi);
     }
+
+    function setNodePending(uint32 nodeIndex, uint192 value) external {
+        tree.nodes[nodeIndex].pendingFactor = value;
+    }
+
+    function getNodePending(uint32 nodeIndex) external view returns (uint192) {
+        return tree.nodes[nodeIndex].pendingFactor;
+    }
+
+    function resolveLeafNodeIndex(uint32 binPosition) external view returns (uint32 nodeIndex) {
+        if (tree.size == 0) revert SE.TreeNotInitialized();
+        if (binPosition >= tree.size) revert SE.IndexOutOfBounds(binPosition, tree.size);
+
+        uint32 l = 0;
+        uint32 r = tree.size - 1;
+        nodeIndex = tree.root;
+
+        while (l < r) {
+            (uint32 left, uint32 right) = _unpackChildPtr(tree.nodes[nodeIndex].childPtr);
+            if (left == 0 || right == 0) revert SparseTreePath(binPosition);
+
+            uint32 mid = l + (r - l) / 2;
+            if (binPosition <= mid) {
+                nodeIndex = left;
+                r = mid;
+            } else {
+                nodeIndex = right;
+                l = mid + 1;
+            }
+        }
+    }
+
+    function getRootIndex() external view returns (uint32) {
+        return tree.root;
+    }
+
+    function _unpackChildPtr(uint64 packed) private pure returns (uint32 left, uint32 right) {
+        left = uint32(packed >> 32);
+        right = uint32(packed);
+    }
 }
-
-
-

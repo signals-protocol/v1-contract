@@ -12,8 +12,8 @@ library LazyMulSegmentTree {
     uint256 private constant HALF_WAD = 5e17;
     uint256 public constant MIN_FACTOR = 0.01e18;
     uint256 public constant MAX_FACTOR = 100e18;
-    uint256 public constant FLUSH_THRESHOLD = 1e21;
-    uint256 public constant UNDERFLOW_FLUSH_THRESHOLD = 1e15;
+    uint256 public constant FLUSH_THRESHOLD = 1e45;
+    uint256 public constant UNDERFLOW_FLUSH_THRESHOLD = 1e9;
 
     struct Node {
         uint256 sum;
@@ -198,15 +198,31 @@ library LazyMulSegmentTree {
     /// flush since they have no children. Safe because l,r are known at this point
     /// (unlike v0's _forcePushPendingFactor which lacked range info).
     function _applyFactorToChildWithFlush(
-        Tree storage tree, uint32 nodeIndex, uint256 factor, uint32 l, uint32 r
+        Tree storage tree,
+        uint32 nodeIndex,
+        uint256 factor,
+        uint32 l,
+        uint32 r
     ) private {
         if (nodeIndex == 0 || factor == ONE_WAD) return;
 
         Node storage node = tree.nodes[nodeIndex];
+
+        // Leaf pending is dead data. Skip both the read and write so stale values
+        // from older deployments cannot overflow during push-down.
+        if (l == r) {
+            _scaleNodeSum(node, factor);
+            if (nodeIndex == tree.root) {
+                tree.cachedRootSum = node.sum;
+            }
+            return;
+        }
+
         uint256 priorPending = uint256(node.pendingFactor);
         uint256 newPendingFactor = _combineFactors(priorPending, factor);
 
-        if (r > l && priorPending != ONE_WAD &&
+        if (
+            priorPending != ONE_WAD &&
             (newPendingFactor > FLUSH_THRESHOLD || newPendingFactor < UNDERFLOW_FLUSH_THRESHOLD)
         ) {
             // Flush BEFORE scaling so _pullUpSum sees clean children sums
@@ -224,12 +240,7 @@ library LazyMulSegmentTree {
         }
     }
 
-    function _rebalanceChildren(
-        Tree storage tree,
-        uint32 left,
-        uint32 right,
-        uint256 target
-    ) private {
+    function _rebalanceChildren(Tree storage tree, uint32 left, uint32 right, uint256 target) private {
         uint256 combined = _addOrRevert(tree.nodes[left].sum, tree.nodes[right].sum);
         if (combined == target) return;
 
@@ -345,12 +356,8 @@ library LazyMulSegmentTree {
 
         current.childPtr = _packChildPtr(leftChild, rightChild);
 
-        uint256 leftSum = (leftChild != 0)
-            ? tree.nodes[leftChild].sum
-            : _defaultSum(l, mid);
-        uint256 rightSum = (rightChild != 0)
-            ? tree.nodes[rightChild].sum
-            : _defaultSum(mid + 1, r);
+        uint256 leftSum = (leftChild != 0) ? tree.nodes[leftChild].sum : _defaultSum(l, mid);
+        uint256 rightSum = (rightChild != 0) ? tree.nodes[rightChild].sum : _defaultSum(mid + 1, r);
         current.sum = _addOrRevert(leftSum, rightSum);
 
         if (nodeIndex == tree.root) {
