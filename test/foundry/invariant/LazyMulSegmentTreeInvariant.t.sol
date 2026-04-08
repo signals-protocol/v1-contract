@@ -121,7 +121,12 @@ contract LazyMulSegmentTreeInvariantTest is HarnessDeployer {
         for (uint32 i = 0; i < SIZE; i++) {
             leafSum += h.getNodeValue(i);
         }
-        uint256 tolerance = 1e12 + totalSum / 1e10;
+        // SIG-596: raised flush threshold (1e21 → 1e45) allows more pending
+        // accumulation before flush, which compounds wMulNearest rounding
+        // over extreme MAX_FACTOR/MIN_FACTOR stress sequences. Observed
+        // worst-case relative drift ~2e-8 under CI invariant fuzzing.
+        // Tolerance widened from 1e-10 to 1e-6 (50× margin over worst case).
+        uint256 tolerance = 1e12 + totalSum / 1e6;
         assertApproxEqAbs(totalSum, leafSum, tolerance, "I3: totalSum != leafSum");
     }
 
