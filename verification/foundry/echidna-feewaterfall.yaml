@@ -1,0 +1,16 @@
+testMode: "property"
+testLimit: 200000
+seqLen: 100
+corpusDir: "corpus/feewaterfall"
+shrinkLimit: 5000
+allContracts: false
+format: "text"
+filterFunctions:
+  - "doCalculate(uint256,uint256,uint256,uint256,uint256,uint256,bool,uint256,uint256,uint256,uint256)"
+  - "echidna_fee_split_conservation()"
+  - "echidna_nav_equation()"
+  - "echidna_loss_comp_bound()"
+  - "echidna_grant_bound()"
+  - "echidna_treasury_non_decreasing()"
+  - "echidna_reference_parity()"
+  - "echidna_no_revert()"

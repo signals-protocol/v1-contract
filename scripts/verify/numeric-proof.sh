@@ -21,6 +21,9 @@ if command -v echidna >/dev/null 2>&1; then
   (
     cd verification/foundry
     echidna . --contract EchidnaLazyMulTree --config echidna.yaml
+    echidna . --contract EchidnaFixedPointMath --config echidna-fixedpoint.yaml
+    echidna . --contract EchidnaClmsrMath --config echidna-clmsr.yaml
+    echidna . --contract EchidnaFeeWaterfallLib --config echidna-feewaterfall.yaml
   )
 else
   echo "echidna not found; skipping (install echidna to enable this gate)"

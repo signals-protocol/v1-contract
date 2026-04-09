@@ -1,0 +1,22 @@
+testMode: "property"
+testLimit: 200000
+seqLen: 100
+corpusDir: "corpus/clmsr"
+shrinkLimit: 5000
+allContracts: false
+format: "text"
+filterFunctions:
+  - "setAlpha(uint256)"
+  - "doBuy(uint32,uint32,uint256)"
+  - "doSell(uint32,uint32,uint256)"
+  - "doRoundtrip(uint32,uint32,uint256)"
+  - "setPureCostPair(uint256,uint256,uint256,uint256)"
+  - "echidna_buy_cost_positive()"
+  - "echidna_sell_proceeds_positive()"
+  - "echidna_no_value_creation()"
+  - "echidna_sum_after_buy_nondecreasing()"
+  - "echidna_sum_after_sell_nonincreasing()"
+  - "echidna_no_unexpected_revert()"
+  - "echidna_buy_cost_monotonic()"
+  - "echidna_sell_proceeds_monotonic()"
+  - "echidna_buy_cost_ge_sell_proceeds()"
