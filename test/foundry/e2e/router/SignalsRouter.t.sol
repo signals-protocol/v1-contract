@@ -201,10 +201,68 @@ contract SignalsRouterTest is FullSystemDeployer {
         assertEq(mockSwapRouter.swapCount(), 0);
     }
 
+    function test_openPositionWithSwap_revertsWhenSwapSlippageExceedsMinCtUSD() public {
+        _allowToken(address(inputToken));
+
+        uint256 inputAmount = 25_000;
+        uint256 userInputBefore = inputToken.balanceOf(user);
+
+        vm.prank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(MockAlgebraSwapRouter.OutputBelowMinimum.selector, inputAmount, inputAmount + 1)
+        );
+        router.openPositionWithSwap(
+            address(inputToken),
+            inputAmount,
+            inputAmount + 1,
+            marketId,
+            LOWER_TICK,
+            UPPER_TICK,
+            POSITION_QTY,
+            inputAmount + 1
+        );
+
+        assertEq(inputToken.balanceOf(user), userInputBefore);
+        assertEq(sys.position.nextId(), 1);
+        assertEq(mockSwapRouter.swapCount(), 0);
+    }
+
+    function test_openPositionWithSwap_revertsAndRollsBackWhenBetCostExceedsSwapOutput() public {
+        _allowToken(address(inputToken));
+
+        uint256 openCost = sys.core.calculateOpenCost(marketId, LOWER_TICK, UPPER_TICK, POSITION_QTY);
+        uint256 inputAmount = openCost - 1;
+        uint256 userInputBefore = inputToken.balanceOf(user);
+
+        vm.prank(user);
+        vm.expectRevert();
+        router.openPositionWithSwap(
+            address(inputToken),
+            inputAmount,
+            1,
+            marketId,
+            LOWER_TICK,
+            UPPER_TICK,
+            POSITION_QTY,
+            openCost + 1
+        );
+
+        assertEq(inputToken.balanceOf(user), userInputBefore);
+        assertEq(sys.position.nextId(), 1);
+        assertEq(sys.payment.balanceOf(address(router)), 0);
+        assertEq(mockSwapRouter.swapCount(), 0);
+    }
+
     function test_openPositionWithSwap_revertsForTokenNotAllowed() public {
         vm.prank(user);
         vm.expectRevert(abi.encodeWithSelector(SignalsRouter.TokenNotAllowed.selector, address(inputToken)));
         router.openPositionWithSwap(address(inputToken), 1, 1, marketId, LOWER_TICK, UPPER_TICK, POSITION_QTY, 1);
+    }
+
+    function test_setAllowedToken_revertsForCtUSD() public {
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(SignalsRouter.TokenNotAllowed.selector, address(sys.payment)));
+        router.setAllowedToken(address(sys.payment), true);
     }
 
     function test_openPositionWithSwap_revertsForZeroInputAmount() public {
@@ -215,12 +273,90 @@ contract SignalsRouterTest is FullSystemDeployer {
         router.openPositionWithSwap(address(inputToken), 0, 1, marketId, LOWER_TICK, UPPER_TICK, POSITION_QTY, 1);
     }
 
+    function test_openPositionWithSwap_revertsWhenMarketExpired() public {
+        _allowToken(address(inputToken));
+
+        uint256 openCost = sys.core.calculateOpenCost(marketId, LOWER_TICK, UPPER_TICK, POSITION_QTY);
+        uint256 userInputBefore = inputToken.balanceOf(user);
+
+        vm.warp(block.timestamp + 51);
+
+        vm.prank(user);
+        vm.expectRevert();
+        router.openPositionWithSwap(
+            address(inputToken),
+            openCost,
+            openCost,
+            marketId,
+            LOWER_TICK,
+            UPPER_TICK,
+            POSITION_QTY,
+            openCost + 1
+        );
+
+        assertEq(inputToken.balanceOf(user), userInputBefore);
+        assertEq(sys.position.nextId(), 1);
+        assertEq(mockSwapRouter.swapCount(), 0);
+    }
+
+    function test_positionOperationsWithSwap_revertWithoutNftApproval() public {
+        _allowToken(address(inputToken));
+        uint256 positionId = _openDirectPosition(POSITION_QTY);
+        uint256 userInputBefore = inputToken.balanceOf(user);
+
+        vm.prank(user);
+        vm.expectRevert();
+        router.increasePositionWithSwap(positionId, address(inputToken), 25_000, 25_000, INCREASE_QTY, 25_000);
+
+        vm.prank(user);
+        vm.expectRevert();
+        router.decreasePositionWithSwap(positionId, POSITION_QTY / 2, address(sys.payment), 0, 0);
+
+        assertEq(sys.position.ownerOf(positionId), user);
+        assertEq(sys.position.getPosition(positionId).quantity, POSITION_QTY);
+        assertEq(inputToken.balanceOf(user), userInputBefore);
+    }
+
+    function test_decreasePositionWithSwap_revertsWhenMinProceedsNotMet() public {
+        uint256 positionId = _openDirectPosition(POSITION_QTY);
+        uint256 quotedProceeds = sys.core.calculateDecreaseProceeds(positionId, POSITION_QTY / 2);
+
+        vm.prank(user);
+        sys.position.setApprovalForAll(address(router), true);
+
+        vm.prank(user);
+        vm.expectRevert();
+        router.decreasePositionWithSwap(positionId, POSITION_QTY / 2, address(sys.payment), 0, quotedProceeds + 1);
+
+        assertEq(sys.position.ownerOf(positionId), user);
+        assertEq(sys.position.getPosition(positionId).quantity, POSITION_QTY);
+        assertEq(mockSwapRouter.swapCount(), 0);
+    }
+
     function test_onERC721Received_rejectsNonMintTransfer() public {
         uint256 positionId = _openDirectPosition(POSITION_QTY);
 
         vm.prank(user);
         vm.expectRevert(SignalsRouter.UnexpectedNFT.selector);
         sys.position.safeTransferFrom(user, address(router), positionId);
+    }
+
+    function test_setAllowedToken_revertsForNonOwner() public {
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(0x118cdaa7, user));
+        router.setAllowedToken(address(inputToken), true);
+    }
+
+    function test_rescueToken_revertsForNonOwner() public {
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(0x118cdaa7, user));
+        router.rescueToken(address(inputToken), user, 1);
+    }
+
+    function test_rescueNFT_revertsForNonOwner() public {
+        vm.prank(user);
+        vm.expectRevert(abi.encodeWithSelector(0x118cdaa7, user));
+        router.rescueNFT(address(sys.position), user, 1);
     }
 
     function test_ownerCanRescueStuckNftAndTokenDust() public {
@@ -239,6 +375,153 @@ contract SignalsRouterTest is FullSystemDeployer {
 
         assertEq(sys.position.ownerOf(positionId), user);
         assertEq(inputToken.balanceOf(user), userInputBefore + RESCUE_DUST);
+    }
+
+    function test_closePositionWithSwap_swapsProceedsToOutputToken() public {
+        _allowToken(address(inputToken));
+        uint256 positionId = _openDirectPosition(POSITION_QTY);
+
+        vm.prank(user);
+        sys.position.setApprovalForAll(address(router), true);
+
+        uint256 userInputBefore = inputToken.balanceOf(user);
+
+        vm.prank(user);
+        router.closePositionWithSwap(positionId, address(inputToken), 1, 0);
+
+        assertFalse(sys.position.exists(positionId));
+        assertGt(inputToken.balanceOf(user), userInputBefore);
+        assertEq(mockSwapRouter.swapCount(), 1);
+    }
+
+    function test_decreasePositionWithSwap_fullQuantityBurnsNft() public {
+        _allowToken(address(inputToken));
+        uint256 positionId = _openDirectPosition(POSITION_QTY);
+
+        vm.prank(user);
+        sys.position.setApprovalForAll(address(router), true);
+
+        uint256 userInputBefore = inputToken.balanceOf(user);
+
+        vm.prank(user);
+        router.decreasePositionWithSwap(positionId, POSITION_QTY, address(inputToken), 1, 0);
+
+        assertFalse(sys.position.exists(positionId));
+        assertGt(inputToken.balanceOf(user), userInputBefore);
+        assertEq(mockSwapRouter.swapCount(), 1);
+    }
+
+    function test_claimPayoutWithSwap_winningClaimSwapsProceedsToUser() public {
+        _allowToken(address(inputToken));
+        uint256 positionId = _openDirectPosition(POSITION_QTY);
+
+        vm.prank(user);
+        sys.position.setApprovalForAll(address(router), true);
+
+        _settleMarket(2);
+        _warpToClaimOpen();
+
+        uint256 userInputBefore = inputToken.balanceOf(user);
+
+        vm.prank(user);
+        router.claimPayoutWithSwap(positionId, address(inputToken), 1);
+
+        assertFalse(sys.position.exists(positionId));
+        assertGt(inputToken.balanceOf(user), userInputBefore);
+        assertEq(mockSwapRouter.swapCount(), 1);
+    }
+
+    function test_decreasePositionWithSwap_keepsPreExistingCtUSDDustInRouter() public {
+        _allowToken(address(inputToken));
+        uint256 positionId = _openDirectPosition(POSITION_QTY);
+        uint256 quotedProceeds = sys.core.calculateDecreaseProceeds(positionId, POSITION_QTY / 2);
+
+        vm.prank(user);
+        sys.position.setApprovalForAll(address(router), true);
+
+        sys.payment.mint(address(router), ROUTER_DUST);
+        uint256 userInputBefore = inputToken.balanceOf(user);
+
+        vm.prank(user);
+        router.decreasePositionWithSwap(positionId, POSITION_QTY / 2, address(inputToken), 1, 0);
+
+        assertEq(sys.payment.balanceOf(address(router)), ROUTER_DUST);
+        assertEq(inputToken.balanceOf(user), userInputBefore + quotedProceeds);
+        assertEq(sys.position.ownerOf(positionId), user);
+        assertEq(sys.position.getPosition(positionId).quantity, POSITION_QTY / 2);
+    }
+
+    function test_claimPayoutWithSwap_keepsPreExistingCtUSDDustInRouter() public {
+        _allowToken(address(inputToken));
+        uint256 positionId = _openDirectPosition(POSITION_QTY);
+
+        vm.prank(user);
+        sys.position.setApprovalForAll(address(router), true);
+
+        _settleMarket(2);
+        _warpToClaimOpen();
+
+        sys.payment.mint(address(router), ROUTER_DUST);
+        uint256 userInputBefore = inputToken.balanceOf(user);
+
+        vm.prank(user);
+        router.claimPayoutWithSwap(positionId, address(inputToken), 1);
+
+        assertFalse(sys.position.exists(positionId));
+        assertEq(sys.payment.balanceOf(address(router)), ROUTER_DUST);
+        assertGt(inputToken.balanceOf(user), userInputBefore);
+    }
+
+    function test_constructor_revertsForZeroAddressParameters() public {
+        vm.expectRevert(SignalsRouter.ZeroAddress.selector);
+        new SignalsRouter(
+            address(0),
+            address(sys.position),
+            address(sys.payment),
+            address(mockSwapRouter),
+            address(0),
+            owner
+        );
+
+        vm.expectRevert(SignalsRouter.ZeroAddress.selector);
+        new SignalsRouter(
+            address(sys.core),
+            address(0),
+            address(sys.payment),
+            address(mockSwapRouter),
+            address(0),
+            owner
+        );
+
+        vm.expectRevert(SignalsRouter.ZeroAddress.selector);
+        new SignalsRouter(
+            address(sys.core),
+            address(sys.position),
+            address(0),
+            address(mockSwapRouter),
+            address(0),
+            owner
+        );
+
+        vm.expectRevert(SignalsRouter.ZeroAddress.selector);
+        new SignalsRouter(
+            address(sys.core),
+            address(sys.position),
+            address(sys.payment),
+            address(0),
+            address(0),
+            owner
+        );
+
+        vm.expectRevert();
+        new SignalsRouter(
+            address(sys.core),
+            address(sys.position),
+            address(sys.payment),
+            address(mockSwapRouter),
+            address(0),
+            address(0)
+        );
     }
 
     function _allowToken(address token) internal {

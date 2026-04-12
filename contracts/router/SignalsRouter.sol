@@ -57,6 +57,7 @@ contract SignalsRouter is Ownable, ReentrancyGuard, IERC721Receiver {
 
     function setAllowedToken(address token, bool allowed) external onlyOwner {
         if (token == address(0)) revert ZeroAddress();
+        if (allowed && token == address(ctUSD)) revert TokenNotAllowed(token);
         allowedTokens[token] = allowed;
         emit AllowedTokenUpdated(token, allowed);
     }
