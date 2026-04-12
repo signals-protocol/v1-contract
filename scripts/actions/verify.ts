@@ -77,6 +77,8 @@ function main() {
   const canVerifyLinkedModules = Boolean(moduleLibraries);
 
   const paymentTokenAddress = envData.contracts.PaymentToken;
+  const satsumaSwapRouter = envData.contracts.SatsumaSwapRouter;
+  const routerOwner = envData.config?.owners?.core;
   const paymentTokenVerifyContract =
     envData.config?.paymentTokenVerifyContract ??
     process.env.PAYMENT_TOKEN_VERIFY_CONTRACT;
@@ -86,6 +88,23 @@ function main() {
       envData.contracts.SignalsCoreProxy)
   ) {
     missing.push('PaymentToken address');
+  }
+  if (
+    envData.contracts.SignalsRouter &&
+    (!envData.contracts.SignalsCoreProxy ||
+      !envData.contracts.SignalsPositionProxy ||
+      !paymentTokenAddress ||
+      !satsumaSwapRouter ||
+      !routerOwner)
+  ) {
+    if (!envData.contracts.SignalsCoreProxy)
+      missing.push('SignalsCoreProxy (for SignalsRouter)');
+    if (!envData.contracts.SignalsPositionProxy)
+      missing.push('SignalsPositionProxy (for SignalsRouter)');
+    if (!paymentTokenAddress) missing.push('PaymentToken (for SignalsRouter)');
+    if (!satsumaSwapRouter)
+      missing.push('SatsumaSwapRouter (for SignalsRouter)');
+    if (!routerOwner) missing.push('config.owners.core (for SignalsRouter)');
   }
   const deployerEOA = envData.config?.deployerEOA ?? process.env.DEPLOYER_EOA;
   if (
@@ -278,6 +297,30 @@ function main() {
             name: 'PaymentToken',
             address: paymentTokenAddress,
             contract: paymentTokenVerifyContract,
+          },
+        ]
+      : []),
+    ...(envData.contracts.SignalsRouter
+      ? [
+          {
+            name: 'SignalsRouter',
+            address: envData.contracts.SignalsRouter,
+            contract: 'contracts/router/SignalsRouter.sol:SignalsRouter',
+            constructorArgs:
+              envData.contracts.SignalsCoreProxy &&
+              envData.contracts.SignalsPositionProxy &&
+              paymentTokenAddress &&
+              satsumaSwapRouter &&
+              routerOwner
+                ? [
+                    envData.contracts.SignalsCoreProxy,
+                    envData.contracts.SignalsPositionProxy,
+                    paymentTokenAddress,
+                    satsumaSwapRouter,
+                    '0x0000000000000000000000000000000000000000',
+                    routerOwner,
+                  ]
+                : undefined,
           },
         ]
       : []),

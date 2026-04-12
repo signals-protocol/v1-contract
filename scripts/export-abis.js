@@ -12,6 +12,7 @@ const OUT_DIR = path.join(ROOT, 'abis');
 // sourceDir is only used for Hardhat path resolution (Foundry uses flat out/<Name>.sol/<Name>.json)
 const CONTRACTS = [
   ['SignalsCore',              'core',       'full'],
+  ['SignalsRouter',            'router',     'full'],
   ['SignalsPosition',          'position',   'full'],
   ['SignalsCoreHarness',       'testonly',   'full'],
   ['SignalsUSDToken',          'testonly',   'full'],

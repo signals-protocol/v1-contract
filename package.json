@@ -20,6 +20,8 @@
     "deploy:dev": "ENV=dev forge script script/actions/DeployV1.s.sol --rpc-url dev --broadcast",
     "deploy-fee-policies:dev": "ENV=dev forge script script/actions/DeployFeePolicies.s.sol --rpc-url dev --broadcast",
     "deploy-fee-policies:prod": "ENV=prod forge script script/actions/DeployFeePolicies.s.sol --rpc-url prod --broadcast",
+    "deploy-router:dev": "ENV=dev forge script script/actions/DeployRouter.s.sol --rpc-url dev --broadcast",
+    "deploy-router:prod": "ENV=prod forge script script/actions/DeployRouter.s.sol --rpc-url prod --broadcast",
     "deploy-impls:dev": "ENV=dev forge script script/actions/DeployImpls.s.sol --rpc-url dev --broadcast",
     "deploy-impls:prod": "ENV=prod forge script script/actions/DeployImpls.s.sol --rpc-url prod --broadcast",
     "update-modules:dev": "ENV=dev forge script script/actions/UpdateModules.s.sol --rpc-url dev --broadcast",
