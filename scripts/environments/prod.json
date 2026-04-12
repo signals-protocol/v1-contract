@@ -3,8 +3,8 @@
   "version": 8,
   "contracts": {
     "SignalsCreate2Factory": "0x17925299E7E2E044672F8a889F5c35C762a2065e",
-    "SignalsCoreImplementation": "0x84F2d11740c352182819591f85cab3F1B0266B33",
-    "SignalsPositionImplementation": "0x63AA48a8a450782643A319a2a4C52B7dF8a07D3F",
+    "SignalsCoreImplementation": "0x2d00f98CFD497bD73FB2DC57759E68cDd73a9DEB",
+    "SignalsPositionImplementation": "0xc62740413CEf424d3c405fC59770a2061A02bB77",
     "SignalsLPShareImplementation": "0x323D7C3d15a483Dc59463807123421f10F7162a4",
     "SignalsDeployer": "0x795B4ed8869Fb2172c2c68eA21cCb5FdE6ad7AB4",
     "SignalsCoreProxy": "0x516312275875932ec2B53A41df4De02743131729",
@@ -81,7 +81,11 @@
       "timestamp": 1771853382,
       "meta": {
         "feature": "batchClaimPayout",
-        "modules": ["TradeModule", "MarketLifecycleModule", "LPVaultModule"]
+        "modules": [
+          "TradeModule",
+          "MarketLifecycleModule",
+          "LPVaultModule"
+        ]
       }
     },
     {
@@ -91,7 +95,10 @@
       "timestamp": 1772537753,
       "meta": {
         "feature": "LazyMulSegmentTree recursive flush",
-        "modules": ["TradeModule", "MarketLifecycleModule"]
+        "modules": [
+          "TradeModule",
+          "MarketLifecycleModule"
+        ]
       }
     },
     {
@@ -101,7 +108,9 @@
       "timestamp": 1741235288,
       "meta": {
         "feature": "openPositionFor (sponsored positions)",
-        "modules": ["TradeModule"],
+        "modules": [
+          "TradeModule"
+        ],
         "txHash": "0x7145f288869212690a80ea86ff1ce8b61225faf815e74417634ecbcb4b74d809"
       }
     }

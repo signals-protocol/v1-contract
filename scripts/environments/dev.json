@@ -5,9 +5,9 @@
     "SignalsCreate2Factory": "0x247aA8fabb783deFbC2cB0e3a5D378eD44d4E67A",
     "SignalsDeployer": "0xa11340e517381fBD1275e81EeaEA405dFC8193Cd",
     "SignalsCoreProxy": "0x5160e4deD8D54288189934781986915c253D6164",
-    "SignalsCoreImplementation": "0x4d213e3F9078b52297508Eb78F2d8A51a853cc04",
+    "SignalsCoreImplementation": "0xf50369Bc64041C10837988bC5d571b73A77AeCb2",
     "SignalsPositionProxy": "0x76B980Da002Ea7098A894E6770651AE570dA4C32",
-    "SignalsPositionImplementation": "0x1099301f8a362C9881a97F3d4caC7F3E087A2B37",
+    "SignalsPositionImplementation": "0x54F3860fCEDC069e351C721ABd145cEB876A9270",
     "SignalsLPShareProxy": "0x1D6dCCff73DA38DC8303B37750Ed4a88c6b2408B",
     "SignalsLPShareImplementation": "0x1b7b96fb51341778d1172DD71Dc660aB235A0a77",
     "SignalsLPShare": "0x1D6dCCff73DA38DC8303B37750Ed4a88c6b2408B",
@@ -170,7 +170,10 @@
       "timestamp": 1772537753,
       "meta": {
         "feature": "LazyMulSegmentTree recursive flush",
-        "modules": ["TradeModule", "MarketLifecycleModule"]
+        "modules": [
+          "TradeModule",
+          "MarketLifecycleModule"
+        ]
       }
     }
   ]
