@@ -201,8 +201,11 @@ contract SignalsRouter is Ownable, ReentrancyGuard, IERC721Receiver {
 
         _requireAllowedToken(outputToken);
 
-        uint256 outputAmount = _swapExactInput(ctUSD, IERC20(outputToken), receivedAmount, minOutputAmount);
-        IERC20(outputToken).safeTransfer(recipient, outputAmount);
+        IERC20 outToken = IERC20(outputToken);
+        uint256 outBefore = outToken.balanceOf(address(this));
+        _swapExactInput(ctUSD, outToken, receivedAmount, minOutputAmount);
+        uint256 outputAmount = outToken.balanceOf(address(this)) - outBefore;
+        outToken.safeTransfer(recipient, outputAmount);
     }
 
     function _swapExactInput(
