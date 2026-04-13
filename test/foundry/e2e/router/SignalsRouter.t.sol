@@ -4,6 +4,8 @@ pragma solidity ^0.8.28;
 import "../../base/FullSystemDeployer.sol";
 import "../../base/SettlementHelper.sol";
 import {SignalsRouter} from "../../../../contracts/router/SignalsRouter.sol";
+import {SignalsErrors as SE} from "../../../../contracts/errors/SignalsErrors.sol";
+import {TradeModule} from "../../../../contracts/modules/TradeModule.sol";
 import {MockAlgebraSwapRouter} from "../../../../contracts/testonly/MockAlgebraSwapRouter.sol";
 import {MockERC20} from "../../../../contracts/testonly/MockERC20.sol";
 
@@ -317,6 +319,60 @@ contract SignalsRouterTest is FullSystemDeployer {
         assertEq(inputToken.balanceOf(user), userInputBefore);
     }
 
+    function test_increasePositionWithSwap_emitsActualOwnerWithoutRouterTransfer() public {
+        _allowToken(address(inputToken));
+        uint256 positionId = _openDirectPosition(POSITION_QTY);
+        uint256 quotedCost = sys.core.calculateIncreaseCost(positionId, INCREASE_QTY);
+
+        vm.prank(user);
+        sys.position.setApprovalForAll(address(router), true);
+
+        vm.recordLogs();
+
+        vm.expectEmit(true, true, false, true, address(sys.core));
+        emit TradeModule.PositionIncreased(positionId, user, INCREASE_QTY, POSITION_QTY + INCREASE_QTY, quotedCost);
+
+        vm.prank(user);
+        router.increasePositionWithSwap(positionId, address(inputToken), 25_000, 25_000, INCREASE_QTY, 25_000);
+
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        _assertNoRouterTransfers(entries);
+    }
+
+    function test_decreasePositionWithSwap_revertsWhenCallerIsNotPositionOwner() public {
+        _allowToken(address(inputToken));
+        uint256 positionId = _openDirectPosition(POSITION_QTY);
+        address attacker = sys.users[1];
+
+        vm.prank(user);
+        sys.position.setApprovalForAll(address(router), true);
+
+        vm.prank(attacker);
+        vm.expectRevert(abi.encodeWithSelector(SE.UnauthorizedCaller.selector, attacker));
+        router.decreasePositionWithSwap(positionId, POSITION_QTY / 2, address(sys.payment), 0, 0);
+    }
+
+    function test_decreasePositionWithSwap_emitsActualOwnerWithoutRouterTransfer() public {
+        _allowToken(address(inputToken));
+        uint256 positionId = _openDirectPosition(POSITION_QTY);
+        uint128 sellQty = POSITION_QTY / 2;
+        uint256 quotedProceeds = sys.core.calculateDecreaseProceeds(positionId, sellQty);
+
+        vm.prank(user);
+        sys.position.setApprovalForAll(address(router), true);
+
+        vm.recordLogs();
+
+        vm.expectEmit(true, true, false, true, address(sys.core));
+        emit TradeModule.PositionDecreased(positionId, user, sellQty, POSITION_QTY - sellQty, quotedProceeds);
+
+        vm.prank(user);
+        router.decreasePositionWithSwap(positionId, sellQty, address(inputToken), 1, 0);
+
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        _assertNoRouterTransfers(entries);
+    }
+
     function test_decreasePositionWithSwap_revertsWhenMinProceedsNotMet() public {
         uint256 positionId = _openDirectPosition(POSITION_QTY);
         uint256 quotedProceeds = sys.core.calculateDecreaseProceeds(positionId, POSITION_QTY / 2);
@@ -544,5 +600,20 @@ contract SignalsRouterTest is FullSystemDeployer {
     function _warpToClaimOpen() internal {
         (, , , uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
         vm.warp(claimOpen);
+    }
+
+    function _assertNoRouterTransfers(Vm.Log[] memory entries) internal view {
+        bytes32 transferSig = keccak256("Transfer(address,address,uint256)");
+        bytes32 routerTopic = bytes32(uint256(uint160(address(router))));
+
+        for (uint256 i; i < entries.length; ++i) {
+            Vm.Log memory entry = entries[i];
+            if (entry.emitter != address(sys.position) || entry.topics.length != 4 || entry.topics[0] != transferSig) {
+                continue;
+            }
+
+            assertTrue(entry.topics[1] != routerTopic, "router should not send position NFT");
+            assertTrue(entry.topics[2] != routerTopic, "router should not receive position NFT");
+        }
     }
 }

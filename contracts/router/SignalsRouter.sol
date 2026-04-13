@@ -10,12 +10,10 @@ import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Recei
 import {ISignalsCore} from "../interfaces/ISignalsCore.sol";
 import {ISignalsPosition} from "../interfaces/ISignalsPosition.sol";
 import {IAlgebraSwapRouter} from "../interfaces/IAlgebraSwapRouter.sol";
+import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
 
 /// @title SignalsRouter
 /// @notice Atomic swap-and-bet router for non-ctUSD tokens.
-/// @dev Risk gate and fee policies observe this router as `msg.sender`/`trader`.
-///      If per-user policy logic is added later, Core or the policy layer must
-///      explicitly account for router-mediated calls.
 contract SignalsRouter is Ownable, ReentrancyGuard, IERC721Receiver {
     using SafeERC20 for IERC20;
 
@@ -114,9 +112,9 @@ contract SignalsRouter is Ownable, ReentrancyGuard, IERC721Receiver {
     ) external nonReentrant {
         _requireAmount(inputAmount);
         _requireAllowedToken(inputToken);
+        _requirePositionOwner(positionId);
 
         IERC20(inputToken).safeTransferFrom(msg.sender, address(this), inputAmount);
-        _takePosition(positionId, msg.sender);
 
         uint256 ctUSDBefore = ctUSD.balanceOf(address(this));
         _swapExactInput(IERC20(inputToken), ctUSD, inputAmount, minCtUSD);
@@ -129,8 +127,6 @@ contract SignalsRouter is Ownable, ReentrancyGuard, IERC721Receiver {
         if (ctUSDDelta > 0) {
             ctUSD.safeTransfer(msg.sender, ctUSDDelta);
         }
-
-        _returnPositionIfNeeded(positionId, msg.sender);
     }
 
     function decreasePositionWithSwap(
@@ -140,13 +136,12 @@ contract SignalsRouter is Ownable, ReentrancyGuard, IERC721Receiver {
         uint256 minOutputAmount,
         uint256 minProceeds
     ) external nonReentrant {
-        _takePosition(positionId, msg.sender);
+        _requirePositionOwner(positionId);
 
         uint256 ctUSDBefore = ctUSD.balanceOf(address(this));
         core.decreasePosition(positionId, quantity, minProceeds);
         uint256 receivedAmount = ctUSD.balanceOf(address(this)) - ctUSDBefore;
 
-        _returnPositionIfNeeded(positionId, msg.sender);
         _deliverOutput(outputToken, minOutputAmount, receivedAmount, msg.sender);
     }
 
@@ -156,13 +151,12 @@ contract SignalsRouter is Ownable, ReentrancyGuard, IERC721Receiver {
         uint256 minOutputAmount,
         uint256 minProceeds
     ) external nonReentrant {
-        _takePosition(positionId, msg.sender);
+        _requirePositionOwner(positionId);
 
         uint256 ctUSDBefore = ctUSD.balanceOf(address(this));
         core.closePosition(positionId, minProceeds);
         uint256 receivedAmount = ctUSD.balanceOf(address(this)) - ctUSDBefore;
 
-        _returnPositionIfNeeded(positionId, msg.sender);
         _deliverOutput(outputToken, minOutputAmount, receivedAmount, msg.sender);
     }
 
@@ -171,13 +165,12 @@ contract SignalsRouter is Ownable, ReentrancyGuard, IERC721Receiver {
         address outputToken,
         uint256 minOutputAmount
     ) external nonReentrant {
-        _takePosition(positionId, msg.sender);
+        _requirePositionOwner(positionId);
 
         uint256 ctUSDBefore = ctUSD.balanceOf(address(this));
         core.claimPayout(positionId);
         uint256 receivedAmount = ctUSD.balanceOf(address(this)) - ctUSDBefore;
 
-        _returnPositionIfNeeded(positionId, msg.sender);
         _deliverOutput(outputToken, minOutputAmount, receivedAmount, msg.sender);
     }
 
@@ -229,14 +222,8 @@ contract SignalsRouter is Ownable, ReentrancyGuard, IERC721Receiver {
         );
     }
 
-    function _takePosition(uint256 positionId, address owner_) internal {
-        IERC721(address(positionNFT)).transferFrom(owner_, address(this), positionId);
-    }
-
-    function _returnPositionIfNeeded(uint256 positionId, address recipient) internal {
-        if (positionNFT.exists(positionId)) {
-            IERC721(address(positionNFT)).safeTransferFrom(address(this), recipient, positionId);
-        }
+    function _requirePositionOwner(uint256 positionId) internal view {
+        if (positionNFT.ownerOf(positionId) != msg.sender) revert SE.UnauthorizedCaller(msg.sender);
     }
 
     function _requireAllowedToken(address token) internal view {
