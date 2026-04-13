@@ -6,6 +6,7 @@ import "../../base/RedstoneHelper.sol";
 import "../../base/SettlementHelper.sol";
 import "../../base/SeedHelper.sol";
 import {SignalsErrors as SE} from "../../../../contracts/errors/SignalsErrors.sol";
+import {TradeModule} from "../../../../contracts/modules/TradeModule.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 /// @title Sponsored Position E2E Tests
@@ -420,6 +421,44 @@ contract SponsoredPositionTest is FullSystemDeployer {
 
         assertEq(sys.payment.balanceOf(otherUser) - userBefore, QUANTITY);
         assertEq(sys.payment.balanceOf(sponsor), sponsorBefore);
+    }
+
+    function test_claimPayout_WIN_approvedOperator_gets_user_profit_sponsor_gets_principal() public {
+        uint256 cost = sys.core.calculateOpenCost(marketId, 1, 3, QUANTITY);
+        uint256 positionId = sys.position.nextId();
+
+        vm.prank(sponsor);
+        sys.core.openPositionFor(beneficiary, marketId, 1, 3, QUANTITY, cost + 1_000_000);
+
+        uint256 sponsoredCost = sys.core.getSponsoredCost(positionId);
+        assertLt(sponsoredCost, QUANTITY);
+
+        vm.prank(beneficiary);
+        sys.position.setApprovalForAll(otherUser, true);
+
+        _settleMarket(marketId, 2);
+
+        vm.prank(sys.owner);
+        sys.core.requestSettlementChunks(marketId, 5);
+
+        (, , , uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
+        vm.warp(claimOpen);
+
+        uint256 sponsorBefore = sys.payment.balanceOf(sponsor);
+        uint256 operatorBefore = sys.payment.balanceOf(otherUser);
+        uint256 beneficiaryBefore = sys.payment.balanceOf(beneficiary);
+
+        vm.expectEmit(true, true, false, true, address(sys.core));
+        emit TradeModule.PositionSettled(positionId, beneficiary, QUANTITY, true);
+        vm.expectEmit(true, true, false, true, address(sys.core));
+        emit TradeModule.PositionClaimed(positionId, beneficiary, QUANTITY);
+
+        vm.prank(otherUser);
+        sys.core.claimPayout(positionId);
+
+        assertEq(sys.payment.balanceOf(sponsor) - sponsorBefore, sponsoredCost);
+        assertEq(sys.payment.balanceOf(otherUser) - operatorBefore, QUANTITY - sponsoredCost);
+        assertEq(sys.payment.balanceOf(beneficiary), beneficiaryBefore);
     }
 
     // =========================================================
