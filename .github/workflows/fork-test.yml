@@ -35,7 +35,7 @@ jobs:
         env:
           FOUNDRY_PROFILE: fork
           FORK_ENV: prod
-          PROD_RPC_URL: ${{ secrets.PROD_RPC_URL }}
+          PROD_RPC_URL: ${{ secrets.PROD_RPC_URL || 'https://rpc.mainnet.citrea.xyz' }}
         run: forge test --match-path 'test/foundry/fork/**/*.sol' --no-match-path 'test/foundry/fork/live/**' -vvv
 
   fork-test-advisory-live:
@@ -61,5 +61,5 @@ jobs:
         env:
           FOUNDRY_PROFILE: fork
           FORK_ENV: prod
-          PROD_RPC_URL: ${{ secrets.PROD_RPC_URL }}
+          PROD_RPC_URL: ${{ secrets.PROD_RPC_URL || 'https://rpc.mainnet.citrea.xyz' }}
         run: forge test --match-path 'test/foundry/fork/live/**' -vvv
