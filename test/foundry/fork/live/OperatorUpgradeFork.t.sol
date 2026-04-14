@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "./base/ForkBaseTest.sol";
-import "../../../contracts/core/SignalsCore.sol";
-import "../../../contracts/modules/TradeModule.sol";
-import "../../../contracts/router/SignalsRouter.sol";
-import "../../../contracts/interfaces/IAlgebraSwapRouter.sol";
-import "../../../contracts/interfaces/ISignalsCore.sol";
-import "../../../contracts/interfaces/ISignalsPosition.sol";
+import "../base/ForkLiveMarketTest.sol";
+import "../../../../contracts/core/SignalsCore.sol";
+import "../../../../contracts/modules/TradeModule.sol";
+import "../../../../contracts/router/SignalsRouter.sol";
+import "../../../../contracts/interfaces/IAlgebraSwapRouter.sol";
+import "../../../../contracts/interfaces/ISignalsCore.sol";
+import "../../../../contracts/interfaces/ISignalsPosition.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
@@ -17,8 +17,8 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 ///         works against real on-chain state with real Satsuma swaps.
 ///
 ///         Run with:
-///         PROD_RPC_URL=... FOUNDRY_PROFILE=fork FORK_ENV=prod forge test --match-contract OperatorUpgradeForkTest -vv
-contract OperatorUpgradeForkTest is ForkBaseTest {
+///         PROD_RPC_URL=... FOUNDRY_PROFILE=fork FORK_ENV=prod forge test --match-contract OperatorUpgradeForkTest --match-path 'test/foundry/fork/live/**' -vv
+contract OperatorUpgradeForkTest is ForkLiveMarketTest {
     IAlgebraSwapRouter internal liveSwapRouter;
     IERC20 internal usdcE;
     IERC20 internal ctUSDToken;
@@ -86,7 +86,8 @@ contract OperatorUpgradeForkTest is ForkBaseTest {
 
     function test_increasePosition_emits_user_not_router() public {
         if (address(router) == address(0)) return;
-        (address trader, uint256 positionId) = _openRealPosition();
+        (bool ok, address trader, uint256 positionId) = _tryOpenRealPosition();
+        if (!ok) return;
         uint128 qtyBefore = position.getPosition(positionId).quantity;
 
         deal(address(usdcE), trader, 3e6);
@@ -114,7 +115,8 @@ contract OperatorUpgradeForkTest is ForkBaseTest {
 
     function test_decreasePosition_emits_user_not_router() public {
         if (address(router) == address(0)) return;
-        (address trader, uint256 positionId) = _openRealPosition();
+        (bool ok, address trader, uint256 positionId) = _tryOpenRealPosition();
+        if (!ok) return;
         uint128 qtyBefore = position.getPosition(positionId).quantity;
 
         vm.startPrank(trader);
@@ -136,7 +138,8 @@ contract OperatorUpgradeForkTest is ForkBaseTest {
 
     function test_closePosition_emits_user_not_router() public {
         if (address(router) == address(0)) return;
-        (address trader, uint256 positionId) = _openRealPosition();
+        (bool ok, address trader, uint256 positionId) = _tryOpenRealPosition();
+        if (!ok) return;
 
         vm.startPrank(trader);
         position.setApprovalForAll(address(router), true);
@@ -157,7 +160,8 @@ contract OperatorUpgradeForkTest is ForkBaseTest {
 
     function test_claimPayout_emits_user_not_router() public {
         if (address(router) == address(0)) return;
-        (address trader, uint256 positionId) = _openRealPosition();
+        (bool ok, address trader, uint256 positionId) = _tryOpenRealPosition();
+        if (!ok) return;
 
         ISignalsPosition.Position memory pos = position.getPosition(positionId);
         ISignalsCore.Market memory m = core.getMarket(pos.marketId);
@@ -205,7 +209,8 @@ contract OperatorUpgradeForkTest is ForkBaseTest {
 
     function test_nonOwner_cannot_use_router_lifecycle() public {
         if (address(router) == address(0)) return;
-        (address trader, uint256 positionId) = _openRealPosition();
+        (bool ok, address trader, uint256 positionId) = _tryOpenRealPosition();
+        if (!ok) return;
 
         // Trader approves router
         vm.prank(trader);
@@ -226,8 +231,10 @@ contract OperatorUpgradeForkTest is ForkBaseTest {
     // Helpers
     // ============================================================
 
-    function _openRealPosition() internal returns (address trader, uint256 positionId) {
-        (uint256 marketId, ISignalsCore.Market memory m) = _findActiveMarket();
+    function _tryOpenRealPosition() internal returns (bool ok, address trader, uint256 positionId) {
+        (bool found, uint256 marketId, ISignalsCore.Market memory m) = _tryFindActiveMarket();
+        if (!found) return (false, trader, 0);
+
         trader = makeAddr("forkTrader");
         deal(address(usdcE), trader, 10e6);
 
@@ -245,25 +252,7 @@ contract OperatorUpgradeForkTest is ForkBaseTest {
             5e6
         );
         vm.stopPrank();
-    }
-
-    function _findActiveMarket() internal view returns (uint256 marketId, ISignalsCore.Market memory m) {
-        uint256 upper = core.nextMarketId() + 5;
-        for (uint256 i = upper; i > 0; --i) {
-            try core.getMarket(i) returns (ISignalsCore.Market memory candidate) {
-                if (
-                    candidate.isSeeded &&
-                    !candidate.settled &&
-                    block.timestamp >= candidate.startTimestamp &&
-                    block.timestamp <= candidate.endTimestamp
-                ) {
-                    return (i, candidate);
-                }
-            } catch {
-                continue;
-            }
-        }
-        revert("no active market");
+        return (true, trader, positionId);
     }
 
     /// @dev Assert that PositionIncreased/Decreased/Closed/Claimed and TradeFeeCharged

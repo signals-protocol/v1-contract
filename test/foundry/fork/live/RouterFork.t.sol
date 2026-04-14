@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "./base/ForkBaseTest.sol";
-import "../../../contracts/interfaces/IAlgebraSwapRouter.sol";
-import "../../../contracts/interfaces/ISignalsCore.sol";
-import "../../../contracts/interfaces/ISignalsPosition.sol";
-import "../../../contracts/router/SignalsRouter.sol";
+import "../base/ForkLiveMarketTest.sol";
+import "../../../../contracts/interfaces/IAlgebraSwapRouter.sol";
+import "../../../../contracts/interfaces/ISignalsCore.sol";
+import "../../../../contracts/interfaces/ISignalsPosition.sol";
+import "../../../../contracts/router/SignalsRouter.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title RouterForkTest
 /// @notice Fork tests against live Citrea mainnet — REAL Satsuma swap + REAL Core.
 ///         Requires an active market. Run with:
-///         PROD_RPC_URL=... FOUNDRY_PROFILE=fork FORK_ENV=prod forge test --match-contract RouterForkTest -vv
-contract RouterForkTest is ForkBaseTest {
+///         PROD_RPC_URL=... FOUNDRY_PROFILE=fork FORK_ENV=prod forge test --match-contract RouterForkTest --match-path 'test/foundry/fork/live/**' -vv
+contract RouterForkTest is ForkLiveMarketTest {
     IAlgebraSwapRouter internal liveSwapRouter;
     IERC20 internal usdcE;
     IERC20 internal ctUSDToken;
@@ -70,8 +70,8 @@ contract RouterForkTest is ForkBaseTest {
     // ============================================================
 
     function test_fullFlow_openPositionWithSwap() public {
-        if (address(liveSwapRouter) == address(0)) return;
-        (SignalsRouter router, uint256 marketId, ISignalsCore.Market memory m) = _deployRealRouter();
+        (bool ok, SignalsRouter router, uint256 marketId, ISignalsCore.Market memory m) = _tryDeployRealRouter();
+        if (!ok) return;
 
         address trader = makeAddr("openTrader");
         deal(address(usdcE), trader, 5e6);
@@ -99,8 +99,8 @@ contract RouterForkTest is ForkBaseTest {
     }
 
     function test_fullFlow_increasePositionWithSwap() public {
-        if (address(liveSwapRouter) == address(0)) return;
-        (SignalsRouter router, address trader, uint256 positionId) = _openRealPosition();
+        (bool ok, SignalsRouter router, address trader, uint256 positionId) = _tryOpenRealPosition();
+        if (!ok) return;
 
         uint256 qtyBefore = position.getPosition(positionId).quantity;
         deal(address(usdcE), trader, 3e6);
@@ -116,8 +116,8 @@ contract RouterForkTest is ForkBaseTest {
     }
 
     function test_fullFlow_decreasePositionWithSwap() public {
-        if (address(liveSwapRouter) == address(0)) return;
-        (SignalsRouter router, address trader, uint256 positionId) = _openRealPosition();
+        (bool ok, SignalsRouter router, address trader, uint256 positionId) = _tryOpenRealPosition();
+        if (!ok) return;
 
         uint256 qtyBefore = position.getPosition(positionId).quantity;
         uint256 ctUSDBefore = ctUSDToken.balanceOf(trader);
@@ -133,8 +133,8 @@ contract RouterForkTest is ForkBaseTest {
     }
 
     function test_fullFlow_closePositionWithSwap() public {
-        if (address(liveSwapRouter) == address(0)) return;
-        (SignalsRouter router, address trader, uint256 positionId) = _openRealPosition();
+        (bool ok, SignalsRouter router, address trader, uint256 positionId) = _tryOpenRealPosition();
+        if (!ok) return;
 
         vm.startPrank(trader);
         position.setApprovalForAll(address(router), true);
@@ -145,8 +145,8 @@ contract RouterForkTest is ForkBaseTest {
     }
 
     function test_fullFlow_claimPayoutWithSwap() public {
-        if (address(liveSwapRouter) == address(0)) return;
-        (SignalsRouter router, address trader, uint256 positionId) = _openRealPosition();
+        (bool ok, SignalsRouter router, address trader, uint256 positionId) = _tryOpenRealPosition();
+        if (!ok) return;
 
         // Get market and position info
         ISignalsPosition.Position memory pos = position.getPosition(positionId);
@@ -198,11 +198,15 @@ contract RouterForkTest is ForkBaseTest {
     // Helpers
     // ============================================================
 
-    function _deployRealRouter()
+    function _tryDeployRealRouter()
         internal
-        returns (SignalsRouter router, uint256 marketId, ISignalsCore.Market memory m)
+        returns (bool ok, SignalsRouter router, uint256 marketId, ISignalsCore.Market memory m)
     {
-        (marketId, m) = _findActiveMarket();
+        if (address(liveSwapRouter) == address(0)) return (false, router, 0, m);
+
+        (bool found, uint256 activeMarketId, ISignalsCore.Market memory activeMarket) = _tryFindActiveMarket();
+        if (!found) return (false, router, 0, m);
+
         router = new SignalsRouter(
             address(core),
             address(position),
@@ -212,12 +216,17 @@ contract RouterForkTest is ForkBaseTest {
             address(this)
         );
         router.setAllowedToken(address(usdcE), true);
+        return (true, router, activeMarketId, activeMarket);
     }
 
-    function _openRealPosition() internal returns (SignalsRouter router, address trader, uint256 positionId) {
+    function _tryOpenRealPosition()
+        internal
+        returns (bool ok, SignalsRouter router, address trader, uint256 positionId)
+    {
         uint256 marketId;
         ISignalsCore.Market memory m;
-        (router, marketId, m) = _deployRealRouter();
+        (ok, router, marketId, m) = _tryDeployRealRouter();
+        if (!ok) return (false, router, trader, 0);
 
         trader = makeAddr("posTrader");
         deal(address(usdcE), trader, 10e6);
@@ -239,24 +248,6 @@ contract RouterForkTest is ForkBaseTest {
             5e6
         );
         vm.stopPrank();
-    }
-
-    function _findActiveMarket() internal view returns (uint256 marketId, ISignalsCore.Market memory m) {
-        uint256 upper = core.nextMarketId() + 5;
-        for (uint256 i = upper; i > 0; --i) {
-            try core.getMarket(i) returns (ISignalsCore.Market memory candidate) {
-                if (
-                    candidate.isSeeded &&
-                    !candidate.settled &&
-                    block.timestamp >= candidate.startTimestamp &&
-                    block.timestamp <= candidate.endTimestamp
-                ) {
-                    return (i, candidate);
-                }
-            } catch {
-                continue;
-            }
-        }
-        revert("no active market - run during market hours");
+        return (true, router, trader, positionId);
     }
 }
