@@ -13,17 +13,11 @@ permissions:
   contents: read
 
 jobs:
-  fork-test:
-    name: Fork Tests
+  fork-test-baseline:
+    name: Fork Tests Baseline
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # On push: only run when commit message contains [fork-test]
-    # On workflow_dispatch: always run
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.head_commit.message, '[fork-test]')
-    # Advisory only — Citrea public RPC instability shouldn't block PRs.
-    continue-on-error: true
+    continue-on-error: false
 
     steps:
       - uses: actions/checkout@v4
@@ -42,11 +36,37 @@ jobs:
           FOUNDRY_PROFILE: fork
           FORK_ENV: dev
           DEV_RPC_URL: ${{ secrets.DEV_RPC_URL }}
-        run: forge test -vvv
+        run: forge test --match-path 'test/foundry/fork/**/*.sol' --no-match-path 'test/foundry/fork/live/**' -vvv
 
       - name: Fork tests (prod)
         env:
           FOUNDRY_PROFILE: fork
           FORK_ENV: prod
           PROD_RPC_URL: ${{ secrets.PROD_RPC_URL }}
-        run: forge test -vvv
+        run: forge test --match-path 'test/foundry/fork/**/*.sol' --no-match-path 'test/foundry/fork/live/**' -vvv
+
+  fork-test-advisory-live:
+    name: Fork Tests Advisory Live
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: yarn.lock
+      - run: yarn install --frozen-lockfile
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Advisory live fork tests (prod)
+        env:
+          FOUNDRY_PROFILE: fork
+          FORK_ENV: prod
+          PROD_RPC_URL: ${{ secrets.PROD_RPC_URL }}
+        run: forge test --match-path 'test/foundry/fork/live/**' -vvv
