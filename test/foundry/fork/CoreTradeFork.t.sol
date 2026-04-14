@@ -11,6 +11,7 @@ contract CoreTradeForkTest is ForkProtocolTest {
     function test_sponsored_position_claim_splits_principal_and_profit_after_batch_processing() public {
         uint64 targetBatch = _targetBatchAfter(uint64(block.timestamp + 120));
         uint256 marketId = _createUniformMarketForBatch(targetBatch);
+        _warpIntoTradingWindow(marketId);
 
         address sponsor = makeAddr("sponsor");
         address beneficiary = makeAddr("beneficiary");
@@ -51,6 +52,7 @@ contract CoreTradeForkTest is ForkProtocolTest {
     function test_batch_claim_handles_winner_loser_mix_after_batch_processing() public {
         uint64 targetBatch = _targetBatchAfter(uint64(block.timestamp + 120));
         uint256 marketId = _createUniformMarketForBatch(targetBatch);
+        _warpIntoTradingWindow(marketId);
 
         address trader = makeAddr("batchTrader");
         _fundAndApprove(trader, 100_000_000);

@@ -56,6 +56,13 @@ abstract contract ForkProtocolTest is ForkBaseTest {
         return futureBatch > nextBatch ? futureBatch : nextBatch;
     }
 
+    function _warpIntoTradingWindow(uint256 marketId) internal {
+        ISignalsCore.Market memory market = core.getMarket(marketId);
+        if (block.timestamp < market.startTimestamp) {
+            vm.warp(uint256(market.startTimestamp) + 1);
+        }
+    }
+
     function _defaultFeePolicy() internal view returns (address) {
         address feePolicy = _tryContractAddr("FeePolicy10bps");
         if (feePolicy == address(0)) {
@@ -163,11 +170,50 @@ abstract contract ForkProtocolTest is ForkBaseTest {
         return _toBatchId(market.settlementTimestamp);
     }
 
+    function _fallbackSettlementValue(ISignalsCore.Market memory market) internal pure returns (int256) {
+        int256 midpointTick = market.minTick + (int256(uint256(market.numBins / 2)) * market.tickSpacing);
+        int256 lastValidTick = market.maxTick - market.tickSpacing;
+        if (midpointTick > lastValidTick) {
+            midpointTick = lastValidTick;
+        }
+        return midpointTick * 1_000_000;
+    }
+
+    function _resolveAmbientBatchMarkets(uint64 batchId) internal {
+        (uint64 total, uint64 resolved) = core.getBatchMarketState(batchId);
+        if (total == resolved) {
+            return;
+        }
+
+        uint256 maxMarketId = core.nextMarketId();
+        for (uint256 marketId = 1; marketId <= maxMarketId && resolved < total; marketId++) {
+            ISignalsCore.Market memory market = core.getMarket(marketId);
+            if (market.settled || _toBatchId(market.settlementTimestamp) != batchId) {
+                continue;
+            }
+
+            uint64 opsStart = market.settlementTimestamp + core.settlementSubmitWindow();
+            if (block.timestamp < opsStart) {
+                vm.warp(uint256(opsStart) + 1);
+            }
+
+            vm.startPrank(ownerSafe);
+            try core.finalizePrimarySettlement(marketId) {} catch {
+                core.markSettlementFailed(marketId);
+                core.finalizeSecondarySettlement(marketId, _fallbackSettlementValue(market));
+            }
+            vm.stopPrank();
+
+            (total, resolved) = core.getBatchMarketState(batchId);
+        }
+
+        require(total == resolved, "fork baseline blocked by unresolved batch");
+    }
+
     function _processBatchesThrough(uint64 targetBatch) internal {
         while (core.getCurrentBatchId() < targetBatch) {
             uint64 nextBatch = core.getCurrentBatchId() + 1;
-            (uint64 total, uint64 resolved) = core.getBatchMarketState(nextBatch);
-            require(total == resolved, "fork baseline blocked by unresolved batch");
+            _resolveAmbientBatchMarkets(nextBatch);
 
             uint64 batchEnd = _batchEndTimestamp(nextBatch);
             if (block.timestamp <= batchEnd) {

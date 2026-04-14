@@ -31,13 +31,6 @@ jobs:
       - run: yarn install --frozen-lockfile
       - uses: foundry-rs/foundry-toolchain@v1
 
-      - name: Fork tests (dev)
-        env:
-          FOUNDRY_PROFILE: fork
-          FORK_ENV: dev
-          DEV_RPC_URL: ${{ secrets.DEV_RPC_URL }}
-        run: forge test --match-path 'test/foundry/fork/**/*.sol' --no-match-path 'test/foundry/fork/live/**' -vvv
-
       - name: Fork tests (prod)
         env:
           FOUNDRY_PROFILE: fork

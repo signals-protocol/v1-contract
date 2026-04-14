@@ -176,6 +176,7 @@ contract AdminLifecycleForkTest is ForkProtocolTest {
 
         uint64 targetBatch = _targetBatchAfter(uint64(block.timestamp + 120));
         uint256 marketId = _createUniformMarketForBatch(targetBatch);
+        _warpIntoTradingWindow(marketId);
 
         address trader = makeAddr("waterfallTrader");
         _fundAndApprove(trader, 100_000_000);
