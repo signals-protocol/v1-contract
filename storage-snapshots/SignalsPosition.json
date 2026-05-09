@@ -1,0 +1,182 @@
+{
+  "storage": [
+    {
+      "astId": 20029,
+      "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
+      "label": "core",
+      "offset": 0,
+      "slot": "0",
+      "type": "t_address"
+    },
+    {
+      "astId": 20031,
+      "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
+      "label": "_nextId",
+      "offset": 0,
+      "slot": "1",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 20036,
+      "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
+      "label": "_positions",
+      "offset": 0,
+      "slot": "2",
+      "type": "t_mapping(t_uint256,t_struct(Position)5512_storage)"
+    },
+    {
+      "astId": 20041,
+      "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
+      "label": "_marketTokenList",
+      "offset": 0,
+      "slot": "3",
+      "type": "t_mapping(t_uint256,t_array(t_uint256)dyn_storage)"
+    },
+    {
+      "astId": 20045,
+      "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
+      "label": "_positionMarketIndex",
+      "offset": 0,
+      "slot": "4",
+      "type": "t_mapping(t_uint256,t_uint256)"
+    },
+    {
+      "astId": 20050,
+      "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
+      "label": "_ownerTokenList",
+      "offset": 0,
+      "slot": "5",
+      "type": "t_mapping(t_address,t_array(t_uint256)dyn_storage)"
+    },
+    {
+      "astId": 20054,
+      "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
+      "label": "_positionOwnerIndex",
+      "offset": 0,
+      "slot": "6",
+      "type": "t_mapping(t_uint256,t_uint256)"
+    },
+    {
+      "astId": 20058,
+      "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
+      "label": "__gap",
+      "offset": 0,
+      "slot": "7",
+      "type": "t_array(t_uint256)48_storage"
+    }
+  ],
+  "types": {
+    "t_address": {
+      "encoding": "inplace",
+      "label": "address",
+      "numberOfBytes": "20"
+    },
+    "t_array(t_uint256)48_storage": {
+      "encoding": "inplace",
+      "label": "uint256[48]",
+      "numberOfBytes": "1536",
+      "base": "t_uint256"
+    },
+    "t_array(t_uint256)dyn_storage": {
+      "encoding": "dynamic_array",
+      "label": "uint256[]",
+      "numberOfBytes": "32",
+      "base": "t_uint256"
+    },
+    "t_int256": {
+      "encoding": "inplace",
+      "label": "int256",
+      "numberOfBytes": "32"
+    },
+    "t_mapping(t_address,t_array(t_uint256)dyn_storage)": {
+      "encoding": "mapping",
+      "key": "t_address",
+      "label": "mapping(address => uint256[])",
+      "numberOfBytes": "32",
+      "value": "t_array(t_uint256)dyn_storage"
+    },
+    "t_mapping(t_uint256,t_array(t_uint256)dyn_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => uint256[])",
+      "numberOfBytes": "32",
+      "value": "t_array(t_uint256)dyn_storage"
+    },
+    "t_mapping(t_uint256,t_struct(Position)5512_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct ISignalsPosition.Position)",
+      "numberOfBytes": "32",
+      "value": "t_struct(Position)5512_storage"
+    },
+    "t_mapping(t_uint256,t_uint256)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => uint256)",
+      "numberOfBytes": "32",
+      "value": "t_uint256"
+    },
+    "t_struct(Position)5512_storage": {
+      "encoding": "inplace",
+      "label": "struct ISignalsPosition.Position",
+      "numberOfBytes": "128",
+      "members": [
+        {
+          "astId": 5503,
+          "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
+          "label": "marketId",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 5505,
+          "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
+          "label": "lowerTick",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_int256"
+        },
+        {
+          "astId": 5507,
+          "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
+          "label": "upperTick",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_int256"
+        },
+        {
+          "astId": 5509,
+          "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
+          "label": "quantity",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_uint128"
+        },
+        {
+          "astId": 5511,
+          "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
+          "label": "createdAt",
+          "offset": 16,
+          "slot": "3",
+          "type": "t_uint64"
+        }
+      ]
+    },
+    "t_uint128": {
+      "encoding": "inplace",
+      "label": "uint128",
+      "numberOfBytes": "16"
+    },
+    "t_uint256": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "numberOfBytes": "32"
+    },
+    "t_uint64": {
+      "encoding": "inplace",
+      "label": "uint64",
+      "numberOfBytes": "8"
+    }
+  }
+}

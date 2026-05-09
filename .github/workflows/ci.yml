@@ -20,6 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           submodules: recursive
 
       - uses: actions/setup-node@v4
@@ -48,6 +49,14 @@ jobs:
 
       - name: Forge build
         run: forge build
+
+      - name: Test storage comparator
+        run: yarn storage:test
+
+      - name: Validate storage snapshots
+        run: yarn storage:check
+        env:
+          STORAGE_STRICT_BASE: "1"
 
       - name: Forge test
         run: forge test -vvv

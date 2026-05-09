@@ -1,0 +1,1314 @@
+{
+  "storage": [
+    {
+      "astId": 2605,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "settlementSubmitWindow",
+      "offset": 0,
+      "slot": "0",
+      "type": "t_uint64"
+    },
+    {
+      "astId": 2608,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "claimDelaySeconds",
+      "offset": 8,
+      "slot": "0",
+      "type": "t_uint64"
+    },
+    {
+      "astId": 2611,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "pendingOpsWindow",
+      "offset": 16,
+      "slot": "0",
+      "type": "t_uint64"
+    },
+    {
+      "astId": 2614,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "maxSampleDistance",
+      "offset": 24,
+      "slot": "0",
+      "type": "t_uint64"
+    },
+    {
+      "astId": 2617,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "futureTolerance",
+      "offset": 0,
+      "slot": "1",
+      "type": "t_uint64"
+    },
+    {
+      "astId": 2620,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "redstoneFeedId",
+      "offset": 0,
+      "slot": "2",
+      "type": "t_bytes32"
+    },
+    {
+      "astId": 2623,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "redstoneFeedDecimals",
+      "offset": 0,
+      "slot": "3",
+      "type": "t_uint8"
+    },
+    {
+      "astId": 2628,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "_operators",
+      "offset": 0,
+      "slot": "4",
+      "type": "t_mapping(t_address,t_bool)"
+    },
+    {
+      "astId": 2631,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "paymentToken",
+      "offset": 0,
+      "slot": "5",
+      "type": "t_contract(IERC20)71460"
+    },
+    {
+      "astId": 2634,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "positionContract",
+      "offset": 0,
+      "slot": "6",
+      "type": "t_contract(ISignalsPosition)5572"
+    },
+    {
+      "astId": 2637,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "lpShareToken",
+      "offset": 0,
+      "slot": "7",
+      "type": "t_address"
+    },
+    {
+      "astId": 2642,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "markets",
+      "offset": 0,
+      "slot": "8",
+      "type": "t_mapping(t_uint256,t_struct(Market)5110_storage)"
+    },
+    {
+      "astId": 2647,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "marketTrees",
+      "offset": 0,
+      "slot": "9",
+      "type": "t_mapping(t_uint256,t_struct(Tree)7953_storage)"
+    },
+    {
+      "astId": 2649,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "nextMarketId",
+      "offset": 0,
+      "slot": "10",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2659,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "settlementOracleState",
+      "offset": 0,
+      "slot": "11",
+      "type": "t_mapping(t_uint256,t_struct(SettlementOracleState)2654_storage)"
+    },
+    {
+      "astId": 2663,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "positionSettledEmitted",
+      "offset": 0,
+      "slot": "12",
+      "type": "t_mapping(t_uint256,t_bool)"
+    },
+    {
+      "astId": 2680,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "lpVault",
+      "offset": 0,
+      "slot": "13",
+      "type": "t_struct(VaultState)2677_storage"
+    },
+    {
+      "astId": 2736,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "capitalStack",
+      "offset": 0,
+      "slot": "18",
+      "type": "t_struct(CapitalStackState)2686_storage"
+    },
+    {
+      "astId": 2740,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "feeWaterfallConfig",
+      "offset": 0,
+      "slot": "20",
+      "type": "t_struct(FeeWaterfallConfig)2698_storage"
+    },
+    {
+      "astId": 2746,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "_dailyPnl",
+      "offset": 0,
+      "slot": "25",
+      "type": "t_mapping(t_uint64,t_struct(DailyPnlSnapshot)2732_storage)"
+    },
+    {
+      "astId": 2800,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "_depositRequests",
+      "offset": 0,
+      "slot": "26",
+      "type": "t_mapping(t_uint64,t_struct(DepositRequest)2765_storage)"
+    },
+    {
+      "astId": 2806,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "_withdrawRequests",
+      "offset": 0,
+      "slot": "27",
+      "type": "t_mapping(t_uint64,t_struct(WithdrawRequest)2778_storage)"
+    },
+    {
+      "astId": 2812,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "_batchAggregations",
+      "offset": 0,
+      "slot": "28",
+      "type": "t_mapping(t_uint64,t_struct(BatchAggregation)2788_storage)"
+    },
+    {
+      "astId": 2818,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "_pendingBatchTotals",
+      "offset": 0,
+      "slot": "29",
+      "type": "t_mapping(t_uint64,t_struct(PendingBatchTotal)2794_storage)"
+    },
+    {
+      "astId": 2821,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "nextDepositRequestId",
+      "offset": 0,
+      "slot": "30",
+      "type": "t_uint64"
+    },
+    {
+      "astId": 2824,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "nextWithdrawRequestId",
+      "offset": 8,
+      "slot": "30",
+      "type": "t_uint64"
+    },
+    {
+      "astId": 2827,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "currentBatchId",
+      "offset": 16,
+      "slot": "30",
+      "type": "t_uint64"
+    },
+    {
+      "astId": 2830,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "withdrawalLagBatches",
+      "offset": 24,
+      "slot": "30",
+      "type": "t_uint64"
+    },
+    {
+      "astId": 2837,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "_exposureDiff",
+      "offset": 0,
+      "slot": "31",
+      "type": "t_mapping(t_uint256,t_mapping(t_uint32,t_int256))"
+    },
+    {
+      "astId": 2842,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "_payoutReserve",
+      "offset": 0,
+      "slot": "32",
+      "type": "t_mapping(t_uint256,t_uint256)"
+    },
+    {
+      "astId": 2847,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "_payoutReserveRemaining",
+      "offset": 0,
+      "slot": "33",
+      "type": "t_mapping(t_uint256,t_uint256)"
+    },
+    {
+      "astId": 2850,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "_totalPendingDeposits6",
+      "offset": 0,
+      "slot": "34",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2853,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "_totalPayoutReserve6",
+      "offset": 0,
+      "slot": "35",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2856,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "_totalPendingWithdrawals6",
+      "offset": 0,
+      "slot": "36",
+      "type": "t_uint256"
+    },
+    {
+      "astId": 2868,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "riskConfig",
+      "offset": 0,
+      "slot": "37",
+      "type": "t_struct(RiskConfig)2864_storage"
+    },
+    {
+      "astId": 2880,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "_batchMarketState",
+      "offset": 0,
+      "slot": "40",
+      "type": "t_mapping(t_uint64,t_struct(BatchMarketState)2874_storage)"
+    },
+    {
+      "astId": 2885,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "_marketBatchResolved",
+      "offset": 0,
+      "slot": "41",
+      "type": "t_mapping(t_uint256,t_bool)"
+    },
+    {
+      "astId": 2890,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "_sponsoredCost",
+      "offset": 0,
+      "slot": "42",
+      "type": "t_mapping(t_uint256,t_uint256)"
+    },
+    {
+      "astId": 2895,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "_sponsorAddress",
+      "offset": 0,
+      "slot": "43",
+      "type": "t_mapping(t_uint256,t_address)"
+    },
+    {
+      "astId": 2899,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "__gap",
+      "offset": 0,
+      "slot": "44",
+      "type": "t_array(t_uint256)10_storage"
+    },
+    {
+      "astId": 34,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "tradeModule",
+      "offset": 0,
+      "slot": "54",
+      "type": "t_address"
+    },
+    {
+      "astId": 36,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "lifecycleModule",
+      "offset": 0,
+      "slot": "55",
+      "type": "t_address"
+    },
+    {
+      "astId": 38,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "riskModule",
+      "offset": 0,
+      "slot": "56",
+      "type": "t_address"
+    },
+    {
+      "astId": 40,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "vaultModule",
+      "offset": 0,
+      "slot": "57",
+      "type": "t_address"
+    },
+    {
+      "astId": 42,
+      "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+      "label": "oracleModule",
+      "offset": 0,
+      "slot": "58",
+      "type": "t_address"
+    }
+  ],
+  "types": {
+    "t_address": {
+      "encoding": "inplace",
+      "label": "address",
+      "numberOfBytes": "20"
+    },
+    "t_array(t_uint256)10_storage": {
+      "encoding": "inplace",
+      "label": "uint256[10]",
+      "numberOfBytes": "320",
+      "base": "t_uint256"
+    },
+    "t_bool": {
+      "encoding": "inplace",
+      "label": "bool",
+      "numberOfBytes": "1"
+    },
+    "t_bytes32": {
+      "encoding": "inplace",
+      "label": "bytes32",
+      "numberOfBytes": "32"
+    },
+    "t_contract(IERC20)71460": {
+      "encoding": "inplace",
+      "label": "contract IERC20",
+      "numberOfBytes": "20"
+    },
+    "t_contract(ISignalsPosition)5572": {
+      "encoding": "inplace",
+      "label": "contract ISignalsPosition",
+      "numberOfBytes": "20"
+    },
+    "t_enum(RequestStatus)2752": {
+      "encoding": "inplace",
+      "label": "enum SignalsCoreStorage.RequestStatus",
+      "numberOfBytes": "1"
+    },
+    "t_int256": {
+      "encoding": "inplace",
+      "label": "int256",
+      "numberOfBytes": "32"
+    },
+    "t_mapping(t_address,t_bool)": {
+      "encoding": "mapping",
+      "key": "t_address",
+      "label": "mapping(address => bool)",
+      "numberOfBytes": "32",
+      "value": "t_bool"
+    },
+    "t_mapping(t_uint256,t_address)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => address)",
+      "numberOfBytes": "32",
+      "value": "t_address"
+    },
+    "t_mapping(t_uint256,t_bool)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => bool)",
+      "numberOfBytes": "32",
+      "value": "t_bool"
+    },
+    "t_mapping(t_uint256,t_mapping(t_uint32,t_int256))": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => mapping(uint32 => int256))",
+      "numberOfBytes": "32",
+      "value": "t_mapping(t_uint32,t_int256)"
+    },
+    "t_mapping(t_uint256,t_struct(Market)5110_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct ISignalsCore.Market)",
+      "numberOfBytes": "32",
+      "value": "t_struct(Market)5110_storage"
+    },
+    "t_mapping(t_uint256,t_struct(SettlementOracleState)2654_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct SignalsCoreStorage.SettlementOracleState)",
+      "numberOfBytes": "32",
+      "value": "t_struct(SettlementOracleState)2654_storage"
+    },
+    "t_mapping(t_uint256,t_struct(Tree)7953_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => struct LazyMulSegmentTree.Tree)",
+      "numberOfBytes": "32",
+      "value": "t_struct(Tree)7953_storage"
+    },
+    "t_mapping(t_uint256,t_uint256)": {
+      "encoding": "mapping",
+      "key": "t_uint256",
+      "label": "mapping(uint256 => uint256)",
+      "numberOfBytes": "32",
+      "value": "t_uint256"
+    },
+    "t_mapping(t_uint32,t_int256)": {
+      "encoding": "mapping",
+      "key": "t_uint32",
+      "label": "mapping(uint32 => int256)",
+      "numberOfBytes": "32",
+      "value": "t_int256"
+    },
+    "t_mapping(t_uint32,t_struct(Node)7939_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint32",
+      "label": "mapping(uint32 => struct LazyMulSegmentTree.Node)",
+      "numberOfBytes": "32",
+      "value": "t_struct(Node)7939_storage"
+    },
+    "t_mapping(t_uint64,t_struct(BatchAggregation)2788_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint64",
+      "label": "mapping(uint64 => struct SignalsCoreStorage.BatchAggregation)",
+      "numberOfBytes": "32",
+      "value": "t_struct(BatchAggregation)2788_storage"
+    },
+    "t_mapping(t_uint64,t_struct(BatchMarketState)2874_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint64",
+      "label": "mapping(uint64 => struct SignalsCoreStorage.BatchMarketState)",
+      "numberOfBytes": "32",
+      "value": "t_struct(BatchMarketState)2874_storage"
+    },
+    "t_mapping(t_uint64,t_struct(DailyPnlSnapshot)2732_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint64",
+      "label": "mapping(uint64 => struct SignalsCoreStorage.DailyPnlSnapshot)",
+      "numberOfBytes": "32",
+      "value": "t_struct(DailyPnlSnapshot)2732_storage"
+    },
+    "t_mapping(t_uint64,t_struct(DepositRequest)2765_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint64",
+      "label": "mapping(uint64 => struct SignalsCoreStorage.DepositRequest)",
+      "numberOfBytes": "32",
+      "value": "t_struct(DepositRequest)2765_storage"
+    },
+    "t_mapping(t_uint64,t_struct(PendingBatchTotal)2794_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint64",
+      "label": "mapping(uint64 => struct SignalsCoreStorage.PendingBatchTotal)",
+      "numberOfBytes": "32",
+      "value": "t_struct(PendingBatchTotal)2794_storage"
+    },
+    "t_mapping(t_uint64,t_struct(WithdrawRequest)2778_storage)": {
+      "encoding": "mapping",
+      "key": "t_uint64",
+      "label": "mapping(uint64 => struct SignalsCoreStorage.WithdrawRequest)",
+      "numberOfBytes": "32",
+      "value": "t_struct(WithdrawRequest)2778_storage"
+    },
+    "t_struct(BatchAggregation)2788_storage": {
+      "encoding": "inplace",
+      "label": "struct SignalsCoreStorage.BatchAggregation",
+      "numberOfBytes": "128",
+      "members": [
+        {
+          "astId": 2781,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "totalDepositAssets",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2783,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "totalWithdrawShares",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2785,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "batchPrice",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2787,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "processed",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_bool"
+        }
+      ]
+    },
+    "t_struct(BatchMarketState)2874_storage": {
+      "encoding": "inplace",
+      "label": "struct SignalsCoreStorage.BatchMarketState",
+      "numberOfBytes": "32",
+      "members": [
+        {
+          "astId": 2871,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "total",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint64"
+        },
+        {
+          "astId": 2873,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "resolved",
+          "offset": 8,
+          "slot": "0",
+          "type": "t_uint64"
+        }
+      ]
+    },
+    "t_struct(CapitalStackState)2686_storage": {
+      "encoding": "inplace",
+      "label": "struct SignalsCoreStorage.CapitalStackState",
+      "numberOfBytes": "64",
+      "members": [
+        {
+          "astId": 2683,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "backstopNav",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2685,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "treasuryNav",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        }
+      ]
+    },
+    "t_struct(DailyPnlSnapshot)2732_storage": {
+      "encoding": "inplace",
+      "label": "struct SignalsCoreStorage.DailyPnlSnapshot",
+      "numberOfBytes": "512",
+      "members": [
+        {
+          "astId": 2701,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "Lt",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_int256"
+        },
+        {
+          "astId": 2703,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "Ftot",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2705,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "DeltaEtSum",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2707,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "Floss",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2709,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "Fpool",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2711,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "Nraw",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2713,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "Gt",
+          "offset": 0,
+          "slot": "6",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2715,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "Ffill",
+          "offset": 0,
+          "slot": "7",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2717,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "FLP",
+          "offset": 0,
+          "slot": "8",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2719,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "FBS",
+          "offset": 0,
+          "slot": "9",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2721,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "FTR",
+          "offset": 0,
+          "slot": "10",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2723,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "Fdust",
+          "offset": 0,
+          "slot": "11",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2725,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "Ft",
+          "offset": 0,
+          "slot": "12",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2727,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "Npre",
+          "offset": 0,
+          "slot": "13",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2729,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "Pe",
+          "offset": 0,
+          "slot": "14",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2731,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "processed",
+          "offset": 0,
+          "slot": "15",
+          "type": "t_bool"
+        }
+      ]
+    },
+    "t_struct(DepositRequest)2765_storage": {
+      "encoding": "inplace",
+      "label": "struct SignalsCoreStorage.DepositRequest",
+      "numberOfBytes": "96",
+      "members": [
+        {
+          "astId": 2755,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "id",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint64"
+        },
+        {
+          "astId": 2757,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "owner",
+          "offset": 8,
+          "slot": "0",
+          "type": "t_address"
+        },
+        {
+          "astId": 2759,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "amount",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2761,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "eligibleBatchId",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint64"
+        },
+        {
+          "astId": 2764,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "status",
+          "offset": 8,
+          "slot": "2",
+          "type": "t_enum(RequestStatus)2752"
+        }
+      ]
+    },
+    "t_struct(FeeWaterfallConfig)2698_storage": {
+      "encoding": "inplace",
+      "label": "struct SignalsCoreStorage.FeeWaterfallConfig",
+      "numberOfBytes": "160",
+      "members": [
+        {
+          "astId": 2689,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "pdd",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_int256"
+        },
+        {
+          "astId": 2691,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "rhoBS",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2693,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "phiLP",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2695,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "phiBS",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2697,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "phiTR",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_uint256"
+        }
+      ]
+    },
+    "t_struct(Market)5110_storage": {
+      "encoding": "inplace",
+      "label": "struct ISignalsCore.Market",
+      "numberOfBytes": "448",
+      "members": [
+        {
+          "astId": 5063,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "isSeeded",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_bool"
+        },
+        {
+          "astId": 5065,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "settled",
+          "offset": 1,
+          "slot": "0",
+          "type": "t_bool"
+        },
+        {
+          "astId": 5067,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "snapshotChunksDone",
+          "offset": 2,
+          "slot": "0",
+          "type": "t_bool"
+        },
+        {
+          "astId": 5069,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "failed",
+          "offset": 3,
+          "slot": "0",
+          "type": "t_bool"
+        },
+        {
+          "astId": 5071,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "numBins",
+          "offset": 4,
+          "slot": "0",
+          "type": "t_uint32"
+        },
+        {
+          "astId": 5073,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "openPositionCount",
+          "offset": 8,
+          "slot": "0",
+          "type": "t_uint32"
+        },
+        {
+          "astId": 5075,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "snapshotChunkCursor",
+          "offset": 12,
+          "slot": "0",
+          "type": "t_uint32"
+        },
+        {
+          "astId": 5077,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "seedCursor",
+          "offset": 16,
+          "slot": "0",
+          "type": "t_uint32"
+        },
+        {
+          "astId": 5079,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "startTimestamp",
+          "offset": 20,
+          "slot": "0",
+          "type": "t_uint64"
+        },
+        {
+          "astId": 5081,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "endTimestamp",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint64"
+        },
+        {
+          "astId": 5083,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "settlementTimestamp",
+          "offset": 8,
+          "slot": "1",
+          "type": "t_uint64"
+        },
+        {
+          "astId": 5085,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "settlementFinalizedAt",
+          "offset": 16,
+          "slot": "1",
+          "type": "t_uint64"
+        },
+        {
+          "astId": 5087,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "minTick",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_int256"
+        },
+        {
+          "astId": 5089,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "maxTick",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_int256"
+        },
+        {
+          "astId": 5091,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "tickSpacing",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_int256"
+        },
+        {
+          "astId": 5093,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "settlementTick",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_int256"
+        },
+        {
+          "astId": 5095,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "settlementValue",
+          "offset": 0,
+          "slot": "6",
+          "type": "t_int256"
+        },
+        {
+          "astId": 5097,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "liquidityParameter",
+          "offset": 0,
+          "slot": "7",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 5099,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "feePolicy",
+          "offset": 0,
+          "slot": "8",
+          "type": "t_address"
+        },
+        {
+          "astId": 5101,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "seedData",
+          "offset": 0,
+          "slot": "9",
+          "type": "t_address"
+        },
+        {
+          "astId": 5103,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "initialRootSum",
+          "offset": 0,
+          "slot": "10",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 5105,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "accumulatedFees",
+          "offset": 0,
+          "slot": "11",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 5107,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "minFactor",
+          "offset": 0,
+          "slot": "12",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 5109,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "deltaEt",
+          "offset": 0,
+          "slot": "13",
+          "type": "t_uint256"
+        }
+      ]
+    },
+    "t_struct(Node)7939_storage": {
+      "encoding": "inplace",
+      "label": "struct LazyMulSegmentTree.Node",
+      "numberOfBytes": "64",
+      "members": [
+        {
+          "astId": 7934,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "sum",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 7936,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "pendingFactor",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint192"
+        },
+        {
+          "astId": 7938,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "childPtr",
+          "offset": 24,
+          "slot": "1",
+          "type": "t_uint64"
+        }
+      ]
+    },
+    "t_struct(PendingBatchTotal)2794_storage": {
+      "encoding": "inplace",
+      "label": "struct SignalsCoreStorage.PendingBatchTotal",
+      "numberOfBytes": "64",
+      "members": [
+        {
+          "astId": 2791,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "deposits",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2793,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "withdraws",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        }
+      ]
+    },
+    "t_struct(RiskConfig)2864_storage": {
+      "encoding": "inplace",
+      "label": "struct SignalsCoreStorage.RiskConfig",
+      "numberOfBytes": "96",
+      "members": [
+        {
+          "astId": 2859,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "lambda",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2861,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "kDrawdown",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2863,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "enforceAlpha",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_bool"
+        }
+      ]
+    },
+    "t_struct(SettlementOracleState)2654_storage": {
+      "encoding": "inplace",
+      "label": "struct SignalsCoreStorage.SettlementOracleState",
+      "numberOfBytes": "64",
+      "members": [
+        {
+          "astId": 2651,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "candidateValue",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_int256"
+        },
+        {
+          "astId": 2653,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "candidatePriceTimestamp",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint64"
+        }
+      ]
+    },
+    "t_struct(Tree)7953_storage": {
+      "encoding": "inplace",
+      "label": "struct LazyMulSegmentTree.Tree",
+      "numberOfBytes": "96",
+      "members": [
+        {
+          "astId": 7944,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "nodes",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_mapping(t_uint32,t_struct(Node)7939_storage)"
+        },
+        {
+          "astId": 7946,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "root",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint32"
+        },
+        {
+          "astId": 7948,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "nextIndex",
+          "offset": 4,
+          "slot": "1",
+          "type": "t_uint32"
+        },
+        {
+          "astId": 7950,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "size",
+          "offset": 8,
+          "slot": "1",
+          "type": "t_uint32"
+        },
+        {
+          "astId": 7952,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "cachedRootSum",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        }
+      ]
+    },
+    "t_struct(VaultState)2677_storage": {
+      "encoding": "inplace",
+      "label": "struct SignalsCoreStorage.VaultState",
+      "numberOfBytes": "160",
+      "members": [
+        {
+          "astId": 2666,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "nav",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2668,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "shares",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2670,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "price",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2672,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "pricePeak",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2674,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "lastBatchTimestamp",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_uint64"
+        },
+        {
+          "astId": 2676,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "isSeeded",
+          "offset": 8,
+          "slot": "4",
+          "type": "t_bool"
+        }
+      ]
+    },
+    "t_struct(WithdrawRequest)2778_storage": {
+      "encoding": "inplace",
+      "label": "struct SignalsCoreStorage.WithdrawRequest",
+      "numberOfBytes": "96",
+      "members": [
+        {
+          "astId": 2768,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "id",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint64"
+        },
+        {
+          "astId": 2770,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "owner",
+          "offset": 8,
+          "slot": "0",
+          "type": "t_address"
+        },
+        {
+          "astId": 2772,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "shares",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint256"
+        },
+        {
+          "astId": 2774,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "eligibleBatchId",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint64"
+        },
+        {
+          "astId": 2777,
+          "contract": "contracts/core/SignalsCore.sol:SignalsCore",
+          "label": "status",
+          "offset": 8,
+          "slot": "2",
+          "type": "t_enum(RequestStatus)2752"
+        }
+      ]
+    },
+    "t_uint192": {
+      "encoding": "inplace",
+      "label": "uint192",
+      "numberOfBytes": "24"
+    },
+    "t_uint256": {
+      "encoding": "inplace",
+      "label": "uint256",
+      "numberOfBytes": "32"
+    },
+    "t_uint32": {
+      "encoding": "inplace",
+      "label": "uint32",
+      "numberOfBytes": "4"
+    },
+    "t_uint64": {
+      "encoding": "inplace",
+      "label": "uint64",
+      "numberOfBytes": "8"
+    },
+    "t_uint8": {
+      "encoding": "inplace",
+      "label": "uint8",
+      "numberOfBytes": "1"
+    }
+  }
+}
