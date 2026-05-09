@@ -12,7 +12,7 @@ import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
 ///      - Prior admissibility check
 ///
 ///      This library contains ONLY pure calculations.
-///      Enforcement (gate functions) remains in RiskModule.
+///      Enforcement (the createMarket gate) remains in RiskModule.
 library RiskMath {
     using FixedPointMathU for uint256;
 
