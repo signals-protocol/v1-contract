@@ -17,18 +17,37 @@ import type { StorageLayout, TrackedContract } from './types';
 const ROOT = path.resolve(__dirname, '../..');
 const MAX_BUFFER = 64 * 1024 * 1024;
 
+function commandOutput(
+  errorValue: unknown,
+  stream: 'stdout' | 'stderr',
+): string {
+  if (!errorValue || typeof errorValue !== 'object') return '';
+  const value = (errorValue as Record<string, unknown>)[stream];
+  if (Buffer.isBuffer(value)) return value.toString('utf8');
+  if (typeof value === 'string') return value;
+  return '';
+}
+
 function runForgeInspect(contract: TrackedContract): StorageLayout {
-  const output = execFileSync(
-    'forge',
-    ['inspect', contract.fqn, 'storageLayout', '--json'],
-    {
+  const args = ['inspect', contract.fqn, 'storageLayout', '--json'];
+  try {
+    const output = execFileSync('forge', args, {
       cwd: ROOT,
       encoding: 'utf8',
       maxBuffer: MAX_BUFFER,
-      stdio: ['ignore', 'pipe', 'inherit'],
-    },
-  );
-  return JSON.parse(output) as StorageLayout;
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return JSON.parse(output) as StorageLayout;
+  } catch (error) {
+    const stderr = commandOutput(error, 'stderr').trim();
+    const stdout = commandOutput(error, 'stdout').trim();
+    const details = [stderr, stdout].filter(Boolean).join('\n');
+    throw new Error(
+      [`[FAIL] forge ${args.join(' ')} failed for ${contract.name}.`, details]
+        .filter(Boolean)
+        .join('\n'),
+    );
+  }
 }
 
 function readJsonFile<T>(filepath: string): T {

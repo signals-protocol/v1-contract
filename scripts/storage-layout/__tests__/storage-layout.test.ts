@@ -10,7 +10,11 @@ import {
   canonicalStorageLayout,
   compareStorageSafety,
 } from '../comparator';
-import { BuildInfoAnnotationResolver } from '../build-info';
+import {
+  BuildInfoAnnotationResolver,
+  discoverUupsContracts,
+  validateTrackedUupsContracts,
+} from '../build-info';
 import type { StorageLayout, TrackedContract } from '../types';
 
 const uint256 = {
@@ -518,6 +522,56 @@ function writeBuildInfo(
   );
 }
 
+type UupsContractFixture = {
+  sourcePath: string;
+  name: string;
+  id: number;
+  bases?: number[];
+};
+
+function writeUupsBuildInfo(
+  root: string,
+  name: string,
+  contracts: UupsContractFixture[],
+): void {
+  const sources: Record<string, { ast: unknown }> = {};
+  const inputSources: Record<string, { content: string }> = {};
+
+  for (const contract of contracts) {
+    inputSources[contract.sourcePath] = {
+      content: `contract ${contract.name} {}`,
+    };
+    sources[contract.sourcePath] = {
+      ast: {
+        absolutePath: contract.sourcePath,
+        id: contract.id * 10,
+        nodeType: 'SourceUnit',
+        nodes: [
+          {
+            id: contract.id,
+            nodeType: 'ContractDefinition',
+            name: contract.name,
+            linearizedBaseContracts: contract.bases,
+          },
+        ],
+      },
+    };
+  }
+
+  fs.mkdirSync(path.join(root, 'out/build-info'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, 'out/build-info', `${name}.json`),
+    JSON.stringify({
+      input: {
+        sources: inputSources,
+      },
+      output: {
+        sources,
+      },
+    }),
+  );
+}
+
 function tempProject(): string {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'storage-layout-'));
   fs.mkdirSync(path.join(root, 'contracts'), { recursive: true });
@@ -597,5 +651,127 @@ test('build-info annotation lookup fails when no source content matches', () => 
   assert.throws(
     () => resolver.hasRenameAnnotation({ astId: 7 }, 'oldName'),
     /Stale build-info/,
+  );
+});
+
+test('UUPS discovery finds direct UUPSUpgradeable inheritance', () => {
+  const root = tempProject();
+  writeUupsBuildInfo(root, 'direct-uups', [
+    {
+      sourcePath: 'node_modules/@openzeppelin/UUPSUpgradeable.sol',
+      name: 'UUPSUpgradeable',
+      id: 1,
+    },
+    {
+      sourcePath: 'contracts/DirectProxy.sol',
+      name: 'DirectProxy',
+      id: 2,
+      bases: [2, 1],
+    },
+  ]);
+
+  assert.deepStrictEqual(discoverUupsContracts(root), [
+    'contracts/DirectProxy.sol:DirectProxy',
+  ]);
+});
+
+test('UUPS discovery finds transitive UUPSUpgradeable inheritance', () => {
+  const root = tempProject();
+  writeUupsBuildInfo(root, 'transitive-uups', [
+    {
+      sourcePath: 'node_modules/@openzeppelin/UUPSUpgradeable.sol',
+      name: 'UUPSUpgradeable',
+      id: 1,
+    },
+    {
+      sourcePath: 'contracts/BaseProxy.sol',
+      name: 'BaseProxy',
+      id: 2,
+      bases: [2, 1],
+    },
+    {
+      sourcePath: 'contracts/ChildProxy.sol',
+      name: 'ChildProxy',
+      id: 3,
+      bases: [3, 2, 1],
+    },
+  ]);
+
+  assert.deepStrictEqual(discoverUupsContracts(root), [
+    'contracts/BaseProxy.sol:BaseProxy',
+    'contracts/ChildProxy.sol:ChildProxy',
+  ]);
+});
+
+test('UUPS discovery excludes contracts under contracts/testonly', () => {
+  const root = tempProject();
+  writeUupsBuildInfo(root, 'testonly-uups', [
+    {
+      sourcePath: 'node_modules/@openzeppelin/UUPSUpgradeable.sol',
+      name: 'UUPSUpgradeable',
+      id: 1,
+    },
+    {
+      sourcePath: 'contracts/testonly/TestProxy.sol',
+      name: 'TestProxy',
+      id: 2,
+      bases: [2, 1],
+    },
+  ]);
+
+  assert.deepStrictEqual(discoverUupsContracts(root), []);
+});
+
+test('tracked UUPS validation passes when all discovered FQNs are tracked', () => {
+  const root = tempProject();
+  writeUupsBuildInfo(root, 'tracked-uups', [
+    {
+      sourcePath: 'node_modules/@openzeppelin/UUPSUpgradeable.sol',
+      name: 'UUPSUpgradeable',
+      id: 1,
+    },
+    {
+      sourcePath: 'contracts/TrackedProxy.sol',
+      name: 'TrackedProxy',
+      id: 2,
+      bases: [2, 1],
+    },
+  ]);
+
+  const errors = validateTrackedUupsContracts(root, [
+    {
+      contractName: 'TrackedProxy',
+      fqn: 'contracts/TrackedProxy.sol:TrackedProxy',
+      name: 'TrackedProxy',
+      snapshotPath: 'storage-snapshots/TrackedProxy.json',
+      sourcePath: 'contracts/TrackedProxy.sol',
+    },
+  ]);
+
+  assert.deepStrictEqual(errors, []);
+});
+
+test('tracked UUPS validation fails when a non-testonly UUPS contract is untracked', () => {
+  const root = tempProject();
+  writeUupsBuildInfo(root, 'untracked-uups', [
+    {
+      sourcePath: 'node_modules/@openzeppelin/UUPSUpgradeable.sol',
+      name: 'UUPSUpgradeable',
+      id: 1,
+    },
+    {
+      sourcePath: 'contracts/UntrackedProxy.sol',
+      name: 'UntrackedProxy',
+      id: 2,
+      bases: [2, 1],
+    },
+  ]);
+
+  const errors = validateTrackedUupsContracts(root, []);
+
+  assert.strictEqual(errors.length, 1);
+  assert.match(
+    errors[0],
+    /Add `contracts\/UntrackedProxy\.sol:UntrackedProxy` to tracked storage list/,
   );
 });

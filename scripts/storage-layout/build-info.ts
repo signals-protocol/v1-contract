@@ -28,6 +28,8 @@ type BuildInfoCandidate = {
   data: BuildInfo;
 };
 
+const buildInfoCache = new Map<string, BuildInfoCandidate[]>();
+
 type AstNodeHit = {
   sourcePath: string;
   node: JsonObject;
@@ -72,10 +74,15 @@ function buildInfoFiles(root: string): string[] {
 }
 
 function loadBuildInfos(root: string): BuildInfoCandidate[] {
-  return buildInfoFiles(root).map((filepath) => ({
+  const cached = buildInfoCache.get(root);
+  if (cached) return cached;
+
+  const buildInfos = buildInfoFiles(root).map((filepath) => ({
     filepath,
     data: readJsonFile<BuildInfo>(filepath),
   }));
+  buildInfoCache.set(root, buildInfos);
+  return buildInfos;
 }
 
 function matchingBuildInfos(
@@ -297,7 +304,7 @@ export function validateTrackedUupsContracts(
   for (const fqn of discoveredFqns) {
     if (!trackedFqns.has(fqn)) {
       errors.push(
-        `[FAIL] ${fqn} inherits UUPSUpgradeable but is not tracked by storage snapshots. Add it to scripts/storage-layout/config.ts or mark it as testonly/untracked.`,
+        `[FAIL] ${fqn} inherits UUPSUpgradeable but is not tracked by storage snapshots. Add \`${fqn}\` to tracked storage list in scripts/storage-layout/config.ts or move it under contracts/testonly/.`,
       );
     }
   }

@@ -229,6 +229,11 @@ function comparePrefix(
     location === 'storage' &&
     currentEntries.length > baselineEntries.length
   ) {
+    // Only entirely new top-level slots after the previous maximum baseline slot
+    // are allowed. Shrinking an upgradeable __gap and placing a new variable in
+    // the old gap range is intentionally rejected by the existing slot/type
+    // comparison plus this append check; see .workflow/plans/SIG-743.md
+    // Non-goals for the conservative rationale.
     const lastBaselineSlot = baselineEntries.reduce<bigint | undefined>(
       (maxSlot, entry) => {
         const slot = BigInt(entry.slot);
