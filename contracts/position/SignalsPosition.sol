@@ -112,26 +112,11 @@ contract SignalsPosition is
         return _nextId;
     }
 
-    // --- Internal helpers (no-op, indexing removed for L1 fee optimization) ---
-
-    function _addPositionToMarket(uint256, uint256) internal pure {}
-
-    function _removePositionFromMarket(uint256, uint256) internal pure {}
-
-    function _addPositionToOwner(address, uint256) internal pure {}
-
-    function _removePositionFromOwner(address, uint256) internal pure {}
-
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
         return super._update(to, tokenId, auth);
     }
 
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(ERC721Upgradeable)
-        returns (bool)
-    {
+    function supportsInterface(bytes4 interfaceId) public view override(ERC721Upgradeable) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 
