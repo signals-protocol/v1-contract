@@ -237,7 +237,7 @@ contract SignalsCore is
     }
 
     /// @notice Configure fee waterfall parameters (except pdd)
-    /// @dev Per WP v2: pdd := -λ is enforced via setRiskConfig to maintain the NAV floor invariant.
+    /// @dev pdd := -λ is enforced via setRiskConfig to maintain the NAV floor invariant.
     ///      This function does NOT accept pdd parameter to prevent breaking the invariant.
     ///      Use setRiskConfig to change the NAV loss floor (via λ).
     function setFeeWaterfallConfig(uint256 rhoBS, uint256 phiLP, uint256 phiBS, uint256 phiTR) external onlyOwner {
@@ -537,7 +537,7 @@ contract SignalsCore is
         );
     }
 
-    /// @notice Set settlement timeline parameters (WP v2 state machine)
+    /// @notice Set settlement timeline parameters
     /// @param _sampleWindow Δsettle: SettlementOpen duration for sample submission
     /// @param _opsWindow Δops: PendingOps duration
     /// @param _claimDelay Δclaim: Delay before claims open after Tset

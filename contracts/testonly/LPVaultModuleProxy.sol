@@ -38,11 +38,11 @@ contract LPVaultModuleProxy is SignalsCoreStorage {
         riskConfig.lambda = lambda;
         riskConfig.kDrawdown = kDrawdown;
         riskConfig.enforceAlpha = enforceAlpha;
-        // WP v2: NAV floor invariant (pdd := -λ)
+        // NAV floor invariant (pdd := -λ)
         feeWaterfallConfig.pdd = -int256(lambda);
     }
 
-    /// @dev Per WP v2: NAV floor invariant (pdd := -λ) is enforced via setRiskConfig.
+    /// @dev NAV floor invariant (pdd := -λ) is enforced via setRiskConfig.
     ///      This function does NOT accept pdd.
     function setFeeWaterfallConfig(
         uint256 rhoBS,

@@ -17,7 +17,7 @@ import "../../../contracts/testonly/ClmsrMathHarness.sol";
 ///   6. SDK decrease/close proceeds parity
 ///   7. SDK parity on non-uniform distribution with alpha != 1
 ///   8. Larger quantity full-range parity
-///   9. v0 safeExp parity (golden values)
+///   9. safeExp parity (golden values)
 contract ClmsrParityTest is HarnessDeployer {
     ClmsrMathHarness h;
 
@@ -201,7 +201,7 @@ contract ClmsrParityTest is HarnessDeployer {
     }
 
     // ============================================================
-    // 9. safeExp parity (golden values from v0)
+    // 9. safeExp parity (golden values)
     // Representative inputs: alpha in {0.5, 1, 2}, q in {0.1, 0.5, 1, 2}
     // ============================================================
 
