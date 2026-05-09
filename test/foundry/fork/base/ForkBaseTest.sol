@@ -23,11 +23,22 @@ abstract contract ForkBaseTest is Test {
     address internal ownerSafe;
     address internal paymentToken;
 
+    /// @dev Pin prod fork to a known-good baseline block so the suite stays deterministic
+    /// as live state evolves. Block 6029250 ≈ 2026-04-14 09:31 UTC matches the last
+    /// green Fork Tests Baseline run on `main`. Override via `FORK_BLOCK` to bump the pin.
+    /// Dev fork remains on latest because the dev chain has no baseline mapping.
+    uint256 internal constant PROD_BASELINE_FORK_BLOCK = 6029250;
+
     function setUp() public virtual {
         envName = vm.envOr("FORK_ENV", string("dev"));
         envJsonPath = string.concat("scripts/environments/", envName, ".json");
 
-        vm.createSelectFork(envName);
+        if (_isDevEnv()) {
+            vm.createSelectFork(envName);
+        } else {
+            uint256 forkBlock = vm.envOr("FORK_BLOCK", PROD_BASELINE_FORK_BLOCK);
+            vm.createSelectFork(envName, forkBlock);
+        }
 
         uint256 expectedChain = _isDevEnv() ? 5115 : 4114;
         assertEq(block.chainid, expectedChain, "chain ID mismatch");
