@@ -8,8 +8,7 @@ import {SignalsErrors as SE} from "../../../../contracts/errors/SignalsErrors.so
 import {RiskModule} from "../../../../contracts/modules/RiskModule.sol";
 
 /// @title Risk Gate Call Order Integration Tests
-/// @notice Verifies that SignalsCore calls RiskModule gates BEFORE delegating to target modules
-///         (7 tests from riskGateCallOrder.spec.ts)
+/// @notice Verifies the createMarket risk gate and surviving trade valid paths
 contract RiskGateCallOrderTest is FullSystemDeployer {
     FullSystem internal sys;
 
@@ -68,7 +67,7 @@ contract RiskGateCallOrderTest is FullSystemDeployer {
     }
 
     // ============================================================
-    // openPosition gate enforcement
+    // openPosition valid path
     // ============================================================
 
     function _createActiveMarket() internal returns (uint256 marketId) {
@@ -92,15 +91,6 @@ contract RiskGateCallOrderTest is FullSystemDeployer {
         sys.payment.approve(address(sys.core), type(uint256).max);
     }
 
-    function test_openPosition_gate_no_revert() public {
-        uint256 marketId = _createActiveMarket();
-
-        // gateOpenPosition is currently a no-op (exposure cap enforcement deferred)
-        // Should succeed because gate is no-op
-        vm.prank(sys.users[0]);
-        sys.core.openPosition(marketId, int256(0), int256(50), uint128(100), 1000e18);
-    }
-
     function test_openPosition_succeeds_with_valid_params() public {
         uint256 marketId = _createActiveMarket();
 
@@ -112,22 +102,8 @@ contract RiskGateCallOrderTest is FullSystemDeployer {
     }
 
     // ============================================================
-    // increasePosition gate enforcement
+    // increasePosition valid path
     // ============================================================
-
-    function test_increasePosition_gate_no_revert() public {
-        uint256 marketId = _createActiveMarket();
-        address user = sys.users[0];
-
-        // Open position
-        uint256 positionId = sys.position.nextId();
-        vm.prank(user);
-        sys.core.openPosition(marketId, int256(0), int256(50), uint128(100), 1000e18);
-
-        // gateIncreasePosition is currently a no-op
-        vm.prank(user);
-        sys.core.increasePosition(positionId, uint128(50), 1000e18);
-    }
 
     function test_increasePosition_updates_quantity() public {
         uint256 marketId = _createActiveMarket();

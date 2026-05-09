@@ -15,9 +15,9 @@ import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
 ///      - Prior admissibility check
 ///
 ///      Core-first Risk Gate Architecture:
-///      This module provides BOTH calculations AND enforcement via gate functions.
-///      SignalsCore calls gate* functions BEFORE delegating to target modules.
-///      This ensures bypass-proof enforcement and clear single point of risk validation.
+///      This module provides calculations and the createMarket enforcement gate.
+///      SignalsCore calls gateCreateMarket BEFORE delegating to market lifecycle.
+///      This keeps market-creation risk validation in one bypass-resistant module.
 contract RiskModule is SignalsCoreStorage {
     using FixedPointMathU for uint256;
 
@@ -169,7 +169,7 @@ contract RiskModule is SignalsCoreStorage {
     }
 
     // ============================================================
-    // Gate Functions (Enforcement)
+    // createMarket Gate (Enforcement)
     // ============================================================
 
     /**
@@ -189,44 +189,6 @@ contract RiskModule is SignalsCoreStorage {
         (, , uint256 deltaEt) = SeedDataLib.computeSeedStats(seedData, numBins, liquidityParameter);
         _enforceAlphaLimit(liquidityParameter, numBins);
         _enforcePriorAdmissibility(deltaEt);
-    }
-
-    /**
-     * @notice Gate for position open - validates exposure caps
-     * @dev Currently no-op. Exposure cap enforcement to be implemented.
-     * @param marketId Market ID
-     * @param trader Trader address
-     * @param quantity Position quantity
-     */
-    function gateOpenPosition(
-        uint256 marketId,
-        address trader,
-        uint128 quantity
-    ) external view onlyDelegated {
-        // Exposure cap enforcement pending implementation
-        // Silence unused parameter warnings
-        marketId;
-        trader;
-        quantity;
-    }
-
-    /**
-     * @notice Gate for position increase - validates exposure caps
-     * @dev Currently no-op. Exposure cap enforcement to be implemented.
-     * @param positionId Position ID
-     * @param trader Trader address
-     * @param additionalQuantity Additional quantity
-     */
-    function gateIncreasePosition(
-        uint256 positionId,
-        address trader,
-        uint128 additionalQuantity
-    ) external view onlyDelegated {
-        // Exposure cap enforcement pending implementation
-        // Silence unused parameter warnings
-        positionId;
-        trader;
-        additionalQuantity;
     }
 
     // ============================================================

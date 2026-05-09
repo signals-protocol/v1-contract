@@ -303,9 +303,6 @@ contract SignalsCore is
         uint128 quantity,
         uint256 maxCost
     ) external override whenNotPaused nonReentrant returns (uint256 positionId) {
-        // Risk gate first: validate exposure caps before position modification
-        _riskGate(abi.encodeCall(IRiskModule.gateOpenPosition, (marketId, msg.sender, quantity)));
-
         bytes memory ret = _delegate(
             tradeModule,
             abi.encodeCall(ISignalsCore.openPosition, (marketId, lowerTick, upperTick, quantity, maxCost))
@@ -321,9 +318,6 @@ contract SignalsCore is
         uint128 quantity,
         uint256 maxCost
     ) external override whenNotPaused nonReentrant returns (uint256 positionId) {
-        // Risk gate: exposure cap is on beneficiary (actual position holder)
-        _riskGate(abi.encodeCall(IRiskModule.gateOpenPosition, (marketId, beneficiary, quantity)));
-
         bytes memory ret = _delegate(
             tradeModule,
             abi.encodeCall(
@@ -339,9 +333,6 @@ contract SignalsCore is
         uint128 quantity,
         uint256 maxCost
     ) external override whenNotPaused nonReentrant {
-        // Risk gate first: validate exposure caps before position modification
-        _riskGate(abi.encodeCall(IRiskModule.gateIncreasePosition, (positionId, msg.sender, quantity)));
-
         _delegate(tradeModule, abi.encodeCall(ISignalsCore.increasePosition, (positionId, quantity, maxCost)));
     }
 
