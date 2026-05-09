@@ -293,7 +293,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         // After PendingOps with candidate: should use settleMarket instead
         require(nowTs < opsEnd || !hasCandidate, SE.SettlementOracleCandidateMissing());
         
-        // Clear any candidate (WP v2: divergence case discards candidate)
+        // Clear any candidate (divergence case discards candidate)
         state.candidateValue = 0;
         state.candidatePriceTimestamp = 0;
 
@@ -324,7 +324,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         market.settled = true;
         market.settlementValue = settlementValue;
         market.settlementTick = settlementTick;
-        // WP v2: Keep original settlementTimestamp as market day key
+        // Keep original settlementTimestamp as market day key
         // (DO NOT change to endTimestamp - that breaks batch association)
         market.settlementFinalizedAt = uint64(block.timestamp);
         market.snapshotChunkCursor = 0;
@@ -590,11 +590,11 @@ contract MarketLifecycleModule is SignalsCoreStorage {
             deltaC = -int256(alpha.wMul(lnZStart - lnZEnd));
         }
         
-        // Payout_t := Q_{t,τ_t} (WP v2 Eq. 3.11)
+        // Payout_t := Q_{t,τ_t}
         // Get payout exposure at settlement tick using diff-array point query
         payoutReserve = _getExposureAtTick(marketId, market.minTick, market.tickSpacing, market.numBins, settlementTick);
         
-        // L_t := ΔC_t - Payout_t (WP v2 Eq. 3.12)
+        // L_t := ΔC_t - Payout_t
         // Note: payoutReserve is in token units (6 decimals), need to convert to WAD for consistency
         // However, positions use quantity in token units, so payout is also in token units
         // For internal accounting consistency, we keep payoutReserve in token units

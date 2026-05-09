@@ -154,7 +154,7 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
                 ? existingTs - tSet
                 : tSet - existingTs;
 
-            // WP v2: Replace only if strictly closer, or same distance and more past
+            // Replace only if strictly closer, or same distance and more past
             bool shouldReplace = newDistance < existingDistance ||
                 (newDistance == existingDistance && priceTimestamp < existingTs);
 

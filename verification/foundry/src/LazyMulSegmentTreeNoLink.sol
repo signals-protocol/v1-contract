@@ -161,7 +161,6 @@ library LazyMulSegmentTreeNoLink {
     }
 
     /// @dev Push pending factor to children with recursive flush when threshold exceeded.
-    /// Unlike v0's _forcePushPendingFactor, this has l,r in scope for auto-allocate.
     function _pushPendingFactor(Tree storage tree, uint32 nodeIndex, uint32 l, uint32 r) private {
         if (nodeIndex == 0) return;
 
@@ -193,8 +192,7 @@ library LazyMulSegmentTreeNoLink {
 
     /// @dev Apply factor to a child during push-down, triggering recursive flush when
     /// the combined pending factor would exceed threshold. Leaf nodes (l == r) skip
-    /// flush since they have no children. Safe because l,r are known at this point
-    /// (unlike v0's _forcePushPendingFactor which lacked range info).
+    /// flush since they have no children. Safe because l,r are known at this point.
     function _applyFactorToChildWithFlush(
         Tree storage tree,
         uint32 nodeIndex,
@@ -207,7 +205,7 @@ library LazyMulSegmentTreeNoLink {
         Node storage node = tree.nodes[nodeIndex];
 
         // Leaf pending is dead data. Skip both the read and write so stale values
-        // from older deployments cannot overflow during push-down.
+        // cannot overflow during push-down.
         if (l == r) {
             _scaleNodeSum(node, factor);
             if (nodeIndex == tree.root) {

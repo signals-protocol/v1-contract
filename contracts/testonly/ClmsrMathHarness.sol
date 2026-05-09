@@ -58,7 +58,7 @@ contract ClmsrMathHarness {
         quantityWad = ClmsrMath.calculateQuantityFromCost(tree, alpha, loBin, hiBin, costWad);
     }
 
-    /// @notice Expose the core safe exponential helper for parity tests against v0.
+    /// @notice Expose the core safe exponential helper for unit, fuzz, and parity tests.
     function exposedSafeExp(uint256 qWad, uint256 alphaWad) external pure returns (uint256) {
         return ClmsrMath._safeExp(qWad, alphaWad);
     }
