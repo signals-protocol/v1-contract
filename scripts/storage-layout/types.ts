@@ -24,7 +24,6 @@ export type StorageLayout = {
 };
 
 export type TrackedContract = {
-  name: string;
   contractName: string;
   sourcePath: string;
   fqn: string;

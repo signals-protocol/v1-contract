@@ -43,7 +43,10 @@ function runForgeInspect(contract: TrackedContract): StorageLayout {
     const stdout = commandOutput(error, 'stdout').trim();
     const details = [stderr, stdout].filter(Boolean).join('\n');
     throw new Error(
-      [`[FAIL] forge ${args.join(' ')} failed for ${contract.name}.`, details]
+      [
+        `[FAIL] forge ${args.join(' ')} failed for ${contract.contractName}.`,
+        details,
+      ]
         .filter(Boolean)
         .join('\n'),
     );
@@ -131,23 +134,23 @@ function safetyCheck(
   for (const contract of TRACKED_CONTRACTS) {
     if (!gitPathExists(baseRef, contract.snapshotPath)) {
       console.warn(
-        `[WARN] ${baseRef}:${contract.snapshotPath} does not exist; skipping ${contract.name} safety diff for initial snapshot rollout.`,
+        `[WARN] ${baseRef}:${contract.snapshotPath} does not exist; skipping ${contract.contractName} safety diff for initial snapshot rollout.`,
       );
       continue;
     }
 
     const baseline = readGitJson<StorageLayout>(baseRef, contract.snapshotPath);
-    const current = currentLayouts.get(contract.name);
+    const current = currentLayouts.get(contract.contractName);
     if (!current) {
       errors.push(
-        `[FAIL] Missing current storage layout for ${contract.name}.`,
+        `[FAIL] Missing current storage layout for ${contract.contractName}.`,
       );
       continue;
     }
 
     try {
       const result = compareStorageSafety(
-        contract.name,
+        contract.contractName,
         baseline,
         current,
         new BuildInfoAnnotationResolver(ROOT, contract, current),
@@ -155,14 +158,14 @@ function safetyCheck(
       errors.push(...result.errors);
       if (result.ok) {
         console.log(
-          `[storage:check] ${contract.name} is storage-safe relative to ${baseRef}`,
+          `[storage:check] ${contract.contractName} is storage-safe relative to ${baseRef}`,
         );
       }
     } catch (error) {
       errors.push(
         error instanceof Error
-          ? `[FAIL] ${contract.name} annotation lookup failed: ${error.message}`
-          : `[FAIL] ${contract.name} annotation lookup failed.`,
+          ? `[FAIL] ${contract.contractName} annotation lookup failed: ${error.message}`
+          : `[FAIL] ${contract.contractName} annotation lookup failed.`,
       );
     }
   }
@@ -183,10 +186,10 @@ function staleCheck(currentLayouts: Map<string, StorageLayout>): string[] {
     }
 
     const committed = readJsonFile<StorageLayout>(snapshotPath);
-    const current = currentLayouts.get(contract.name);
+    const current = currentLayouts.get(contract.contractName);
     if (!current) {
       errors.push(
-        `[FAIL] Missing current storage layout for ${contract.name}.`,
+        `[FAIL] Missing current storage layout for ${contract.contractName}.`,
       );
       continue;
     }
@@ -214,7 +217,7 @@ function check(): void {
   const currentLayouts = new Map<string, StorageLayout>();
 
   for (const contract of TRACKED_CONTRACTS) {
-    currentLayouts.set(contract.name, runForgeInspect(contract));
+    currentLayouts.set(contract.contractName, runForgeInspect(contract));
   }
 
   const errors = [

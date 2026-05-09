@@ -582,7 +582,6 @@ function trackedFoo(): TrackedContract {
   return {
     contractName: 'Foo',
     fqn: 'contracts/Foo.sol:Foo',
-    name: 'Foo',
     snapshotPath: 'storage-snapshots/Foo.json',
     sourcePath: 'contracts/Foo.sol',
   };
@@ -742,7 +741,6 @@ test('tracked UUPS validation passes when all discovered FQNs are tracked', () =
     {
       contractName: 'TrackedProxy',
       fqn: 'contracts/TrackedProxy.sol:TrackedProxy',
-      name: 'TrackedProxy',
       snapshotPath: 'storage-snapshots/TrackedProxy.json',
       sourcePath: 'contracts/TrackedProxy.sol',
     },
@@ -773,5 +771,36 @@ test('tracked UUPS validation fails when a non-testonly UUPS contract is untrack
   assert.match(
     errors[0],
     /Add `contracts\/UntrackedProxy\.sol:UntrackedProxy` to tracked storage list/,
+  );
+});
+
+test('tracked UUPS validation fails when a tracked FQN is no longer discovered', () => {
+  const root = tempProject();
+  writeUupsBuildInfo(root, 'missing-tracked-uups', [
+    {
+      sourcePath: 'node_modules/@openzeppelin/UUPSUpgradeable.sol',
+      name: 'UUPSUpgradeable',
+      id: 1,
+    },
+    {
+      sourcePath: 'contracts/PlainContract.sol',
+      name: 'PlainContract',
+      id: 2,
+    },
+  ]);
+
+  const errors = validateTrackedUupsContracts(root, [
+    {
+      contractName: 'TrackedProxy',
+      fqn: 'contracts/TrackedProxy.sol:TrackedProxy',
+      snapshotPath: 'storage-snapshots/TrackedProxy.json',
+      sourcePath: 'contracts/TrackedProxy.sol',
+    },
+  ]);
+
+  assert.strictEqual(errors.length, 1);
+  assert.match(
+    errors[0],
+    /\[FAIL\] contracts\/TrackedProxy\.sol:TrackedProxy is tracked for storage snapshots but was not discovered as a non-testonly UUPS contract/,
   );
 });
