@@ -15,8 +15,8 @@
     "test:fork:prod": "yarn test:fork:baseline",
     "test:cov": "FOUNDRY_PROFILE=coverage forge coverage --report lcov",
     "lint": "tsc --noEmit --noUnusedLocals --noUnusedParameters",
-    "format": "prettier --write \"contracts/**/*.sol\" \"scripts/**/*.ts\"",
-    "format:check": "prettier --check \"contracts/**/*.sol\" \"scripts/**/*.ts\"",
+    "format": "forge fmt contracts script test && prettier --write \"scripts/**/*.ts\"",
+    "format:check": "forge fmt --check contracts script test && prettier --check \"scripts/**/*.ts\"",
     "export-abis": "node scripts/export-abis.js",
     "storage:snapshot": "tsx scripts/storage-layout/index.ts snapshot",
     "storage:check": "tsx scripts/storage-layout/index.ts check",
@@ -61,15 +61,11 @@
     "lint-staged": "^16.4.0",
     "patch-package": "^8.0.1",
     "prettier": "^3.8.1",
-    "prettier-plugin-solidity": "^2.3.1",
     "tsx": "^4.19.0",
     "typescript": "^5.4.0",
     "viem": "^2.21.0"
   },
   "lint-staged": {
-    "*.sol": [
-      "prettier --write"
-    ],
     "*.ts": [
       "prettier --write"
     ]
