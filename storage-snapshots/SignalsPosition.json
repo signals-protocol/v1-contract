@@ -1,7 +1,7 @@
 {
   "storage": [
     {
-      "astId": 20029,
+      "astId": 19893,
       "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
       "label": "core",
       "offset": 0,
@@ -9,7 +9,7 @@
       "type": "t_address"
     },
     {
-      "astId": 20031,
+      "astId": 19895,
       "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
       "label": "_nextId",
       "offset": 0,
@@ -17,47 +17,47 @@
       "type": "t_uint256"
     },
     {
-      "astId": 20036,
+      "astId": 19900,
       "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
       "label": "_positions",
       "offset": 0,
       "slot": "2",
-      "type": "t_mapping(t_uint256,t_struct(Position)5512_storage)"
+      "type": "t_mapping(t_uint256,t_struct(Position)5446_storage)"
     },
     {
-      "astId": 20041,
+      "astId": 19906,
       "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
-      "label": "_marketTokenList",
+      "label": "__deprecated_slot_3",
       "offset": 0,
       "slot": "3",
       "type": "t_mapping(t_uint256,t_array(t_uint256)dyn_storage)"
     },
     {
-      "astId": 20045,
+      "astId": 19911,
       "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
-      "label": "_positionMarketIndex",
+      "label": "__deprecated_slot_4",
       "offset": 0,
       "slot": "4",
       "type": "t_mapping(t_uint256,t_uint256)"
     },
     {
-      "astId": 20050,
+      "astId": 19917,
       "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
-      "label": "_ownerTokenList",
+      "label": "__deprecated_slot_5",
       "offset": 0,
       "slot": "5",
       "type": "t_mapping(t_address,t_array(t_uint256)dyn_storage)"
     },
     {
-      "astId": 20054,
+      "astId": 19922,
       "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
-      "label": "_positionOwnerIndex",
+      "label": "__deprecated_slot_6",
       "offset": 0,
       "slot": "6",
       "type": "t_mapping(t_uint256,t_uint256)"
     },
     {
-      "astId": 20058,
+      "astId": 19926,
       "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
       "label": "__gap",
       "offset": 0,
@@ -102,12 +102,12 @@
       "numberOfBytes": "32",
       "value": "t_array(t_uint256)dyn_storage"
     },
-    "t_mapping(t_uint256,t_struct(Position)5512_storage)": {
+    "t_mapping(t_uint256,t_struct(Position)5446_storage)": {
       "encoding": "mapping",
       "key": "t_uint256",
       "label": "mapping(uint256 => struct ISignalsPosition.Position)",
       "numberOfBytes": "32",
-      "value": "t_struct(Position)5512_storage"
+      "value": "t_struct(Position)5446_storage"
     },
     "t_mapping(t_uint256,t_uint256)": {
       "encoding": "mapping",
@@ -116,13 +116,13 @@
       "numberOfBytes": "32",
       "value": "t_uint256"
     },
-    "t_struct(Position)5512_storage": {
+    "t_struct(Position)5446_storage": {
       "encoding": "inplace",
       "label": "struct ISignalsPosition.Position",
       "numberOfBytes": "128",
       "members": [
         {
-          "astId": 5503,
+          "astId": 5437,
           "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
           "label": "marketId",
           "offset": 0,
@@ -130,7 +130,7 @@
           "type": "t_uint256"
         },
         {
-          "astId": 5505,
+          "astId": 5439,
           "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
           "label": "lowerTick",
           "offset": 0,
@@ -138,7 +138,7 @@
           "type": "t_int256"
         },
         {
-          "astId": 5507,
+          "astId": 5441,
           "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
           "label": "upperTick",
           "offset": 0,
@@ -146,7 +146,7 @@
           "type": "t_int256"
         },
         {
-          "astId": 5509,
+          "astId": 5443,
           "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
           "label": "quantity",
           "offset": 0,
@@ -154,7 +154,7 @@
           "type": "t_uint128"
         },
         {
-          "astId": 5511,
+          "astId": 5445,
           "contract": "contracts/position/SignalsPosition.sol:SignalsPosition",
           "label": "createdAt",
           "offset": 16,
