@@ -180,6 +180,8 @@ contract RiskModule is SignalsCoreStorage {
         view
         onlyDelegated
     {
+        // gateCreateMarket only needs deltaEt for prior-admissibility; rootSum/minFactor are consumed by createMarket.
+        // slither-disable-next-line unused-return
         (,, uint256 deltaEt) = SeedDataLib.computeSeedStats(seedData, numBins, liquidityParameter);
         _enforceAlphaLimit(liquidityParameter, numBins);
         _enforcePriorAdmissibility(deltaEt);

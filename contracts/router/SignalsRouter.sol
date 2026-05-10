@@ -181,6 +181,8 @@ contract SignalsRouter is Ownable, ReentrancyGuard, IERC721Receiver {
     function _deliverOutput(address outputToken, uint256 minOutputAmount, uint256 receivedAmount, address recipient)
         internal
     {
+        // Exact zero is the intended no-output sentinel, so transfer work can be skipped.
+        // slither-disable-next-line incorrect-equality
         if (receivedAmount == 0) return;
 
         if (outputToken == address(ctUSD)) {

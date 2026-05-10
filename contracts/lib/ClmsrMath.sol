@@ -115,6 +115,8 @@ library ClmsrMath {
         uint256 requiredChunks = (totalQuantity + maxSafeQuantityPerChunk - 1) / maxSafeQuantityPerChunk;
         require(requiredChunks <= MAX_CHUNKS_PER_TX, SE.ChunkLimitExceeded(requiredChunks, MAX_CHUNKS_PER_TX));
 
+        // Accumulator intentionally starts from Solidity's default zero value.
+        // slither-disable-next-line uninitialized-local
         uint256 cumulativeCostWad;
         uint256 remainingQuantity = totalQuantity;
         uint256 currentSumBefore = sumBefore;
@@ -192,6 +194,8 @@ library ClmsrMath {
         uint256 requiredChunks = (totalQuantity + maxSafeQuantityPerChunk - 1) / maxSafeQuantityPerChunk;
         require(requiredChunks <= MAX_CHUNKS_PER_TX, SE.ChunkLimitExceeded(requiredChunks, MAX_CHUNKS_PER_TX));
 
+        // Accumulator intentionally starts from Solidity's default zero value.
+        // slither-disable-next-line uninitialized-local
         uint256 cumulativeProceeds;
         uint256 remainingQuantity = totalQuantity;
         uint256 currentSumBefore = sumBefore;

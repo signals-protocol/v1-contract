@@ -131,6 +131,8 @@ contract LPVaultModule is SignalsCoreStorage {
         //
         // We set currentBatchId to "yesterday" so the first processDailyBatch targets "today".
         uint64 todayBatchId = _toBatchId(uint64(block.timestamp));
+        // Equality protects the genesis batch boundary from underflow; the zero case is intentional.
+        // slither-disable-next-line incorrect-equality
         currentBatchId = todayBatchId == 0 ? 0 : todayBatchId - 1;
 
         // Event emits WAD amounts for consistency with internal accounting
@@ -391,6 +393,8 @@ contract LPVaultModule is SignalsCoreStorage {
         // Step 5: Process deposits (at batch price)
         if (totalDeposits > 0) {
             uint256 totalRefund;
+            // The mintedShares return is allocated per depositor at claim time; batch processing only needs aggregate NAV/shares/refund.
+            // slither-disable-next-line unused-return
             (currentNav, currentShares,, totalRefund) =
                 VaultAccountingLib.applyDeposit(currentNav, currentShares, batchPrice, totalDeposits);
             // Release only the "used" portion from pending deposits

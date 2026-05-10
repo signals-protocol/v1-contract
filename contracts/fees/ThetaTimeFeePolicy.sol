@@ -88,6 +88,8 @@ contract ThetaTimeFeePolicy is IFeePolicy {
     }
 
     /// @dev Exponentiation by squaring for WAD fixed point.
+    // WAD multiplication intentionally divides after each multiply to keep values scaled and bounded.
+    // slither-disable-start divide-before-multiply
     function _powWad(uint256 xWad, uint8 exp) internal pure returns (uint256) {
         uint256 result = WAD;
         uint256 base = xWad;
@@ -104,4 +106,5 @@ contract ThetaTimeFeePolicy is IFeePolicy {
         }
         return result;
     }
+    // slither-disable-end divide-before-multiply
 }

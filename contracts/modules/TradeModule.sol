@@ -257,6 +257,8 @@ contract TradeModule is SignalsCoreStorage {
         uint256 len = positionIds.length;
         require(len > 0 && len <= MAX_BATCH_CLAIM, SE.BatchClaimTooLarge(len, MAX_BATCH_CLAIM));
 
+        // Accumulator intentionally starts from Solidity's default zero value.
+        // slither-disable-next-line uninitialized-local
         uint256 totalPayout;
         for (uint256 i; i < len;) {
             totalPayout += _processClaimPayout(positionIds[i]);

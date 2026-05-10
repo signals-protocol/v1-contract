@@ -726,6 +726,8 @@ contract SignalsCore is
     /// @notice Uses delegatecall to access storage in Core's context.
     function _delegateView(address module, bytes memory callData) internal returns (bytes memory) {
         if (module == address(0)) revert SignalsErrors.ModuleNotSet();
+        // Module addresses are owner-controlled through initialize()/setModules(); delegated views are trusted protocol modules.
+        // slither-disable-next-line controlled-delegatecall
         (bool success, bytes memory ret) = module.delegatecall(callData);
         if (!success) {
             assembly ("memory-safe") {
@@ -743,6 +745,8 @@ contract SignalsCore is
     /// @param gateCalldata Encoded call to RiskModule gate function
     function _riskGate(bytes memory gateCalldata) internal {
         if (riskModule == address(0)) revert SignalsErrors.ModuleNotSet();
+        // Risk module is owner-controlled protocol code; delegatecall is the module dispatch design.
+        // slither-disable-next-line controlled-delegatecall
         (bool success, bytes memory ret) = riskModule.delegatecall(gateCalldata);
         if (!success) {
             assembly ("memory-safe") {

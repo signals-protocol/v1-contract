@@ -52,6 +52,8 @@ contract SignalsDeployer is SignalsErrors {
         string memory lpShareName,
         string memory lpShareSymbol
     ) external onlyDeployer returns (address coreProxy, address positionProxy, address lpShareProxy) {
+        // Standard memory struct assembly: every DeployConfig field is assigned before use below.
+        // slither-disable-next-line uninitialized-local
         DeployConfig memory config;
         config.coreImpl = coreImpl;
         config.positionImpl = positionImpl;
@@ -80,6 +82,8 @@ contract SignalsDeployer is SignalsErrors {
         address lpShareProxy = _deployExpectedProxy(config.lpShareImpl, config.lpShareSalt, config.expectedLpShareProxy);
 
         _verifyInitTargets(config.coreParams, positionProxy, lpShareProxy);
+        // Single-shot deployer: `executed` blocks replay, and these calls initialize newly deployed trusted proxies.
+        // slither-disable-next-line reentrancy-no-eth
         _initializeProxies(config, coreProxy, positionProxy, lpShareProxy);
         _verifyWiring(config, coreProxy, positionProxy, lpShareProxy);
 

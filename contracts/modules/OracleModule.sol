@@ -222,6 +222,10 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
     /// @dev Convert settlement value to tick
     /// settlementTick = settlementValue / 1e6
     /// maxTick is exclusive upper bound, clamp to last valid tick
+    // Clamp then snap to the tick-spacing grid. Truncating the spacing division is the intended floor alignment,
+    // and the second write reads the clamped tick through `offset` before assigning the aligned value.
+    // slither-disable-start divide-before-multiply
+    // slither-disable-start write-after-write
     function _toSettlementTick(ISignalsCore.Market storage market, int256 settlementValue)
         internal
         view
@@ -242,4 +246,6 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
         tick = market.minTick + (offset / spacing) * spacing;
         return tick;
     }
+    // slither-disable-end write-after-write
+    // slither-disable-end divide-before-multiply
 }

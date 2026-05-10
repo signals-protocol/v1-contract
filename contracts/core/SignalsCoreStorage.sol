@@ -31,6 +31,27 @@ abstract contract SignalsCoreStorage {
         return batchId * BATCH_SECONDS + BATCH_TIMEZONE_OFFSET;
     }
 
+    // Slither's `uninitialized-state` detector flags storage variables not directly written in this
+    // abstract layout container. Writes happen through SignalsCore.initialize() and delegated modules.
+    // Storage variables here follow one of four lifecycles:
+    //
+    // (A) Set in SignalsCore.initialize() and updateable through owner-only setters:
+    //     settlementSubmitWindow, claimDelaySeconds, pendingOpsWindow, maxSampleDistance,
+    //     futureTolerance, redstoneFeedId, redstoneFeedDecimals, paymentToken, positionContract,
+    //     lpShareToken, riskConfig, feeWaterfallConfig, withdrawalLagBatches, _operators.
+    //
+    // (B) Module-owned operational state written by protocol flows:
+    //     markets, marketTrees, nextMarketId, lpVault, currentBatchId, capitalStack, _dailyPnl,
+    //     settlementOracleState, positionSettledEmitted, _batchMarketState, _marketBatchResolved,
+    //     _payoutReserve, _payoutReserveRemaining, _totalPayoutReserve6, _exposureDiff,
+    //     request queues, batch aggregations, and pending/reserved totals.
+    //
+    // (C) Default-zero sentinel mappings:
+    //     _sponsoredCost and _sponsorAddress use zero/address(0) to mean non-sponsored.
+    //
+    // (D) Reserved UUPS storage gap:
+    //     __gap is intentionally unwritten and reserved for future layout extension.
+    // slither-disable-start uninitialized-state
     // ============================================================
     // Settlement Timeline Configuration
     // ============================================================
@@ -322,4 +343,5 @@ abstract contract SignalsCoreStorage {
 
     // Reserve ample slots for future upgrades; do not change after first deployment.
     uint256[10] internal __gap;
+    // slither-disable-end uninitialized-state
 }

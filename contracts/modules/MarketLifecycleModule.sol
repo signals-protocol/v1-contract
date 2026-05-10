@@ -215,6 +215,8 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         // settlementFinalizedAt records when settlement tx was mined
         market.settlementFinalizedAt = nowTs;
         market.snapshotChunkCursor = 0;
+        // Strict equality is required: zero open positions means there is no snapshot work to perform.
+        // slither-disable-next-line incorrect-equality
         market.snapshotChunksDone = (market.openPositionCount == 0);
 
         // clear oracle candidate after use
@@ -302,6 +304,8 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         // (DO NOT change to endTimestamp - that breaks batch association)
         market.settlementFinalizedAt = uint64(block.timestamp);
         market.snapshotChunkCursor = 0;
+        // Strict equality is required: zero open positions means there is no snapshot work to perform.
+        // slither-disable-next-line incorrect-equality
         market.snapshotChunksDone = (market.openPositionCount == 0);
 
         // Calculate P&L with payout reserve
@@ -424,6 +428,10 @@ contract MarketLifecycleModule is SignalsCoreStorage {
     /// @dev Convert settlement value to tick
     /// settlementTick = settlementValue / 1e6
     /// maxTick is exclusive upper bound, clamp to last valid tick
+    // Clamp then snap to the tick-spacing grid. Truncating the spacing division is the intended floor alignment,
+    // and the second write reads the clamped tick through `offset` before assigning the aligned value.
+    // slither-disable-start divide-before-multiply
+    // slither-disable-start write-after-write
     function _toSettlementTick(int256 minTick, int256 maxTick, int256 tickSpacing, int256 settlementValue)
         internal
         pure
@@ -444,6 +452,9 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         tick = minTick + (offset / spacing) * spacing;
         return tick;
     }
+
+    // slither-disable-end write-after-write
+    // slither-disable-end divide-before-multiply
 
     /// @dev Get payout exposure at a specific tick using diff-array point query
     /// @param marketId Market identifier
