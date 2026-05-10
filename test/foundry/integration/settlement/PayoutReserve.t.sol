@@ -118,7 +118,7 @@ contract PayoutReserveTest is FullSystemDeployer {
     }
 
     function test_allowsClaimPayoutAfterClaimDelay() public {
-        (uint256 marketId, uint64 tSet, uint64 batchId) = _setupMarket();
+        (uint256 marketId, uint64 tSet,) = _setupMarket();
 
         _openPosition(sys.users[0], marketId, 0, 2, 1000);
 

@@ -114,7 +114,6 @@ contract VaultEscrowSecurityTest is FullSystemDeployer {
         uint64 targetBatchId = currentBatchId + 1;
 
         uint256 marketId = _createMarketInBatch(targetBatchId);
-        ISignalsCore.Market memory market = sys.core.harnessGetMarket(marketId);
 
         // Settle the market using SettlementHelper
         SettlementHelper.settleMarket(vm, address(sys.core), sys.owner, marketId, 5);

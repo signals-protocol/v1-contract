@@ -20,7 +20,7 @@ contract ValidationTest is SignalsBaseTest {
 
     /// @dev Build a test market struct with configurable fields
     function _buildMarket(
-        uint64 baseTime,
+        uint64,
         uint32 numBins,
         int256 tickSpacing,
         int256 maxTick,

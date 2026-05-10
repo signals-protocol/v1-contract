@@ -65,7 +65,7 @@ contract OperatorUpgradeForkTest is ForkLiveMarketTest {
     // Upgrade integrity
     // ============================================================
 
-    function test_upgrade_preserves_vault_state() public {
+    function test_upgrade_preserves_vault_state() public view {
         if (address(router) == address(0)) return;
         // If setUp completed, the upgrade already happened.
         // Verify vault reads still work.

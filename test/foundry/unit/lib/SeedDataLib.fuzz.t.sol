@@ -178,7 +178,7 @@ contract SeedDataLibFuzzTest is HarnessDeployer {
 
     /// @notice Non-uniform prior produces positive deltaEt
     function testFuzz_computeSeedStats_skewedHasPositiveDeltaEt(
-        uint64 seed,
+        uint64,
         uint8 _rawNumBins,
         uint128 _rawAlpha,
         uint8 _rawBoostIdx,

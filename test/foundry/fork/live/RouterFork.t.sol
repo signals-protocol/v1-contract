@@ -112,8 +112,6 @@ contract RouterForkTest is ForkLiveMarketTest {
         if (!ok) return;
 
         uint256 qtyBefore = position.getPosition(positionId).quantity;
-        uint256 ctUSDBefore = ctUSDToken.balanceOf(trader);
-
         vm.startPrank(trader);
         position.setApprovalForAll(address(router), true);
         router.decreasePositionWithSwap(positionId, uint128(qtyBefore / 2), address(ctUSDToken), 0, 0);
@@ -146,7 +144,6 @@ contract RouterForkTest is ForkLiveMarketTest {
 
         // 1. Warp past end + settlement window + pending ops window
         uint64 submitWindow = core.settlementSubmitWindow();
-        uint64 opsWindow = core.pendingOpsWindow();
         vm.warp(uint256(m.settlementTimestamp) + submitWindow + 1);
 
         // 2. Mark settlement as failed (owner only, during PendingOps)

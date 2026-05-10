@@ -110,7 +110,7 @@ contract ThetaTimeFeePolicyIntegrationTest is TradeModuleDeployer {
     }
 
     /// @notice Base fee only when tau >= window.
-    function test_baseFeeOnlyWhenTauGteWindow() public {
+    function test_baseFeeOnlyWhenTauGteWindow() public view {
         IFeePolicy.QuoteParams memory params = IFeePolicy.QuoteParams({
             trader: sys.users[0],
             marketId: 1,

@@ -289,7 +289,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         c.Bprev = 200e18;
         c.rhoBS = 0.2e18; // Btarget = 500 * 0.2 = 100 < Bgrant = 200
 
-        (,,,, uint256 Ffill,, uint256 Ft, uint256 Npre, uint256 Bnext, uint256 Tnext) = _calc(c);
+        (,,,, uint256 Ffill,, uint256 Ft,, uint256 Bnext, uint256 Tnext) = _calc(c);
 
         assertEq(Ffill, 0);
         // Fremain = Fpool = 100 WAD
@@ -335,7 +335,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         c.Lt = -400e18;
         c.Ftot = 50e18;
         c.deltaEt = 100e18; // grantNeed = 50 < deltaEt = 100
-        (,, uint256 Nraw, uint256 Gt,,, uint256 Ft, uint256 Npre,,) = _calc(c);
+        (,, uint256 Nraw, uint256 Gt,,,, uint256 Npre,,) = _calc(c);
         assertGe(Npre, Nraw); // Grant increases NAV
         assertGt(Gt, 0);
         assertEq(Gt, 50e18);

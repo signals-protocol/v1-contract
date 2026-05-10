@@ -55,6 +55,7 @@ library RedstoneHelper {
     /// @return payload The encoded Redstone payload bytes (to be appended to calldata)
     function buildRedstonePayload(Vm vm_, uint256 value8dec, uint256 timestampSec)
         internal
+        pure
         returns (bytes memory payload)
     {
         uint256[3] memory keys = [LOCAL_SIGNER_KEY_0, LOCAL_SIGNER_KEY_1, LOCAL_SIGNER_KEY_2];
@@ -122,6 +123,7 @@ library RedstoneHelper {
     /// Note: no dataByteSize trailer — on-chain extractor computes size from metadata.
     function _buildSignedDataPackage(Vm vm_, uint256 signerKey, uint256 value8dec, uint256 timestampSec)
         private
+        pure
         returns (bytes memory)
     {
         // Data point: [feedId(32B)][value(32B)] — on-chain CalldataExtractor reads feedId first
