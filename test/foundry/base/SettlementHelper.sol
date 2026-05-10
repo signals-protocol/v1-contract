@@ -18,7 +18,7 @@ library SettlementHelper {
     /// @param priceHuman Human-readable price (e.g. 100000 for $100,000 BTC)
     function settleMarket(Vm vm_, address core, address submitter, uint256 marketId, uint256 priceHuman) internal {
         // Get settlement windows (single call)
-        (uint64 tSet, uint64 settleEnd, , ) = SignalsCoreHarness(core).getSettlementWindows(marketId);
+        (uint64 tSet, uint64 settleEnd,,) = SignalsCoreHarness(core).getSettlementWindows(marketId);
 
         // Warp to settlement window start (tSet = market.settlementTimestamp)
         vm_.warp(tSet);

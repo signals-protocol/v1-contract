@@ -9,9 +9,5 @@ interface IRiskModule {
     /// @param liquidityParameter Market α to validate (WAD)
     /// @param numBins Number of outcome bins
     /// @param seedData Address of SeedData contract containing factors
-    function gateCreateMarket(
-        uint256 liquidityParameter,
-        uint32 numBins,
-        address seedData
-    ) external view;
+    function gateCreateMarket(uint256 liquidityParameter, uint32 numBins, address seedData) external view;
 }

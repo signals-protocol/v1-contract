@@ -27,11 +27,7 @@ contract BoundariesTest is TradeModuleDeployer {
 
         sys = deployTradeModuleSystem(
             DeployOptions({
-                markets: markets,
-                userCount: 1,
-                fundAmount: 100_000e6,
-                submitWindow: 300,
-                settlementWindow: 60
+                markets: markets, userCount: 1, fundAmount: 100_000e6, submitWindow: 300, settlementWindow: 60
             })
         );
     }
@@ -50,8 +46,9 @@ contract BoundariesTest is TradeModuleDeployer {
         // 1 wei quantity should either work or revert cleanly
         vm.prank(sys.users[0]);
         try sys.core.openPosition(MARKET_ID, int256(10), int256(20), uint128(1), 1000e6) {
-            // Success is acceptable
-        } catch {
+        // Success is acceptable
+        }
+            catch {
             // Revert is also acceptable for edge case
         }
     }
@@ -96,13 +93,10 @@ contract BoundariesTest is TradeModuleDeployer {
 
     function test_allows_trade_at_maximum_tick_boundary() public {
         vm.prank(sys.users[0]);
-        sys.core.openPosition(
-            MARKET_ID,
-            int256(uint256(NUM_BINS) - 2),
-            int256(uint256(NUM_BINS) - 1),
-            uint128(SMALL_QUANTITY),
-            100e6
-        );
+        sys.core
+            .openPosition(
+                MARKET_ID, int256(uint256(NUM_BINS) - 2), int256(uint256(NUM_BINS) - 1), uint128(SMALL_QUANTITY), 100e6
+            );
     }
 
     function test_reverts_when_tick_exceeds_maxTick() public {

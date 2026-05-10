@@ -68,17 +68,8 @@ contract VaultEscrowSecurityTest is FullSystemDeployer {
         uint64 startTime = endTime - 3600;
 
         vm.prank(sys.owner);
-        uint256 marketId = sys.core.createMarketUniform(
-            0,
-            10,
-            1,
-            startTime,
-            endTime,
-            settlementTs,
-            10,
-            WAD,
-            address(sys.feePolicy)
-        );
+        uint256 marketId =
+            sys.core.createMarketUniform(0, 10, 1, startTime, endTime, settlementTs, 10, WAD, address(sys.feePolicy));
         return marketId;
     }
 

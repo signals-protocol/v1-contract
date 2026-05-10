@@ -246,15 +246,16 @@ contract VaultSecurityTest is FullSystemDeployer {
         // We need: lpVault.shares - userAShares < MIN_DEAD_SHARES
         // So set lpVault.shares = userAShares + MIN_DEAD_SHARES - 1
         uint256 manipulatedShares = userAShares + minDeadShares - 1;
-        (, , uint256 price, uint256 pricePeak, ) = sys.core.harnessGetLpVault();
+        (,, uint256 price, uint256 pricePeak,) = sys.core.harnessGetLpVault();
         vm.prank(sys.owner);
-        sys.core.harnessSetLpVault(
-            (manipulatedShares * price) / WAD, // NAV proportional to shares
-            manipulatedShares,
-            price,
-            pricePeak,
-            true
-        );
+        sys.core
+            .harnessSetLpVault(
+                (manipulatedShares * price) / WAD, // NAV proportional to shares
+                manipulatedShares,
+                price,
+                pricePeak,
+                true
+            );
 
         // Record PnL and set batch state for withdrawal batch
         vm.prank(sys.owner);

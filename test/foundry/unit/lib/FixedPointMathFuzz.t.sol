@@ -194,12 +194,10 @@ contract FixedPointMathFuzz is HarnessDeployer {
         assertEq(h.clmsrCost(alpha, sum, sum), 0);
     }
 
-    function testFuzz_clmsrCost_monotonic(
-        uint256 alpha,
-        uint256 sumBefore,
-        uint256 delta1,
-        uint256 delta2
-    ) public view {
+    function testFuzz_clmsrCost_monotonic(uint256 alpha, uint256 sumBefore, uint256 delta1, uint256 delta2)
+        public
+        view
+    {
         alpha = bound(alpha, 1, 100e18);
         sumBefore = bound(sumBefore, WAD, 1e36);
         delta1 = bound(delta1, 1, sumBefore);

@@ -39,18 +39,10 @@ contract VaultLifecycleTest is FullSystemDeployer {
         SeedData seedData = SeedHelper.deploySeedData(factors);
 
         vm.prank(sys.owner);
-        mktId = sys.core.createMarket(
-            0,
-            100,
-            10,
-            startTs,
-            endTs,
-            settlementTs,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            address(seedData)
-        );
+        mktId = sys.core
+            .createMarket(
+                0, 100, 10, startTs, endTs, settlementTs, 10, 100e18, address(sys.feePolicy), address(seedData)
+            );
 
         vm.prank(sys.owner);
         sys.core.seedNextChunks(mktId, 10);

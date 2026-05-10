@@ -195,13 +195,9 @@ library LazyMulSegmentTree {
     /// @dev Apply factor to a child during push-down, triggering recursive flush when
     /// the combined pending factor would exceed threshold. Leaf nodes (l == r) skip
     /// flush since they have no children. Safe because l,r are known at this point.
-    function _applyFactorToChildWithFlush(
-        Tree storage tree,
-        uint32 nodeIndex,
-        uint256 factor,
-        uint32 l,
-        uint32 r
-    ) private {
+    function _applyFactorToChildWithFlush(Tree storage tree, uint32 nodeIndex, uint256 factor, uint32 l, uint32 r)
+        private
+    {
         if (nodeIndex == 0 || factor == ONE_WAD) return;
 
         Node storage node = tree.nodes[nodeIndex];
@@ -220,8 +216,8 @@ library LazyMulSegmentTree {
         uint256 newPendingFactor = _combineFactors(priorPending, factor);
 
         if (
-            priorPending != ONE_WAD &&
-            (newPendingFactor > FLUSH_THRESHOLD || newPendingFactor < UNDERFLOW_FLUSH_THRESHOLD)
+            priorPending != ONE_WAD
+                && (newPendingFactor > FLUSH_THRESHOLD || newPendingFactor < UNDERFLOW_FLUSH_THRESHOLD)
         ) {
             // Flush BEFORE scaling so _pullUpSum sees clean children sums
             _pushPendingFactor(tree, nodeIndex, l, r);
@@ -305,8 +301,8 @@ library LazyMulSegmentTree {
             uint256 combinedPending = _combineFactors(priorPending, factor);
 
             if (
-                priorPending != ONE_WAD &&
-                (combinedPending < UNDERFLOW_FLUSH_THRESHOLD || combinedPending > FLUSH_THRESHOLD)
+                priorPending != ONE_WAD
+                    && (combinedPending < UNDERFLOW_FLUSH_THRESHOLD || combinedPending > FLUSH_THRESHOLD)
             ) {
                 _pushPendingFactor(tree, nodeIndex, l, r);
                 priorPending = uint256(node.pendingFactor);
@@ -396,14 +392,10 @@ library LazyMulSegmentTree {
         return _addOrRevert(leftSum, rightSum);
     }
 
-    function _queryRecursive(
-        Tree storage tree,
-        uint32 nodeIndex,
-        uint32 l,
-        uint32 r,
-        uint32 lo,
-        uint32 hi
-    ) private returns (uint256 sum) {
+    function _queryRecursive(Tree storage tree, uint32 nodeIndex, uint32 l, uint32 r, uint32 lo, uint32 hi)
+        private
+        returns (uint256 sum)
+    {
         if (nodeIndex == 0) {
             if (r < lo || l > hi) return 0;
             uint32 overlapL = lo > l ? lo : l;
@@ -429,12 +421,10 @@ library LazyMulSegmentTree {
         return _addOrRevert(leftSum, rightSum);
     }
 
-    function _buildTreeFromArray(
-        Tree storage tree,
-        uint32 l,
-        uint32 r,
-        uint256[] memory factors
-    ) private returns (uint32 nodeIndex, uint256 sum) {
+    function _buildTreeFromArray(Tree storage tree, uint32 l, uint32 r, uint256[] memory factors)
+        private
+        returns (uint32 nodeIndex, uint256 sum)
+    {
         nodeIndex = _allocateNode(tree, l, r);
         Node storage node = tree.nodes[nodeIndex];
         node.pendingFactor = uint192(ONE_WAD);

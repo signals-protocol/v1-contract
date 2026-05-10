@@ -155,12 +155,11 @@ abstract contract SignalsBaseTest is Test {
         return min + (uint256(raw) % (max - min));
     }
 
-    function randomFactors(
-        Prng memory prng,
-        uint32 count,
-        uint256 min,
-        uint256 max
-    ) internal pure returns (uint256[] memory factors) {
+    function randomFactors(Prng memory prng, uint32 count, uint256 min, uint256 max)
+        internal
+        pure
+        returns (uint256[] memory factors)
+    {
         factors = new uint256[](count);
         for (uint32 i = 0; i < count; i++) {
             factors[i] = nextInRange(prng, min, max);

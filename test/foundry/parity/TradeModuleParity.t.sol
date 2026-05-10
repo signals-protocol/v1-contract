@@ -22,12 +22,7 @@ contract TradeModuleParityTest is TradeModuleDeployer {
 
         MarketConfig[] memory markets = new MarketConfig[](1);
         markets[0] = MarketConfig({
-            numBins: 4,
-            tickSpacing: 1,
-            minTick: 0,
-            maxTick: 4,
-            endOffset: 1_000,
-            liquidityParameter: WAD
+            numBins: 4, tickSpacing: 1, minTick: 0, maxTick: 4, endOffset: 1_000, liquidityParameter: WAD
         });
 
         sys = deployTradeModuleSystem(

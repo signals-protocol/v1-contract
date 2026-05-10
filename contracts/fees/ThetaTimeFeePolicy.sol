@@ -46,20 +46,19 @@ contract ThetaTimeFeePolicy is IFeePolicy {
     }
 
     function descriptor() external view override returns (string memory) {
-        return
-            string(
-                abi.encodePacked(
-                    '{"policy":"theta-time","params":{"baseBps":"',
-                    Strings.toString(baseBps),
-                    '","thetaMaxBps":"',
-                    Strings.toString(thetaMaxBps),
-                    '","windowSec":"',
-                    Strings.toString(thetaWindowSeconds),
-                    '","beta":"',
-                    Strings.toString(beta),
-                    '","name":"ThetaTimeFeePolicy"},"name":"ThetaTimeFeePolicy"}'
-                )
-            );
+        return string(
+            abi.encodePacked(
+                '{"policy":"theta-time","params":{"baseBps":"',
+                Strings.toString(baseBps),
+                '","thetaMaxBps":"',
+                Strings.toString(thetaMaxBps),
+                '","windowSec":"',
+                Strings.toString(thetaWindowSeconds),
+                '","beta":"',
+                Strings.toString(beta),
+                '","name":"ThetaTimeFeePolicy"},"name":"ThetaTimeFeePolicy"}'
+            )
+        );
     }
 
     function quoteFee(QuoteParams calldata params) external view override returns (uint256 feeAmount) {

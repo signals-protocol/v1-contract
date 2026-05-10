@@ -28,12 +28,10 @@ contract RiskMathFuzzTest is HarnessDeployer {
         assertGt(alphaBase, 0);
     }
 
-    function testFuzz_alphaBase_proportionalToEt(
-        uint256 et1Seed,
-        uint256 et2Seed,
-        uint256 nbSeed,
-        uint256 lamSeed
-    ) public view {
+    function testFuzz_alphaBase_proportionalToEt(uint256 et1Seed, uint256 et2Seed, uint256 nbSeed, uint256 lamSeed)
+        public
+        view
+    {
         uint256 numBins = bound(nbSeed, 2, 200);
         uint256 lambda = bound(lamSeed, 0.01e18, WAD);
         uint256 Et1 = bound(et1Seed, WAD, 1e27);
@@ -44,12 +42,10 @@ contract RiskMathFuzzTest is HarnessDeployer {
         assertGt(ab2, ab1);
     }
 
-    function testFuzz_alphaBase_proportionalToLambda(
-        uint256 etSeed,
-        uint256 nbSeed,
-        uint256 l1Seed,
-        uint256 l2Seed
-    ) public view {
+    function testFuzz_alphaBase_proportionalToLambda(uint256 etSeed, uint256 nbSeed, uint256 l1Seed, uint256 l2Seed)
+        public
+        view
+    {
         uint256 Et = bound(etSeed, WAD, 1e30);
         uint256 numBins = bound(nbSeed, 2, 200);
         uint256 lambda1 = bound(l1Seed, 0.01e18, WAD / 4);
@@ -60,12 +56,10 @@ contract RiskMathFuzzTest is HarnessDeployer {
         assertGt(ab2, ab1);
     }
 
-    function testFuzz_alphaBase_inverseToNumBins(
-        uint256 etSeed,
-        uint256 n1Seed,
-        uint256 n2Seed,
-        uint256 lamSeed
-    ) public view {
+    function testFuzz_alphaBase_inverseToNumBins(uint256 etSeed, uint256 n1Seed, uint256 n2Seed, uint256 lamSeed)
+        public
+        view
+    {
         uint256 Et = bound(etSeed, WAD, 1e30);
         uint256 lambda = bound(lamSeed, 0.01e18, WAD);
         uint256 n1 = bound(n1Seed, 2, 100);

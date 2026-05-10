@@ -55,9 +55,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         c.phiTR = DEF_PHI_TR;
     }
 
-    function _calc(
-        CalcInput memory c
-    )
+    function _calc(CalcInput memory c)
         internal
         view
         returns (
@@ -73,20 +71,9 @@ contract FeeWaterfallLibTest is HarnessDeployer {
             uint256 Tnext
         )
     {
-        return
-            harness.calculate(
-                c.Lt,
-                c.Ftot,
-                c.Nprev,
-                c.Bprev,
-                c.Tprev,
-                c.deltaEt,
-                c.pdd,
-                c.rhoBS,
-                c.phiLP,
-                c.phiBS,
-                c.phiTR
-            );
+        return harness.calculate(
+            c.Lt, c.Ftot, c.Nprev, c.Bprev, c.Tprev, c.deltaEt, c.pdd, c.rhoBS, c.phiLP, c.phiBS, c.phiTR
+        );
     }
 
     // ============================================================
@@ -97,7 +84,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         CalcInput memory c = _defaults();
         c.Lt = 100e18;
         c.Ftot = 50e18;
-        (uint256 Floss, uint256 Fpool, , , , , , , , ) = _calc(c);
+        (uint256 Floss, uint256 Fpool,,,,,,,,) = _calc(c);
         assertEq(Floss + Fpool, 50e18);
     }
 
@@ -105,7 +92,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         CalcInput memory c = _defaults();
         c.Lt = -30e18;
         c.Ftot = 50e18;
-        (uint256 Floss, uint256 Fpool, , , , , , , , ) = _calc(c);
+        (uint256 Floss, uint256 Fpool,,,,,,,,) = _calc(c);
         assertEq(Floss + Fpool, 50e18);
         assertEq(Floss, 30e18);
     }
@@ -114,7 +101,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         CalcInput memory c = _defaults();
         c.Lt = -100e18;
         c.Ftot = 20e18;
-        (uint256 Floss, uint256 Fpool, , , , , , , , ) = _calc(c);
+        (uint256 Floss, uint256 Fpool,,,,,,,,) = _calc(c);
         assertEq(Floss + Fpool, 20e18);
         assertEq(Floss, 20e18); // Floss capped at Ftot
         assertEq(Fpool, 0);
@@ -128,7 +115,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         CalcInput memory c = _defaults();
         c.Lt = 100e18;
         c.Ftot = 50e18;
-        (uint256 Floss, uint256 Fpool, , , , , , , , ) = _calc(c);
+        (uint256 Floss, uint256 Fpool,,,,,,,,) = _calc(c);
         assertEq(Floss, 0);
         assertEq(Fpool, 50e18);
     }
@@ -137,7 +124,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         CalcInput memory c = _defaults();
         c.Lt = -30e18;
         c.Ftot = 100e18;
-        (uint256 Floss, uint256 Fpool, , uint256 Gt, , , , , , ) = _calc(c);
+        (uint256 Floss, uint256 Fpool,, uint256 Gt,,,,,,) = _calc(c);
         assertEq(Floss, 30e18);
         assertEq(Fpool, 70e18);
         assertEq(Gt, 0); // No grant needed
@@ -154,7 +141,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         c.Nprev = 1000e18;
         c.Bprev = 200e18;
         c.deltaEt = 100e18;
-        (, , , uint256 Gt, , , , , uint256 Bnext, ) = _calc(c);
+        (,,, uint256 Gt,,,,, uint256 Bnext,) = _calc(c);
         // Nraw = 1000 - 400 + 50 = 650; Nfloor = 1000 * 0.7 = 700; grantNeed = 50
         assertEq(Gt, 50e18);
         assertLe(Bnext, 200e18); // Backstop decreased
@@ -191,7 +178,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         c.Lt = -50e18;
         c.Ftot = 100e18;
         // Nraw = 1000 - 50 + 50 = 1000; Nfloor = 700; grantNeed = 0
-        (, , , uint256 Gt, , , , , , ) = _calc(c);
+        (,,, uint256 Gt,,,,,,) = _calc(c);
         assertEq(Gt, 0);
     }
 
@@ -201,7 +188,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         c.Ftot = 50e18;
         c.deltaEt = 500e18;
         // Nraw = 1000 - 400 + 50 = 650; Nfloor = 700; grantNeed = 50
-        (, , , uint256 Gt, , , , , , ) = _calc(c);
+        (,,, uint256 Gt,,,,,,) = _calc(c);
         assertEq(Gt, 50e18);
     }
 
@@ -222,7 +209,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         CalcInput memory c = _defaults();
         c.Lt = 100e18;
         c.Ftot = 100e18;
-        (, , , uint256 Gt, , , , , uint256 Bnext, ) = _calc(c);
+        (,,, uint256 Gt,,,,, uint256 Bnext,) = _calc(c);
         assertEq(Gt, 0); // No grant in profit case
         assertGe(Bnext, DEF_BPREV); // Backstop should receive its share
     }
@@ -238,7 +225,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         c.Nprev = 500e18;
         c.Bprev = 200e18;
         c.rhoBS = 0.2e18; // Btarget = 550 * 0.2 = 110; dBneed = max(0, 110 - 200) = 0
-        (, , , , uint256 Ffill, , , , , ) = _calc(c);
+        (,,,, uint256 Ffill,,,,,) = _calc(c);
         assertEq(Ffill, 0);
     }
 
@@ -249,7 +236,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         c.Nprev = 1000e18;
         c.Bprev = 50e18;
         c.rhoBS = 0.3e18; // Btarget = 1100 * 0.3 = 330; dBneed = 280 > Fpool = 10
-        (uint256 Floss, uint256 Fpool, , , uint256 Ffill, , , , , ) = _calc(c);
+        (uint256 Floss, uint256 Fpool,,, uint256 Ffill,,,,,) = _calc(c);
         assertEq(Floss, 0); // profit case, no loss compensation
         assertEq(Ffill, Fpool); // Ffill capped at Fpool
     }
@@ -261,7 +248,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         c.Nprev = 1000e18;
         c.Bprev = 200e18;
         c.rhoBS = 0.2e18; // Btarget = 1100 * 0.2 = 220; dBneed = 20 < Fpool = 200
-        (, , , , uint256 Ffill, , , , , ) = _calc(c);
+        (,,,, uint256 Ffill,,,,,) = _calc(c);
         assertEq(Ffill, 20e18);
     }
 
@@ -273,7 +260,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         CalcInput memory c = _defaults();
         c.Lt = 0;
         c.Ftot = 100e18;
-        (uint256 Floss, uint256 Fpool, , , , , , , , ) = _calc(c);
+        (uint256 Floss, uint256 Fpool,,,,,,,,) = _calc(c);
         assertEq(Floss, 0);
         assertEq(Fpool, 100e18);
     }
@@ -284,7 +271,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         c.Ftot = 100e18 + 3; // Small amount with dust
         c.Nprev = 500e18;
         c.Bprev = 200e18;
-        (uint256 Floss, , , , , uint256 Fdust, uint256 Ft, , , ) = _calc(c);
+        (uint256 Floss,,,,, uint256 Fdust, uint256 Ft,,,) = _calc(c);
         assertGe(Fdust, 0);
         assertGe(Ft, Floss);
     }
@@ -302,7 +289,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         c.Bprev = 200e18;
         c.rhoBS = 0.2e18; // Btarget = 500 * 0.2 = 100 < Bgrant = 200
 
-        (, , , , uint256 Ffill, , uint256 Ft, uint256 Npre, uint256 Bnext, uint256 Tnext) = _calc(c);
+        (,,,, uint256 Ffill,, uint256 Ft, uint256 Npre, uint256 Bnext, uint256 Tnext) = _calc(c);
 
         assertEq(Ffill, 0);
         // Fremain = Fpool = 100 WAD
@@ -320,7 +307,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         c.Bprev = 150e18;
         c.rhoBS = 0.2e18; // Btarget = 1000 * 0.2 = 200; dBneed = 50
 
-        (, , , , uint256 Ffill, , uint256 Ft, , uint256 Bnext, uint256 Tnext) = _calc(c);
+        (,,,, uint256 Ffill,, uint256 Ft,, uint256 Bnext, uint256 Tnext) = _calc(c);
 
         // Ffill = min(50, 100) = 50
         assertEq(Ffill, 50e18);
@@ -339,7 +326,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         CalcInput memory c = _defaults();
         c.Lt = 100e18;
         c.Ftot = 50e18;
-        (, , , , , , , uint256 Npre, , ) = _calc(c);
+        (,,,,,,, uint256 Npre,,) = _calc(c);
         assertGt(Npre, DEF_NPREV);
     }
 
@@ -348,7 +335,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         c.Lt = -400e18;
         c.Ftot = 50e18;
         c.deltaEt = 100e18; // grantNeed = 50 < deltaEt = 100
-        (, , uint256 Nraw, uint256 Gt, , , uint256 Ft, uint256 Npre, , ) = _calc(c);
+        (,, uint256 Nraw, uint256 Gt,,, uint256 Ft, uint256 Npre,,) = _calc(c);
         assertGe(Npre, Nraw); // Grant increases NAV
         assertGt(Gt, 0);
         assertEq(Gt, 50e18);
@@ -362,7 +349,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         CalcInput memory c = _defaults();
         c.Lt = 100e18;
         c.Ftot = 0;
-        (uint256 Floss, uint256 Fpool, , , , , uint256 Ft, , , ) = _calc(c);
+        (uint256 Floss, uint256 Fpool,,,,, uint256 Ft,,,) = _calc(c);
         assertEq(Floss, 0);
         assertEq(Fpool, 0);
         assertEq(Ft, 0);
@@ -372,7 +359,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         CalcInput memory c = _defaults();
         c.Lt = 0;
         c.Ftot = 50e18;
-        (uint256 Floss, , uint256 Nraw, , , , , , , ) = _calc(c);
+        (uint256 Floss,, uint256 Nraw,,,,,,,) = _calc(c);
         assertEq(Floss, 0);
         assertEq(Nraw, DEF_NPREV);
     }
@@ -423,7 +410,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         c.Nprev = 0;
         c.Bprev = 200e18;
         c.Tprev = 50e18;
-        (, , uint256 Nraw, uint256 Gt, , , , , , ) = _calc(c);
+        (,, uint256 Nraw, uint256 Gt,,,,,,) = _calc(c);
         // Nfloor = 0 when Nprev = 0; Nraw = 0 + 100 + 0 = 100 > 0
         assertEq(Gt, 0);
         assertEq(Nraw, 100e18);
@@ -442,7 +429,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         // Nraw = (1000e18+1) - 301e18 + 1e18 = 700e18 + 1
         // wMulUp: ceil((1000e18+1) * 0.7e18 / 1e18) = 700e18 + 1
         // grantNeed = max(0, (700e18+1) - (700e18+1)) = 0
-        (, , , uint256 Gt, , , , , , ) = _calc(c);
+        (,,, uint256 Gt,,,,,,) = _calc(c);
         assertEq(Gt, 0);
     }
 
@@ -453,7 +440,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         c.Nprev = 999e18 + 999999999999999999;
         c.deltaEt = 500e18;
 
-        (, , , uint256 Gt, , , uint256 Ft, uint256 Npre, , ) = _calc(c);
+        (,,, uint256 Gt,,, uint256 Ft, uint256 Npre,,) = _calc(c);
         // Verify NAV equation: Npre - Nprev == Lt + Ft + Gt
         int256 navDelta = int256(Npre) - int256(c.Nprev);
         int256 expected = c.Lt + int256(Ft) + int256(Gt);
@@ -474,7 +461,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
             c.Nprev = nprevs[i];
             c.deltaEt = 500e18;
 
-            (, , , , , , , uint256 Npre, , ) = _calc(c);
+            (,,,,,,, uint256 Npre,,) = _calc(c);
 
             // Expected Nfloor with ceil
             uint256 wadPlusPdd = 0.7e18;
@@ -494,7 +481,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         c.Lt = -400e18;
         c.Ftot = 50e18;
         c.deltaEt = 100e18;
-        (, , , , , , , , uint256 Bnext, ) = _calc(c);
+        (,,,,,,,, uint256 Bnext,) = _calc(c);
         assertGe(Bnext, 0);
     }
 
@@ -502,7 +489,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         CalcInput memory c = _defaults();
         c.Lt = -200e18;
         c.Ftot = 30e18;
-        (, , , , , , , , , uint256 Tnext) = _calc(c);
+        (,,,,,,,,, uint256 Tnext) = _calc(c);
         assertGe(Tnext, DEF_TPREV);
     }
 
@@ -510,7 +497,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         CalcInput memory c = _defaults();
         c.Lt = -300e18;
         c.Ftot = 100e18;
-        (uint256 Floss, uint256 Fpool, , , , , , uint256 Npre, uint256 Bnext, uint256 Tnext) = _calc(c);
+        (uint256 Floss, uint256 Fpool,,,,,, uint256 Npre, uint256 Bnext, uint256 Tnext) = _calc(c);
 
         // Fee conservation
         assertEq(Floss + Fpool, c.Ftot);
@@ -528,7 +515,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         CalcInput memory c = _defaults();
         c.Lt = -200e18;
         c.Ftot = 80e18;
-        (uint256 Floss, uint256 Fpool, , , , , , , , ) = _calc(c);
+        (uint256 Floss, uint256 Fpool,,,,,,,,) = _calc(c);
         assertEq(Floss + Fpool, 80e18);
     }
 
@@ -538,7 +525,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         c.Ftot = 50e18;
         c.deltaEt = 100e18;
         // Nraw = 1000 - 350 + 50 = 700 = Nfloor => grantNeed = 0
-        (, , , uint256 Gt, , , , , , ) = _calc(c);
+        (,,, uint256 Gt,,,,,,) = _calc(c);
         assertEq(Gt, 0);
         assertLe(Gt, 100e18);
     }
@@ -549,7 +536,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         c.Ftot = 50e18;
         c.Bprev = 200e18;
         c.deltaEt = 300e18;
-        (, , , uint256 Gt, , , , , , ) = _calc(c);
+        (,,, uint256 Gt,,,,,,) = _calc(c);
         assertLe(Gt, 200e18);
     }
 
@@ -557,7 +544,7 @@ contract FeeWaterfallLibTest is HarnessDeployer {
         CalcInput memory c = _defaults();
         c.Lt = -300e18;
         c.Ftot = 100e18;
-        (, , , uint256 Gt, , , uint256 Ft, uint256 Npre, , ) = _calc(c);
+        (,,, uint256 Gt,,, uint256 Ft, uint256 Npre,,) = _calc(c);
         // Npre - Nprev = Lt + Ft + Gt
         int256 navDelta = int256(Npre) - int256(DEF_NPREV);
         int256 expected = c.Lt + int256(Ft) + int256(Gt);
@@ -583,30 +570,9 @@ contract FeeWaterfallLibTest is HarnessDeployer {
             phiTR: DEF_PHI_TR
         });
 
-        (
-            uint256 Floss,
-            uint256 Fpool,
-            ,
-            uint256 Gt,
-            ,
-            ,
-            uint256 Ft,
-            uint256 Npre,
-            uint256 Bnext,
-            uint256 Tnext
-        ) = harness.calculate(
-                rp.Lt,
-                rp.Ftot,
-                rp.Nprev,
-                rp.Bprev,
-                rp.Tprev,
-                rp.deltaEt,
-                rp.pdd,
-                rp.rhoBS,
-                rp.phiLP,
-                rp.phiBS,
-                rp.phiTR
-            );
+        (uint256 Floss, uint256 Fpool,, uint256 Gt,,, uint256 Ft, uint256 Npre, uint256 Bnext, uint256 Tnext) = harness.calculate(
+            rp.Lt, rp.Ftot, rp.Nprev, rp.Bprev, rp.Tprev, rp.deltaEt, rp.pdd, rp.rhoBS, rp.phiLP, rp.phiBS, rp.phiTR
+        );
 
         FeeWaterfallReference.Result memory ref = FeeWaterfallReference.calculate(rp);
 
@@ -634,30 +600,9 @@ contract FeeWaterfallLibTest is HarnessDeployer {
             phiTR: DEF_PHI_TR
         });
 
-        (
-            uint256 Floss,
-            uint256 Fpool,
-            ,
-            uint256 Gt,
-            ,
-            ,
-            uint256 Ft,
-            uint256 Npre,
-            uint256 Bnext,
-            uint256 Tnext
-        ) = harness.calculate(
-                rp.Lt,
-                rp.Ftot,
-                rp.Nprev,
-                rp.Bprev,
-                rp.Tprev,
-                rp.deltaEt,
-                rp.pdd,
-                rp.rhoBS,
-                rp.phiLP,
-                rp.phiBS,
-                rp.phiTR
-            );
+        (uint256 Floss, uint256 Fpool,, uint256 Gt,,, uint256 Ft, uint256 Npre, uint256 Bnext, uint256 Tnext) = harness.calculate(
+            rp.Lt, rp.Ftot, rp.Nprev, rp.Bprev, rp.Tprev, rp.deltaEt, rp.pdd, rp.rhoBS, rp.phiLP, rp.phiBS, rp.phiTR
+        );
 
         FeeWaterfallReference.Result memory ref = FeeWaterfallReference.calculate(rp);
 
@@ -712,8 +657,9 @@ contract FeeWaterfallLibTest is HarnessDeployer {
                 phiTR: DEF_PHI_TR
             });
 
-            (uint256 Floss, uint256 Fpool, , uint256 Gt, , , , uint256 Npre, uint256 Bnext, uint256 Tnext) = harness
-                .calculate(Lt, Ftot, Nprev, Bprev, Tprev, deltaEt, pdd, rhoBS, DEF_PHI_LP, DEF_PHI_BS, DEF_PHI_TR);
+            (uint256 Floss, uint256 Fpool,, uint256 Gt,,,, uint256 Npre, uint256 Bnext, uint256 Tnext) = harness.calculate(
+                Lt, Ftot, Nprev, Bprev, Tprev, deltaEt, pdd, rhoBS, DEF_PHI_LP, DEF_PHI_BS, DEF_PHI_TR
+            );
 
             FeeWaterfallReference.Result memory ref = FeeWaterfallReference.calculate(rp);
 
@@ -767,30 +713,9 @@ contract FeeWaterfallLibTest is HarnessDeployer {
                 if (grantNeed_ > Bprev) continue;
             }
 
-            (
-                uint256 Floss,
-                uint256 Fpool,
-                ,
-                uint256 Gt,
-                ,
-                ,
-                uint256 Ft,
-                uint256 Npre,
-                uint256 Bnext,
-                uint256 Tnext
-            ) = harness.calculate(
-                    Lt,
-                    Ftot,
-                    Nprev,
-                    Bprev,
-                    Tprev,
-                    deltaEt,
-                    pdd,
-                    rhoBS,
-                    DEF_PHI_LP,
-                    DEF_PHI_BS,
-                    DEF_PHI_TR
-                );
+            (uint256 Floss, uint256 Fpool,, uint256 Gt,,, uint256 Ft, uint256 Npre, uint256 Bnext, uint256 Tnext) = harness.calculate(
+                Lt, Ftot, Nprev, Bprev, Tprev, deltaEt, pdd, rhoBS, DEF_PHI_LP, DEF_PHI_BS, DEF_PHI_TR
+            );
 
             // INV-FW1: Floss + Fpool == Ftot
             assertEq(Floss + Fpool, Ftot, "INV-FW1 violated");

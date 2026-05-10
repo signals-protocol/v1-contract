@@ -63,8 +63,7 @@ contract PrepareSafePositionUpgrade is BaseScript {
         vm.writeFile(string.concat(copyDir, "/01-to.txt"), vm.toString(positionProxy));
         vm.writeFile(string.concat(copyDir, "/02-value.txt"), "0");
         vm.writeFile(
-            string.concat(copyDir, "/03-method.txt"),
-            "upgradeToAndCall(address newImplementation, bytes data)"
+            string.concat(copyDir, "/03-method.txt"), "upgradeToAndCall(address newImplementation, bytes data)"
         );
         vm.writeFile(string.concat(copyDir, "/04-arg-newImplementation.txt"), vm.toString(newImpl));
         vm.writeFile(string.concat(copyDir, "/05-arg-data.txt"), "0x");
@@ -81,11 +80,8 @@ contract PrepareSafePositionUpgrade is BaseScript {
         console.log("4) Fill args or paste calldata in Data field");
 
         // 6. Write script output for post-deploy.ts
-        string memory contracts = vm.serializeAddress(
-            "prepare-safe-position-upgrade",
-            "SignalsPositionImplementation",
-            newImpl
-        );
+        string memory contracts =
+            vm.serializeAddress("prepare-safe-position-upgrade", "SignalsPositionImplementation", newImpl);
 
         string memory root = vm.serializeString("root", "action", "prepare-safe-position-upgrade");
         root = vm.serializeAddress("root", "deployer", deployer);

@@ -60,7 +60,9 @@ contract OracleTest is FullSystemDeployer {
 
         // Seed tree for settlement tests
         uint256[] memory factors = new uint256[](4);
-        for (uint256 i = 0; i < 4; i++) factors[i] = WAD;
+        for (uint256 i = 0; i < 4; i++) {
+            factors[i] = WAD;
+        }
         vm.prank(sys.owner);
         sys.core.harnessSeedTree(1, factors);
     }

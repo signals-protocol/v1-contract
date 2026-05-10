@@ -30,16 +30,7 @@ contract AdminLifecycleForkTest is ForkProtocolTest {
         vm.prank(ownerSafe);
         vm.expectPartialRevert(SignalsErrors.AlphaExceedsLimit.selector);
         core.createMarket(
-            0,
-            4,
-            1,
-            startTimestamp,
-            endTimestamp,
-            settlementTimestamp,
-            4,
-            WAD,
-            _defaultFeePolicy(),
-            seedData
+            0, 4, 1, startTimestamp, endTimestamp, settlementTimestamp, 4, WAD, _defaultFeePolicy(), seedData
         );
 
         vm.prank(ownerSafe);
@@ -52,16 +43,7 @@ contract AdminLifecycleForkTest is ForkProtocolTest {
 
         vm.prank(ownerSafe);
         uint256 marketId = core.createMarket(
-            0,
-            4,
-            1,
-            startTimestamp,
-            endTimestamp,
-            settlementTimestamp,
-            4,
-            WAD,
-            _defaultFeePolicy(),
-            seedData
+            0, 4, 1, startTimestamp, endTimestamp, settlementTimestamp, 4, WAD, _defaultFeePolicy(), seedData
         );
 
         vm.prank(ownerSafe);
@@ -85,16 +67,7 @@ contract AdminLifecycleForkTest is ForkProtocolTest {
 
         vm.prank(operator);
         uint256 marketId = core.createMarket(
-            0,
-            4,
-            1,
-            startTimestamp,
-            endTimestamp,
-            settlementTimestamp,
-            4,
-            WAD,
-            _defaultFeePolicy(),
-            seedData
+            0, 4, 1, startTimestamp, endTimestamp, settlementTimestamp, 4, WAD, _defaultFeePolicy(), seedData
         );
 
         vm.prank(operator);
@@ -190,7 +163,7 @@ contract AdminLifecycleForkTest is ForkProtocolTest {
         uint64 batchId = _secondarySettleAndSnapshot(marketId, 0, 8);
         _processBatchesThrough(batchId);
 
-        (, uint256 ftot, , , , , bool processed) = core.getDailyPnl(batchId);
+        (, uint256 ftot,,,,, bool processed) = core.getDailyPnl(batchId);
         (uint256 backstopAfter, uint256 treasuryAfter) = core.getCapitalStack();
 
         assertTrue(processed, "daily pnl not processed");

@@ -10,19 +10,19 @@ contract ClmsrMathCostHarness {
         return ClmsrMath.maxSafeChunkQuantity(alpha);
     }
 
-    function computeBuyCostFromSumChange(
-        uint256 alpha,
-        uint256 sumBefore,
-        uint256 sumAfter
-    ) external pure returns (uint256) {
+    function computeBuyCostFromSumChange(uint256 alpha, uint256 sumBefore, uint256 sumAfter)
+        external
+        pure
+        returns (uint256)
+    {
         return ClmsrMath.computeBuyCostFromSumChange(alpha, sumBefore, sumAfter);
     }
 
-    function computeSellProceedsFromSumChange(
-        uint256 alpha,
-        uint256 sumBefore,
-        uint256 sumAfter
-    ) external pure returns (uint256) {
+    function computeSellProceedsFromSumChange(uint256 alpha, uint256 sumBefore, uint256 sumAfter)
+        external
+        pure
+        returns (uint256)
+    {
         return ClmsrMath.computeSellProceedsFromSumChange(alpha, sumBefore, sumAfter);
     }
 

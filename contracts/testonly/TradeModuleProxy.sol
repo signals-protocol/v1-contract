@@ -57,21 +57,13 @@ contract TradeModuleProxy is SignalsCoreStorage {
     }
 
     // trade entrypoints
-    function openPosition(
-        uint256 marketId,
-        int256 lowerTick,
-        int256 upperTick,
-        uint128 quantity,
-        uint256 maxCost
-    ) external returns (uint256 positionId) {
+    function openPosition(uint256 marketId, int256 lowerTick, int256 upperTick, uint128 quantity, uint256 maxCost)
+        external
+        returns (uint256 positionId)
+    {
         bytes memory ret = _delegate(
             abi.encodeWithSignature(
-                "openPosition(uint256,int256,int256,uint128,uint256)",
-                marketId,
-                lowerTick,
-                upperTick,
-                quantity,
-                maxCost
+                "openPosition(uint256,int256,int256,uint128,uint256)", marketId, lowerTick, upperTick, quantity, maxCost
             )
         );
         if (ret.length > 0) positionId = abi.decode(ret, (uint256));
@@ -100,28 +92,21 @@ contract TradeModuleProxy is SignalsCoreStorage {
     }
 
     // views
-    function calculateOpenCost(
-        uint256 marketId,
-        int256 lowerTick,
-        int256 upperTick,
-        uint128 quantity
-    ) external returns (uint256) {
+    function calculateOpenCost(uint256 marketId, int256 lowerTick, int256 upperTick, uint128 quantity)
+        external
+        returns (uint256)
+    {
         bytes memory ret = _delegateView(
             abi.encodeWithSignature(
-                "calculateOpenCost(uint256,int256,int256,uint128)",
-                marketId,
-                lowerTick,
-                upperTick,
-                quantity
+                "calculateOpenCost(uint256,int256,int256,uint128)", marketId, lowerTick, upperTick, quantity
             )
         );
         return abi.decode(ret, (uint256));
     }
 
     function calculateDecreaseProceeds(uint256 positionId, uint128 quantity) external returns (uint256) {
-        bytes memory ret = _delegateView(
-            abi.encodeWithSignature("calculateDecreaseProceeds(uint256,uint128)", positionId, quantity)
-        );
+        bytes memory ret =
+            _delegateView(abi.encodeWithSignature("calculateDecreaseProceeds(uint256,uint128)", positionId, quantity));
         return abi.decode(ret, (uint256));
     }
 

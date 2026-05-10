@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 interface ISignalsCore {
     event OperatorUpdated(address indexed operator, bool allowed);
+
     struct Market {
         // status flags (packable)
         bool isSeeded;
@@ -45,13 +46,9 @@ interface ISignalsCore {
     }
 
     // Trade / lifecycle entrypoints
-    function openPosition(
-        uint256 marketId,
-        int256 lowerTick,
-        int256 upperTick,
-        uint128 quantity,
-        uint256 maxCost
-    ) external returns (uint256 positionId);
+    function openPosition(uint256 marketId, int256 lowerTick, int256 upperTick, uint128 quantity, uint256 maxCost)
+        external
+        returns (uint256 positionId);
 
     function openPositionFor(
         address beneficiary,
@@ -73,12 +70,9 @@ interface ISignalsCore {
     function batchClaimPayout(uint256[] calldata positionIds) external;
 
     // View helpers for cost/proceeds calculation
-    function calculateOpenCost(
-        uint256 marketId,
-        int256 lowerTick,
-        int256 upperTick,
-        uint128 quantity
-    ) external returns (uint256 cost);
+    function calculateOpenCost(uint256 marketId, int256 lowerTick, int256 upperTick, uint128 quantity)
+        external
+        returns (uint256 cost);
 
     function calculateIncreaseCost(uint256 positionId, uint128 quantity) external returns (uint256 cost);
 
@@ -143,12 +137,8 @@ interface ISignalsCore {
     function submitSettlementSample(uint256 marketId) external;
 
     /// @notice Configure Redstone oracle parameters
-    function setRedstoneConfig(
-        bytes32 feedId,
-        uint8 feedDecimals,
-        uint64 maxSampleDistance,
-        uint64 futureTolerance
-    ) external;
+    function setRedstoneConfig(bytes32 feedId, uint8 feedDecimals, uint64 maxSampleDistance, uint64 futureTolerance)
+        external;
 
     /// @notice Set settlement timeline parameters
     function setSettlementTimeline(uint64 sampleWindow, uint64 opsWindow, uint64 claimDelay) external;
@@ -166,9 +156,9 @@ interface ISignalsCore {
     function getMarketState(uint256 marketId) external returns (uint8 state);
 
     /// @notice Get settlement windows for a market
-    function getSettlementWindows(
-        uint256 marketId
-    ) external returns (uint64 tSet, uint64 settleEnd, uint64 opsEnd, uint64 claimOpen);
+    function getSettlementWindows(uint256 marketId)
+        external
+        returns (uint64 tSet, uint64 settleEnd, uint64 opsEnd, uint64 claimOpen);
 
     /// @notice Get current batch ID
     function getCurrentBatchId() external view returns (uint64);

@@ -18,11 +18,11 @@ contract TickBinLibFuzzTest is HarnessDeployer {
     // ============================================================
 
     /// @dev Build valid market config from fuzz inputs (numBins >= 2 for ticksToBins)
-    function _makeMarketConfig(
-        int128 _minTick,
-        uint16 _rawSpacing,
-        uint16 _rawNumBins
-    ) private pure returns (int256 minTick, int256 maxTick, int256 tickSpacing, uint32 numBins) {
+    function _makeMarketConfig(int128 _minTick, uint16 _rawSpacing, uint16 _rawNumBins)
+        private
+        pure
+        returns (int256 minTick, int256 maxTick, int256 tickSpacing, uint32 numBins)
+    {
         minTick = int256(_minTick);
         tickSpacing = int256(uint256(bound(_rawSpacing, 1, 10_000)));
         numBins = uint32(bound(_rawNumBins, 2, 1000));
@@ -34,12 +34,10 @@ contract TickBinLibFuzzTest is HarnessDeployer {
     // ============================================================
 
     /// @notice Round-trip: bin → tick → bin recovers the original index
-    function testFuzz_tickToBin_roundTrip(
-        int128 _minTick,
-        uint16 _rawSpacing,
-        uint16 _rawNumBins,
-        uint16 _rawBinIdx
-    ) public view {
+    function testFuzz_tickToBin_roundTrip(int128 _minTick, uint16 _rawSpacing, uint16 _rawNumBins, uint16 _rawBinIdx)
+        public
+        view
+    {
         int256 minTick = int256(_minTick);
         int256 tickSpacing = int256(uint256(bound(_rawSpacing, 1, 10_000)));
         uint32 numBins = uint32(bound(_rawNumBins, 1, 1000));
@@ -114,11 +112,8 @@ contract TickBinLibFuzzTest is HarnessDeployer {
         uint16 _rawLoBin,
         uint16 _rawHiBin
     ) public view {
-        (int256 minTick, int256 maxTick, int256 tickSpacing, uint32 numBins) = _makeMarketConfig(
-            _minTick,
-            _rawSpacing,
-            _rawNumBins
-        );
+        (int256 minTick, int256 maxTick, int256 tickSpacing, uint32 numBins) =
+            _makeMarketConfig(_minTick, _rawSpacing, _rawNumBins);
 
         uint32 loBinExpected = uint32(bound(_rawLoBin, 0, numBins - 2));
         uint32 hiBinExpected = uint32(bound(_rawHiBin, loBinExpected, numBins - 1));
@@ -126,14 +121,7 @@ contract TickBinLibFuzzTest is HarnessDeployer {
         int256 lowerTick = minTick + int256(uint256(loBinExpected)) * tickSpacing;
         int256 upperTick = minTick + int256(uint256(hiBinExpected + 1)) * tickSpacing;
 
-        (uint32 loBin, uint32 hiBin) = harness.ticksToBins(
-            minTick,
-            maxTick,
-            tickSpacing,
-            numBins,
-            lowerTick,
-            upperTick
-        );
+        (uint32 loBin, uint32 hiBin) = harness.ticksToBins(minTick, maxTick, tickSpacing, numBins, lowerTick, upperTick);
 
         assertEq(loBin, harness.tickToBin(minTick, tickSpacing, numBins, lowerTick));
         assertEq(hiBin, harness.tickToBin(minTick, tickSpacing, numBins, upperTick - tickSpacing));
@@ -147,11 +135,8 @@ contract TickBinLibFuzzTest is HarnessDeployer {
         uint16 _rawLoBin,
         uint16 _rawHiBin
     ) public view {
-        (int256 minTick, int256 maxTick, int256 tickSpacing, uint32 numBins) = _makeMarketConfig(
-            _minTick,
-            _rawSpacing,
-            _rawNumBins
-        );
+        (int256 minTick, int256 maxTick, int256 tickSpacing, uint32 numBins) =
+            _makeMarketConfig(_minTick, _rawSpacing, _rawNumBins);
 
         uint32 loBinExpected = uint32(bound(_rawLoBin, 0, numBins - 2));
         uint32 hiBinExpected = uint32(bound(_rawHiBin, loBinExpected, numBins - 1));
@@ -159,41 +144,23 @@ contract TickBinLibFuzzTest is HarnessDeployer {
         int256 lowerTick = minTick + int256(uint256(loBinExpected)) * tickSpacing;
         int256 upperTick = minTick + int256(uint256(hiBinExpected + 1)) * tickSpacing;
 
-        (uint32 loBin, uint32 hiBin) = harness.ticksToBins(
-            minTick,
-            maxTick,
-            tickSpacing,
-            numBins,
-            lowerTick,
-            upperTick
-        );
+        (uint32 loBin, uint32 hiBin) = harness.ticksToBins(minTick, maxTick, tickSpacing, numBins, lowerTick, upperTick);
 
         assertEq(uint256(hiBin - loBin + 1) * uint256(int256(tickSpacing)), uint256(upperTick - lowerTick));
     }
 
     /// @notice Full market range maps to [0, numBins-1]
-    function testFuzz_ticksToBins_fullRangeGivesAllBins(
-        int128 _minTick,
-        uint16 _rawSpacing,
-        uint16 _rawNumBins
-    ) public view {
-        (int256 minTick, int256 maxTick, int256 tickSpacing, uint32 numBins) = _makeMarketConfig(
-            _minTick,
-            _rawSpacing,
-            _rawNumBins
-        );
+    function testFuzz_ticksToBins_fullRangeGivesAllBins(int128 _minTick, uint16 _rawSpacing, uint16 _rawNumBins)
+        public
+        view
+    {
+        (int256 minTick, int256 maxTick, int256 tickSpacing, uint32 numBins) =
+            _makeMarketConfig(_minTick, _rawSpacing, _rawNumBins);
 
         int256 lowerTick = minTick;
         int256 upperTick = minTick + int256(uint256(numBins)) * tickSpacing;
 
-        (uint32 loBin, uint32 hiBin) = harness.ticksToBins(
-            minTick,
-            maxTick,
-            tickSpacing,
-            numBins,
-            lowerTick,
-            upperTick
-        );
+        (uint32 loBin, uint32 hiBin) = harness.ticksToBins(minTick, maxTick, tickSpacing, numBins, lowerTick, upperTick);
 
         assertEq(loBin, 0);
         assertEq(hiBin, numBins - 1);
@@ -206,25 +173,15 @@ contract TickBinLibFuzzTest is HarnessDeployer {
         uint16 _rawNumBins,
         uint16 _rawBinIdx
     ) public view {
-        (int256 minTick, int256 maxTick, int256 tickSpacing, uint32 numBins) = _makeMarketConfig(
-            _minTick,
-            _rawSpacing,
-            _rawNumBins
-        );
+        (int256 minTick, int256 maxTick, int256 tickSpacing, uint32 numBins) =
+            _makeMarketConfig(_minTick, _rawSpacing, _rawNumBins);
 
         uint32 binIdx = uint32(bound(_rawBinIdx, 0, numBins - 1));
 
         int256 lowerTick = minTick + int256(uint256(binIdx)) * tickSpacing;
         int256 upperTick = lowerTick + tickSpacing;
 
-        (uint32 loBin, uint32 hiBin) = harness.ticksToBins(
-            minTick,
-            maxTick,
-            tickSpacing,
-            numBins,
-            lowerTick,
-            upperTick
-        );
+        (uint32 loBin, uint32 hiBin) = harness.ticksToBins(minTick, maxTick, tickSpacing, numBins, lowerTick, upperTick);
 
         assertEq(loBin, binIdx);
         assertEq(hiBin, binIdx);
@@ -238,11 +195,8 @@ contract TickBinLibFuzzTest is HarnessDeployer {
         uint16 _rawLoBin,
         uint16 _rawHiBin
     ) public view {
-        (int256 minTick, int256 maxTick, int256 tickSpacing, uint32 numBins) = _makeMarketConfig(
-            _minTick,
-            _rawSpacing,
-            _rawNumBins
-        );
+        (int256 minTick, int256 maxTick, int256 tickSpacing, uint32 numBins) =
+            _makeMarketConfig(_minTick, _rawSpacing, _rawNumBins);
 
         uint32 loBinExpected = uint32(bound(_rawLoBin, 0, numBins - 2));
         uint32 hiBinExpected = uint32(bound(_rawHiBin, loBinExpected, numBins - 1));
@@ -250,14 +204,7 @@ contract TickBinLibFuzzTest is HarnessDeployer {
         int256 lowerTick = minTick + int256(uint256(loBinExpected)) * tickSpacing;
         int256 upperTick = minTick + int256(uint256(hiBinExpected + 1)) * tickSpacing;
 
-        (uint32 loBin, uint32 hiBin) = harness.ticksToBins(
-            minTick,
-            maxTick,
-            tickSpacing,
-            numBins,
-            lowerTick,
-            upperTick
-        );
+        (uint32 loBin, uint32 hiBin) = harness.ticksToBins(minTick, maxTick, tickSpacing, numBins, lowerTick, upperTick);
 
         assertLe(loBin, hiBin);
     }
@@ -270,11 +217,8 @@ contract TickBinLibFuzzTest is HarnessDeployer {
         uint16 _rawBinIdx,
         bool equalCase
     ) public {
-        (int256 minTick, int256 maxTick, int256 tickSpacing, uint32 numBins) = _makeMarketConfig(
-            _minTick,
-            _rawSpacing,
-            _rawNumBins
-        );
+        (int256 minTick, int256 maxTick, int256 tickSpacing, uint32 numBins) =
+            _makeMarketConfig(_minTick, _rawSpacing, _rawNumBins);
 
         uint32 binIdx = uint32(bound(_rawBinIdx, 0, numBins - 1));
         int256 lowerTick = minTick + int256(uint256(binIdx)) * tickSpacing;

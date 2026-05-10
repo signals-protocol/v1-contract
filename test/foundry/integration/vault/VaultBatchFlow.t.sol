@@ -588,7 +588,7 @@ contract VaultBatchFlowTest is FullSystemDeployer {
         vm.prank(userA);
         sys.core.cancelDeposit(0);
 
-        (uint256 deposits, ) = sys.core.harnessGetPendingBatchTotals(firstBatchId);
+        (uint256 deposits,) = sys.core.harnessGetPendingBatchTotals(firstBatchId);
         assertEq(deposits, 200e18);
     }
 }

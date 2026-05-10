@@ -160,20 +160,11 @@ contract EventsTest is TradeModuleDeployer {
     function test_tracks_positions_per_user_correctly() public {
         MarketConfig[] memory markets = new MarketConfig[](1);
         markets[0] = MarketConfig({
-            numBins: 4,
-            tickSpacing: 1,
-            minTick: 0,
-            maxTick: 4,
-            endOffset: 10_000,
-            liquidityParameter: WAD
+            numBins: 4, tickSpacing: 1, minTick: 0, maxTick: 4, endOffset: 10_000, liquidityParameter: WAD
         });
         TradeModuleSystem memory multi = deployTradeModuleSystem(
             DeployOptions({
-                markets: markets,
-                userCount: 2,
-                fundAmount: 100_000e6,
-                submitWindow: 300,
-                settlementWindow: 60
+                markets: markets, userCount: 2, fundAmount: 100_000e6, submitWindow: 300, settlementWindow: 60
             })
         );
 
@@ -197,20 +188,11 @@ contract EventsTest is TradeModuleDeployer {
     function test_users_can_trade_in_same_market_independently() public {
         MarketConfig[] memory markets = new MarketConfig[](1);
         markets[0] = MarketConfig({
-            numBins: 4,
-            tickSpacing: 1,
-            minTick: 0,
-            maxTick: 4,
-            endOffset: 10_000,
-            liquidityParameter: WAD
+            numBins: 4, tickSpacing: 1, minTick: 0, maxTick: 4, endOffset: 10_000, liquidityParameter: WAD
         });
         TradeModuleSystem memory multi = deployTradeModuleSystem(
             DeployOptions({
-                markets: markets,
-                userCount: 2,
-                fundAmount: 100_000e6,
-                submitWindow: 300,
-                settlementWindow: 60
+                markets: markets, userCount: 2, fundAmount: 100_000e6, submitWindow: 300, settlementWindow: 60
             })
         );
 
@@ -245,14 +227,7 @@ contract EventsTest is TradeModuleDeployer {
         // Open
         vm.prank(user);
         vm.expectEmit(true, false, false, false, address(sys.position));
-        emit SignalsPosition.PositionMinted(
-            positionId,
-            user,
-            MARKET_ID,
-            int256(0),
-            int256(2),
-            uint128(MEDIUM_QUANTITY)
-        );
+        emit SignalsPosition.PositionMinted(positionId, user, MARKET_ID, int256(0), int256(2), uint128(MEDIUM_QUANTITY));
         sys.core.openPosition(MARKET_ID, int256(0), int256(2), uint128(MEDIUM_QUANTITY), 100e6);
 
         assertGt(positionId, 0);

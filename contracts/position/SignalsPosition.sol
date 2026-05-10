@@ -54,13 +54,11 @@ contract SignalsPosition is
 
     // --- Core-only position lifecycle ---
 
-    function mintPosition(
-        address to,
-        uint256 marketId,
-        int256 lowerTick,
-        int256 upperTick,
-        uint128 quantity
-    ) external onlyCore returns (uint256 positionId) {
+    function mintPosition(address to, uint256 marketId, int256 lowerTick, int256 upperTick, uint128 quantity)
+        external
+        onlyCore
+        returns (uint256 positionId)
+    {
         if (to == address(0)) revert SignalsErrors.ZeroAddress();
         if (quantity == 0) revert SignalsErrors.InvalidQuantity(quantity);
 

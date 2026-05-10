@@ -19,18 +19,22 @@ contract FeeWaterfallLibHarness {
         uint256 phiLP,
         uint256 phiBS,
         uint256 phiTR
-    ) external pure returns (
-        uint256 Floss,
-        uint256 Fpool,
-        uint256 Nraw,
-        uint256 Gt,
-        uint256 Ffill,
-        uint256 Fdust,
-        uint256 Ft,
-        uint256 Npre,
-        uint256 Bnext,
-        uint256 Tnext
-    ) {
+    )
+        external
+        pure
+        returns (
+            uint256 Floss,
+            uint256 Fpool,
+            uint256 Nraw,
+            uint256 Gt,
+            uint256 Ffill,
+            uint256 Fdust,
+            uint256 Ft,
+            uint256 Npre,
+            uint256 Bnext,
+            uint256 Tnext
+        )
+    {
         FeeWaterfallLib.Params memory params = FeeWaterfallLib.Params({
             Lt: Lt,
             Ftot: Ftot,
@@ -47,19 +51,6 @@ contract FeeWaterfallLibHarness {
 
         FeeWaterfallLib.Result memory r = FeeWaterfallLib.calculate(params);
 
-        return (
-            r.Floss,
-            r.Fpool,
-            r.Nraw,
-            r.Gt,
-            r.Ffill,
-            r.Fdust,
-            r.Ft,
-            r.Npre,
-            r.Bnext,
-            r.Tnext
-        );
+        return (r.Floss, r.Fpool, r.Nraw, r.Gt, r.Ffill, r.Fdust, r.Ft, r.Npre, r.Bnext, r.Tnext);
     }
 }
-
-

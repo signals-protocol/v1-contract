@@ -118,33 +118,17 @@ contract OperatorSecurityTest is FullSystemDeployer {
         // Outsider rejected
         vm.prank(outsider);
         vm.expectRevert(abi.encodeWithSelector(SE.UnauthorizedCaller.selector, outsider));
-        sys.core.createMarket(
-            minTick,
-            maxTick,
-            tickSpacing,
-            start,
-            end,
-            settlement,
-            numBins,
-            liqParam,
-            address(sys.feePolicy),
-            seed
-        );
+        sys.core
+            .createMarket(
+                minTick, maxTick, tickSpacing, start, end, settlement, numBins, liqParam, address(sys.feePolicy), seed
+            );
 
         // Owner succeeds
         vm.prank(sys.owner);
-        sys.core.createMarket(
-            minTick,
-            maxTick,
-            tickSpacing,
-            start,
-            end,
-            settlement,
-            numBins,
-            liqParam,
-            address(sys.feePolicy),
-            seed
-        );
+        sys.core
+            .createMarket(
+                minTick, maxTick, tickSpacing, start, end, settlement, numBins, liqParam, address(sys.feePolicy), seed
+            );
 
         // Add operator
         vm.prank(sys.owner);
@@ -154,18 +138,19 @@ contract OperatorSecurityTest is FullSystemDeployer {
         address seed2 = _deploySeedData(numBins);
         uint64 now_ = uint64(block.timestamp);
         vm.prank(operator);
-        sys.core.createMarket(
-            minTick,
-            maxTick,
-            tickSpacing,
-            now_ - 99,
-            now_ + 10001,
-            now_ + 10101,
-            numBins,
-            liqParam,
-            address(sys.feePolicy),
-            seed2
-        );
+        sys.core
+            .createMarket(
+                minTick,
+                maxTick,
+                tickSpacing,
+                now_ - 99,
+                now_ + 10001,
+                now_ + 10101,
+                numBins,
+                liqParam,
+                address(sys.feePolicy),
+                seed2
+            );
     }
 
     // ============================================================
@@ -187,18 +172,10 @@ contract OperatorSecurityTest is FullSystemDeployer {
 
         // Create market (not seeded yet - createMarket doesn't seed chunks)
         vm.prank(sys.owner);
-        uint256 marketId = sys.core.createMarket(
-            minTick,
-            maxTick,
-            tickSpacing,
-            start,
-            end,
-            settlement,
-            numBins,
-            liqParam,
-            address(sys.feePolicy),
-            seed
-        );
+        uint256 marketId = sys.core
+            .createMarket(
+                minTick, maxTick, tickSpacing, start, end, settlement, numBins, liqParam, address(sys.feePolicy), seed
+            );
 
         // Outsider rejected
         vm.prank(outsider);
@@ -387,17 +364,8 @@ contract OperatorSecurityTest is FullSystemDeployer {
         // Create a market
         uint64 now_ = uint64(block.timestamp);
         vm.prank(sys.owner);
-        uint256 marketId = sys.core.createMarketUniform(
-            0,
-            4,
-            1,
-            now_ - 100,
-            now_ + 10000,
-            now_ + 10100,
-            4,
-            WAD,
-            address(sys.feePolicy)
-        );
+        uint256 marketId = sys.core
+        .createMarketUniform(0, 4, 1, now_ - 100, now_ + 10000, now_ + 10100, 4, WAD, address(sys.feePolicy));
 
         vm.prank(operator);
         sys.core.pause();

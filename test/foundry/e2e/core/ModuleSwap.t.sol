@@ -44,17 +44,7 @@ contract ModuleSwapTest is FullSystemDeployer {
         uint64 settlement = uint64(block.timestamp + 60);
 
         vm.prank(sys.owner);
-        uint256 marketId = sys.core.createMarketUniform(
-            0,
-            4,
-            1,
-            start,
-            end,
-            settlement,
-            4,
-            WAD,
-            address(sys.feePolicy)
-        );
+        uint256 marketId = sys.core.createMarketUniform(0, 4, 1, start, end, settlement, 4, WAD, address(sys.feePolicy));
 
         // User A opens position
         uint128 qtyA = 1_000;
@@ -69,13 +59,14 @@ contract ModuleSwapTest is FullSystemDeployer {
 
         // Hot-swap modules
         vm.prank(sys.owner);
-        sys.core.setModules(
-            address(newTrade),
-            address(newLifecycle),
-            address(sys.riskModule),
-            address(sys.vaultModule),
-            address(sys.oracleModule)
-        );
+        sys.core
+            .setModules(
+                address(newTrade),
+                address(newLifecycle),
+                address(sys.riskModule),
+                address(sys.vaultModule),
+                address(sys.oracleModule)
+            );
 
         // User B opens position with new modules
         uint128 qtyB = 2_000;
@@ -91,7 +82,7 @@ contract ModuleSwapTest is FullSystemDeployer {
         vm.prank(sys.owner);
         sys.core.requestSettlementChunks(marketId, 5);
 
-        (, , , uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
+        (,,, uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
         vm.warp(claimOpen);
 
         // Both users claim

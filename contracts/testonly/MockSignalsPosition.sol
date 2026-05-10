@@ -26,20 +26,13 @@ contract MockSignalsPosition is ISignalsPosition {
         return _nextId;
     }
 
-    function mintPosition(
-        address trader,
-        uint256 marketId,
-        int256 lowerTick,
-        int256 upperTick,
-        uint128 quantity
-    ) external returns (uint256 positionId) {
+    function mintPosition(address trader, uint256 marketId, int256 lowerTick, int256 upperTick, uint128 quantity)
+        external
+        returns (uint256 positionId)
+    {
         positionId = _nextId++;
         _positions[positionId] = MinimalPosition({
-            marketId: marketId,
-            lowerTick: lowerTick,
-            upperTick: upperTick,
-            quantity: quantity,
-            owner: trader
+            marketId: marketId, lowerTick: lowerTick, upperTick: upperTick, quantity: quantity, owner: trader
         });
         emit PositionMinted(positionId, trader);
     }
@@ -56,11 +49,7 @@ contract MockSignalsPosition is ISignalsPosition {
     function getPosition(uint256 positionId) external view returns (ISignalsPosition.Position memory position) {
         MinimalPosition memory p = _positions[positionId];
         position = ISignalsPosition.Position({
-            marketId: p.marketId,
-            lowerTick: p.lowerTick,
-            upperTick: p.upperTick,
-            quantity: p.quantity,
-            createdAt: 0
+            marketId: p.marketId, lowerTick: p.lowerTick, upperTick: p.upperTick, quantity: p.quantity, createdAt: 0
         });
     }
 
@@ -83,11 +72,7 @@ contract MockSignalsPosition is ISignalsPosition {
         uint128 quantity
     ) external {
         _positions[positionId] = MinimalPosition({
-            marketId: marketId,
-            lowerTick: lowerTick,
-            upperTick: upperTick,
-            quantity: quantity,
-            owner: trader
+            marketId: marketId, lowerTick: lowerTick, upperTick: upperTick, quantity: quantity, owner: trader
         });
         if (positionId >= _nextId) {
             _nextId = positionId + 1;

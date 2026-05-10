@@ -160,11 +160,10 @@ contract SignalsRouter is Ownable, ReentrancyGuard, IERC721Receiver {
         _deliverOutput(outputToken, minOutputAmount, receivedAmount, msg.sender);
     }
 
-    function claimPayoutWithSwap(
-        uint256 positionId,
-        address outputToken,
-        uint256 minOutputAmount
-    ) external nonReentrant {
+    function claimPayoutWithSwap(uint256 positionId, address outputToken, uint256 minOutputAmount)
+        external
+        nonReentrant
+    {
         _requirePositionOwner(positionId);
 
         uint256 ctUSDBefore = ctUSD.balanceOf(address(this));
@@ -179,12 +178,9 @@ contract SignalsRouter is Ownable, ReentrancyGuard, IERC721Receiver {
         return this.onERC721Received.selector;
     }
 
-    function _deliverOutput(
-        address outputToken,
-        uint256 minOutputAmount,
-        uint256 receivedAmount,
-        address recipient
-    ) internal {
+    function _deliverOutput(address outputToken, uint256 minOutputAmount, uint256 receivedAmount, address recipient)
+        internal
+    {
         if (receivedAmount == 0) return;
 
         if (outputToken == address(ctUSD)) {
@@ -201,12 +197,10 @@ contract SignalsRouter is Ownable, ReentrancyGuard, IERC721Receiver {
         outToken.safeTransfer(recipient, outputAmount);
     }
 
-    function _swapExactInput(
-        IERC20 tokenIn,
-        IERC20 tokenOut,
-        uint256 amountIn,
-        uint256 amountOutMinimum
-    ) internal returns (uint256 amountOut) {
+    function _swapExactInput(IERC20 tokenIn, IERC20 tokenOut, uint256 amountIn, uint256 amountOutMinimum)
+        internal
+        returns (uint256 amountOut)
+    {
         tokenIn.forceApprove(address(swapRouter), amountIn);
         amountOut = swapRouter.exactInputSingle(
             IAlgebraSwapRouter.ExactInputSingleParams({

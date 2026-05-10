@@ -42,9 +42,7 @@ contract ModuleSwapSimulationTest is ForkBaseTest {
             assertEq(post.settled, pre[i].settled, string.concat("market ", id, ": settled changed"));
             assertEq(post.numBins, pre[i].numBins, string.concat("market ", id, ": numBins changed"));
             assertEq(
-                post.liquidityParameter,
-                pre[i].liquidityParameter,
-                string.concat("market ", id, ": liqParam changed")
+                post.liquidityParameter, pre[i].liquidityParameter, string.concat("market ", id, ": liqParam changed")
             );
             assertEq(post.startTs, pre[i].startTs, string.concat("market ", id, ": startTs changed"));
             assertEq(post.endTs, pre[i].endTs, string.concat("market ", id, ": endTs changed"));

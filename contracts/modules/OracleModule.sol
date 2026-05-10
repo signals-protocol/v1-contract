@@ -29,26 +29,14 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
     // ============================================================
 
     event SettlementPriceSubmitted(
-        uint256 indexed marketId,
-        int256 settlementValue,
-        uint64 priceTimestamp,
-        address indexed submitter
+        uint256 indexed marketId, int256 settlementValue, uint64 priceTimestamp, address indexed submitter
     );
 
     event SettlementCandidateUpdated(
-        uint256 indexed marketId,
-        int256 settlementValue,
-        int256 settlementTick,
-        uint64 priceTimestamp,
-        uint64 distance
+        uint256 indexed marketId, int256 settlementValue, int256 settlementTick, uint64 priceTimestamp, uint64 distance
     );
 
-    event OracleConfigUpdated(
-        bytes32 feedId,
-        uint8 feedDecimals,
-        uint64 maxSampleDistance,
-        uint64 futureTolerance
-    );
+    event OracleConfigUpdated(bytes32 feedId, uint8 feedDecimals, uint64 maxSampleDistance, uint64 futureTolerance);
 
     // ============================================================
     // Configuration
@@ -59,12 +47,10 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
     /// @param feedDecimals Decimals of the feed price (e.g., 8 for BTC/USD)
     /// @param _maxSampleDistance Δmax: maximum |priceTimestamp - Tset|
     /// @param _futureTolerance δfuture: maximum priceTimestamp - block.timestamp
-    function setRedstoneConfig(
-        bytes32 feedId,
-        uint8 feedDecimals,
-        uint64 _maxSampleDistance,
-        uint64 _futureTolerance
-    ) external onlyDelegated {
+    function setRedstoneConfig(bytes32 feedId, uint8 feedDecimals, uint64 _maxSampleDistance, uint64 _futureTolerance)
+        external
+        onlyDelegated
+    {
         redstoneFeedId = feedId;
         redstoneFeedDecimals = feedDecimals;
         maxSampleDistance = _maxSampleDistance;
@@ -81,9 +67,7 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
     ///      Redstone payload in calldata. Signatures verified on-chain.
     ///      Closest-sample selection: |priceTimestamp - Tset| minimum, tie-break to past
     /// @param marketId Market to submit settlement for
-    function submitSettlementSample(
-        uint256 marketId
-    ) external onlyDelegated {
+    function submitSettlementSample(uint256 marketId) external onlyDelegated {
         ISignalsCore.Market storage market = markets[marketId];
         require(market.numBins != 0, SE.MarketNotFound(marketId));
         require(!market.settled, SE.MarketAlreadySettled(marketId));
@@ -106,10 +90,11 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
         require(priceTimestamp <= nowTs + futureTolerance, SE.OracleSampleInFuture(priceTimestamp, nowTs));
 
         // Δmax check: |priceTimestamp - Tset| ≤ maxSampleDistance
-        uint64 distance = priceTimestamp >= tSet
-            ? priceTimestamp - tSet
-            : tSet - priceTimestamp;
-        require(maxSampleDistance == 0 || distance <= maxSampleDistance, SE.OracleSampleTooFarFromTset(distance, maxSampleDistance));
+        uint64 distance = priceTimestamp >= tSet ? priceTimestamp - tSet : tSet - priceTimestamp;
+        require(
+            maxSampleDistance == 0 || distance <= maxSampleDistance,
+            SE.OracleSampleTooFarFromTset(distance, maxSampleDistance)
+        );
 
         // Convert price to settlementValue (scale from feedDecimals to 6 decimals)
         int256 settlementValue = _convertPriceToSettlementValue(price);
@@ -120,7 +105,6 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
         emit SettlementPriceSubmitted(marketId, settlementValue, priceTimestamp, msg.sender);
     }
 
-
     // ============================================================
     // Closest-Sample Selection
     // ============================================================
@@ -128,40 +112,31 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
     /// @dev Update candidate using closest-sample rule
     ///      - Replace if |new - Tset| < |existing - Tset|
     ///      - On tie, keep the more past (smaller timestamp)
-    function _updateCandidate(
-        uint256 marketId,
-        int256 settlementValue,
-        uint64 priceTimestamp,
-        uint64 tSet
-    ) internal {
+    function _updateCandidate(uint256 marketId, int256 settlementValue, uint64 priceTimestamp, uint64 tSet) internal {
         SettlementOracleState storage state = settlementOracleState[marketId];
-        
-        uint64 newDistance = priceTimestamp >= tSet
-            ? priceTimestamp - tSet
-            : tSet - priceTimestamp;
+
+        uint64 newDistance = priceTimestamp >= tSet ? priceTimestamp - tSet : tSet - priceTimestamp;
 
         if (state.candidatePriceTimestamp == 0) {
             // No existing candidate, accept new one
             state.candidateValue = settlementValue;
             state.candidatePriceTimestamp = priceTimestamp;
-            
+
             int256 tick = _toSettlementTick(markets[marketId], settlementValue);
             emit SettlementCandidateUpdated(marketId, settlementValue, tick, priceTimestamp, newDistance);
         } else {
             // Compare distances to Tset (absolute value)
             uint64 existingTs = state.candidatePriceTimestamp;
-            uint64 existingDistance = existingTs >= tSet
-                ? existingTs - tSet
-                : tSet - existingTs;
+            uint64 existingDistance = existingTs >= tSet ? existingTs - tSet : tSet - existingTs;
 
             // Replace only if strictly closer, or same distance and more past
-            bool shouldReplace = newDistance < existingDistance ||
-                (newDistance == existingDistance && priceTimestamp < existingTs);
+            bool shouldReplace =
+                newDistance < existingDistance || (newDistance == existingDistance && priceTimestamp < existingTs);
 
             if (shouldReplace) {
                 state.candidateValue = settlementValue;
                 state.candidatePriceTimestamp = priceTimestamp;
-                
+
                 int256 tick = _toSettlementTick(markets[marketId], settlementValue);
                 emit SettlementCandidateUpdated(marketId, settlementValue, tick, priceTimestamp, newDistance);
             }
@@ -191,17 +166,17 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
     function getMarketState(uint256 marketId) external view returns (uint8 state) {
         ISignalsCore.Market storage market = markets[marketId];
         require(market.numBins != 0, SE.MarketNotFound(marketId));
-        
+
         if (market.settled) {
             return market.failed ? 4 : 3; // FinalizedSecondary or FinalizedPrimary
         }
         if (market.failed) {
             return 5; // FailedPendingManual
         }
-        
+
         uint64 tSet = market.settlementTimestamp;
         uint64 nowTs = uint64(block.timestamp);
-        
+
         if (nowTs < tSet) return 0; // Trading
         if (nowTs < tSet + settlementSubmitWindow) return 1; // SettlementOpen
         if (nowTs < tSet + settlementSubmitWindow + pendingOpsWindow) return 2; // PendingOps
@@ -209,15 +184,14 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
     }
 
     /// @notice Get settlement windows for a market
-    function getSettlementWindows(uint256 marketId) external view returns (
-        uint64 tSet,
-        uint64 settleEnd,
-        uint64 opsEnd,
-        uint64 claimOpen
-    ) {
+    function getSettlementWindows(uint256 marketId)
+        external
+        view
+        returns (uint64 tSet, uint64 settleEnd, uint64 opsEnd, uint64 claimOpen)
+    {
         ISignalsCore.Market storage market = markets[marketId];
         require(market.numBins != 0, SE.MarketNotFound(marketId));
-        
+
         tSet = market.settlementTimestamp;
         settleEnd = tSet + settlementSubmitWindow;
         opsEnd = settleEnd + pendingOpsWindow;
@@ -248,17 +222,21 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
     /// @dev Convert settlement value to tick
     /// settlementTick = settlementValue / 1e6
     /// maxTick is exclusive upper bound, clamp to last valid tick
-    function _toSettlementTick(ISignalsCore.Market storage market, int256 settlementValue) internal view returns (int256) {
+    function _toSettlementTick(ISignalsCore.Market storage market, int256 settlementValue)
+        internal
+        view
+        returns (int256)
+    {
         int256 spacing = market.tickSpacing;
         int256 tick = settlementValue / 1_000_000; // Convert 6-decimal value to tick
-        
+
         // Clamp to valid range [minTick, maxTick - tickSpacing]
         // maxTick is exclusive (outcome space is [minTick, maxTick))
         // Last valid tick is maxTick - tickSpacing
         int256 lastValidTick = market.maxTick - spacing;
         if (tick < market.minTick) tick = market.minTick;
         if (tick > lastValidTick) tick = lastValidTick;
-        
+
         // Align to tick spacing
         int256 offset = tick - market.minTick;
         tick = market.minTick + (offset / spacing) * spacing;

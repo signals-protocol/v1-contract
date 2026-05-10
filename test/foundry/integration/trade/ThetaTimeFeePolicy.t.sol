@@ -23,20 +23,11 @@ contract ThetaTimeFeePolicyIntegrationTest is TradeModuleDeployer {
 
         MarketConfig[] memory markets = new MarketConfig[](1);
         markets[0] = MarketConfig({
-            numBins: 4,
-            tickSpacing: 1,
-            minTick: 0,
-            maxTick: 4,
-            endOffset: ONE_HOUR * 2,
-            liquidityParameter: WAD
+            numBins: 4, tickSpacing: 1, minTick: 0, maxTick: 4, endOffset: ONE_HOUR * 2, liquidityParameter: WAD
         });
         sys = deployTradeModuleSystem(
             DeployOptions({
-                markets: markets,
-                userCount: 1,
-                fundAmount: 100_000e6,
-                submitWindow: 300,
-                settlementWindow: 60
+                markets: markets, userCount: 1, fundAmount: 100_000e6, submitWindow: 300, settlementWindow: 60
             })
         );
 

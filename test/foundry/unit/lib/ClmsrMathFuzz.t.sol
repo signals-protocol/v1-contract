@@ -103,12 +103,10 @@ contract ClmsrMathFuzzTest is HarnessDeployer {
         assertGt(cost, 0);
     }
 
-    function testFuzz_buyCost_monotonic(
-        uint256 alphaSeed,
-        uint256 sumSeed,
-        uint256 d1Seed,
-        uint256 d2Seed
-    ) public view {
+    function testFuzz_buyCost_monotonic(uint256 alphaSeed, uint256 sumSeed, uint256 d1Seed, uint256 d2Seed)
+        public
+        view
+    {
         uint256 alpha = _boundAlpha(alphaSeed);
         uint256 sumBefore = bound(sumSeed, WAD, 1e28);
         uint256 d1 = bound(d1Seed, 1e16, sumBefore);
@@ -118,12 +116,10 @@ contract ClmsrMathFuzzTest is HarnessDeployer {
         assertLe(cost1, cost2);
     }
 
-    function testFuzz_buyCost_scalingWithAlpha(
-        uint256 a1Seed,
-        uint256 a2Seed,
-        uint256 sumSeed,
-        uint256 deltaSeed
-    ) public view {
+    function testFuzz_buyCost_scalingWithAlpha(uint256 a1Seed, uint256 a2Seed, uint256 sumSeed, uint256 deltaSeed)
+        public
+        view
+    {
         uint256 alpha1 = bound(a1Seed, 1e15, 500e18);
         uint256 alpha2 = bound(a2Seed, alpha1 + 1, 1000e18);
         uint256 sumBefore = bound(sumSeed, WAD, 1e28);
@@ -153,12 +149,10 @@ contract ClmsrMathFuzzTest is HarnessDeployer {
         assertGt(proceeds, 0);
     }
 
-    function testFuzz_sellProceeds_monotonic(
-        uint256 alphaSeed,
-        uint256 sumSeed,
-        uint256 d1Seed,
-        uint256 d2Seed
-    ) public view {
+    function testFuzz_sellProceeds_monotonic(uint256 alphaSeed, uint256 sumSeed, uint256 d1Seed, uint256 d2Seed)
+        public
+        view
+    {
         uint256 alpha = _boundAlpha(alphaSeed);
         uint256 sumBefore = bound(sumSeed, 3 * WAD, 1e28);
         uint256 d1 = bound(d1Seed, 1e16, sumBefore / 2);

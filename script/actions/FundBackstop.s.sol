@@ -21,7 +21,7 @@ contract FundBackstop is BaseScript {
         require(IERC20Metadata(paymentAddr).decimals() == 6, "Payment token must have 6 decimals");
 
         SignalsCore core = SignalsCore(coreProxy);
-        (uint256 backstopNav, ) = core.getCapitalStack();
+        (uint256 backstopNav,) = core.getCapitalStack();
         if (backstopNav > 0) {
             console.log("[fund-backstop] backstop already funded (nav=%s); skipping", backstopNav);
             return;

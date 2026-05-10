@@ -38,17 +38,18 @@ contract ApprovedOperatorTest is FullSystemDeployer {
         vm.startPrank(sys.owner);
         sys.payment.approve(address(sys.core), SEED_AMOUNT);
         sys.core.seedVault(SEED_AMOUNT);
-        marketId = sys.core.createMarketUniform(
-            0,
-            4,
-            1,
-            uint64(block.timestamp - 5),
-            uint64(block.timestamp + 50),
-            uint64(block.timestamp + 60),
-            4,
-            WAD,
-            address(sys.feePolicy)
-        );
+        marketId = sys.core
+            .createMarketUniform(
+                0,
+                4,
+                1,
+                uint64(block.timestamp - 5),
+                uint64(block.timestamp + 50),
+                uint64(block.timestamp + 60),
+                4,
+                WAD,
+                address(sys.feePolicy)
+            );
         vm.stopPrank();
 
         vm.prank(trader);
@@ -158,12 +159,10 @@ contract ApprovedOperatorTest is FullSystemDeployer {
         assertEq(sys.payment.balanceOf(operator) - operatorBefore, POSITION_QTY + (POSITION_QTY / 2));
     }
 
-    function _openPosition(
-        address user,
-        int256 lowerTick,
-        int256 upperTick,
-        uint128 quantity
-    ) internal returns (uint256 positionId) {
+    function _openPosition(address user, int256 lowerTick, int256 upperTick, uint128 quantity)
+        internal
+        returns (uint256 positionId)
+    {
         uint256 maxCost = sys.core.calculateOpenCost(marketId, lowerTick, upperTick, quantity) + 1_000_000;
         positionId = sys.position.nextId();
 
@@ -171,11 +170,10 @@ contract ApprovedOperatorTest is FullSystemDeployer {
         sys.core.openPosition(marketId, lowerTick, upperTick, quantity, maxCost);
     }
 
-    function _setTraderFeePolicy(
-        address expectedTrader,
-        uint256 expectedFee,
-        uint256 fallbackFee
-    ) internal returns (MockTraderFeePolicy feePolicy) {
+    function _setTraderFeePolicy(address expectedTrader, uint256 expectedFee, uint256 fallbackFee)
+        internal
+        returns (MockTraderFeePolicy feePolicy)
+    {
         feePolicy = new MockTraderFeePolicy(expectedTrader, expectedFee, fallbackFee);
 
         ISignalsCore.Market memory market = sys.core.harnessGetMarket(marketId);
@@ -190,7 +188,7 @@ contract ApprovedOperatorTest is FullSystemDeployer {
     }
 
     function _warpToClaimOpen() internal {
-        (, , , uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
+        (,,, uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
         vm.warp(claimOpen);
     }
 }

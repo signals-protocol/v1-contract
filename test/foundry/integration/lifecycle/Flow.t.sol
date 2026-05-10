@@ -51,7 +51,7 @@ contract FlowTest is FullSystemDeployer {
         assertEq(market.openPositionCount, 1);
 
         // Get settlement windows
-        (uint64 tSet, uint64 settleEnd, , ) = sys.core.getSettlementWindows(marketId);
+        (uint64 tSet, uint64 settleEnd,,) = sys.core.getSettlementWindows(marketId);
 
         // Submit oracle price after Tset
         uint256 priceTimestamp = tSet + 5;
@@ -75,7 +75,7 @@ contract FlowTest is FullSystemDeployer {
         assertTrue(market.snapshotChunksDone);
 
         // Claim payout
-        (, , , uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
+        (,,, uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
         vm.warp(claimOpen);
 
         uint256 balBefore = sys.payment.balanceOf(user);
@@ -100,7 +100,7 @@ contract FlowTest is FullSystemDeployer {
         sys.core.openPosition(marketId, int256(3), int256(4), uint128(1_000), 5_000_000);
 
         // Settle at tick 1
-        (uint64 tSet, uint64 settleEnd, , ) = sys.core.getSettlementWindows(marketId);
+        (uint64 tSet, uint64 settleEnd,,) = sys.core.getSettlementWindows(marketId);
         uint256 priceTimestamp = tSet + 5;
         vm.warp(priceTimestamp + 1);
         RedstoneHelper.submitWithPayload(vm, address(sys.core), sys.owner, marketId, 1, priceTimestamp);
@@ -113,7 +113,7 @@ contract FlowTest is FullSystemDeployer {
         sys.core.requestSettlementChunks(marketId, 5);
 
         // Claim both
-        (, , , uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
+        (,,, uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
         vm.warp(claimOpen);
 
         uint256 balBefore = sys.payment.balanceOf(user);
@@ -140,17 +140,8 @@ contract FlowTest is FullSystemDeployer {
         uint64 settlementTs = end + 50;
 
         vm.prank(sys.owner);
-        uint256 marketId = sys.core.createMarketUniform(
-            0,
-            4,
-            1,
-            start,
-            end,
-            settlementTs,
-            4,
-            1e18,
-            address(sys.feePolicy)
-        );
+        uint256 marketId =
+            sys.core.createMarketUniform(0, 4, 1, start, end, settlementTs, 4, 1e18, address(sys.feePolicy));
 
         // Too early to trade
         vm.prank(user);

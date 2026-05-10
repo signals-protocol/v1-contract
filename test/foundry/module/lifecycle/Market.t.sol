@@ -34,17 +34,18 @@ contract MarketLifecycleTest is FullSystemDeployer {
         start = now_ - 100;
         end_ = now_ + 200;
         vm.prank(sys.owner);
-        marketId = sys.core.createMarketUniform(
-            0, // minTick
-            4, // maxTick
-            1, // tickSpacing
-            start,
-            end_,
-            end_, // settlementTimestamp = endTimestamp
-            4, // numBins
-            WAD, // liquidityParameter
-            address(sys.feePolicy)
-        );
+        marketId = sys.core
+            .createMarketUniform(
+                0, // minTick
+                4, // maxTick
+                1, // tickSpacing
+                start,
+                end_,
+                end_, // settlementTimestamp = endTimestamp
+                4, // numBins
+                WAD, // liquidityParameter
+                address(sys.feePolicy)
+            );
     }
 
     /// @dev Build a cloned market struct with overrides
@@ -78,23 +79,15 @@ contract MarketLifecycleTest is FullSystemDeployer {
         uint64 settlementTs = end_ + 50;
 
         uint256[] memory factors = new uint256[](4);
-        for (uint256 i = 0; i < 4; i++) factors[i] = WAD;
+        for (uint256 i = 0; i < 4; i++) {
+            factors[i] = WAD;
+        }
 
         SeedData seedData = SeedHelper.deploySeedData(factors);
 
         vm.prank(sys.owner);
-        uint256 marketId = sys.core.createMarket(
-            0,
-            4,
-            1,
-            start,
-            end_,
-            settlementTs,
-            4,
-            WAD,
-            address(sys.feePolicy),
-            address(seedData)
-        );
+        uint256 marketId = sys.core
+        .createMarket(0, 4, 1, start, end_, settlementTs, 4, WAD, address(sys.feePolicy), address(seedData));
 
         vm.prank(sys.owner);
         sys.core.seedNextChunks(marketId, 4);
@@ -144,18 +137,8 @@ contract MarketLifecycleTest is FullSystemDeployer {
         SeedData seedData = SeedHelper.deploySeedData(factors);
 
         vm.prank(sys.owner);
-        uint256 marketId = sys.core.createMarket(
-            0,
-            5,
-            1,
-            start,
-            end_,
-            settlementTs,
-            5,
-            WAD,
-            address(sys.feePolicy),
-            address(seedData)
-        );
+        uint256 marketId = sys.core
+        .createMarket(0, 5, 1, start, end_, settlementTs, 5, WAD, address(sys.feePolicy), address(seedData));
 
         // Zero limit reverts
         vm.prank(sys.owner);
@@ -239,7 +222,7 @@ contract MarketLifecycleTest is FullSystemDeployer {
     // ============================================================
 
     function test_settlesMarketWithCandidate() public {
-        (uint256 marketId, , uint64 end_) = _createDefaultMarket();
+        (uint256 marketId,, uint64 end_) = _createDefaultMarket();
         uint64 tSet = end_; // settlementTimestamp = endTimestamp
 
         // Submit oracle candidate during settlement window
@@ -275,7 +258,7 @@ contract MarketLifecycleTest is FullSystemDeployer {
     // ============================================================
 
     function test_finalizePrimaryEnforcesCandidateAndWindowChecks() public {
-        (uint256 marketId, , uint64 end_) = _createDefaultMarket();
+        (uint256 marketId,, uint64 end_) = _createDefaultMarket();
         uint64 tSet = end_;
         uint256 opsEnd = uint256(tSet) + SUBMIT_WINDOW + OPS_WINDOW;
 
@@ -313,7 +296,7 @@ contract MarketLifecycleTest is FullSystemDeployer {
     // ============================================================
 
     function test_finalizePrimaryAllowsDuringPendingOps() public {
-        (uint256 marketId, , uint64 end_) = _createDefaultMarket();
+        (uint256 marketId,, uint64 end_) = _createDefaultMarket();
         uint64 tSet = end_;
 
         uint256 candidateTs = uint256(tSet) + 10;
@@ -334,7 +317,7 @@ contract MarketLifecycleTest is FullSystemDeployer {
     // ============================================================
 
     function test_marksSettlementFailedDuringPendingOps() public {
-        (uint256 marketId, , uint64 end_) = _createDefaultMarket();
+        (uint256 marketId,, uint64 end_) = _createDefaultMarket();
         uint64 tSet = end_;
         uint256 opsStart = uint256(tSet) + SUBMIT_WINDOW;
 
@@ -353,7 +336,7 @@ contract MarketLifecycleTest is FullSystemDeployer {
     // ============================================================
 
     function test_rejectsMarkFailedBeforePendingOps() public {
-        (uint256 marketId, , uint64 end_) = _createDefaultMarket();
+        (uint256 marketId,, uint64 end_) = _createDefaultMarket();
         uint64 tSet = end_;
 
         vm.warp(uint256(tSet) + 10);
@@ -367,7 +350,7 @@ contract MarketLifecycleTest is FullSystemDeployer {
     // ============================================================
 
     function test_rejectsMarkFailedIfCandidateExists() public {
-        (uint256 marketId, , uint64 end_) = _createDefaultMarket();
+        (uint256 marketId,, uint64 end_) = _createDefaultMarket();
         uint64 tSet = end_;
         uint256 opsEnd = uint256(tSet) + SUBMIT_WINDOW + OPS_WINDOW;
 
@@ -388,7 +371,7 @@ contract MarketLifecycleTest is FullSystemDeployer {
     // ============================================================
 
     function test_finalizesSecondarySettlementForFailedMarket() public {
-        (uint256 marketId, , uint64 end_) = _createDefaultMarket();
+        (uint256 marketId,, uint64 end_) = _createDefaultMarket();
         uint64 tSet = end_;
         uint256 opsStart = uint256(tSet) + SUBMIT_WINDOW;
 
@@ -413,7 +396,7 @@ contract MarketLifecycleTest is FullSystemDeployer {
     // ============================================================
 
     function test_rejectsSecondarySettlementForNonFailedMarket() public {
-        (uint256 marketId, , ) = _createDefaultMarket();
+        (uint256 marketId,,) = _createDefaultMarket();
 
         vm.prank(sys.owner);
         vm.expectRevert(abi.encodeWithSelector(SE.MarketNotFailed.selector, marketId));
@@ -425,7 +408,7 @@ contract MarketLifecycleTest is FullSystemDeployer {
     // ============================================================
 
     function test_rejectsSecondarySettlementForAlreadySettledMarket() public {
-        (uint256 marketId, , uint64 end_) = _createDefaultMarket();
+        (uint256 marketId,, uint64 end_) = _createDefaultMarket();
         uint64 tSet = end_;
         uint256 opsStart = uint256(tSet) + SUBMIT_WINDOW;
 
@@ -449,7 +432,7 @@ contract MarketLifecycleTest is FullSystemDeployer {
     // ============================================================
 
     function test_updatesMarketTiming() public {
-        (uint256 marketId, , ) = _createDefaultMarket();
+        (uint256 marketId,,) = _createDefaultMarket();
 
         // Invalid time range
         vm.prank(sys.owner);
@@ -474,7 +457,7 @@ contract MarketLifecycleTest is FullSystemDeployer {
     // ============================================================
 
     function test_settlementChunkRequestsAndCompletion() public {
-        (uint256 marketId, , ) = _createDefaultMarket();
+        (uint256 marketId,,) = _createDefaultMarket();
 
         ISignalsCore.Market memory market = sys.core.harnessGetMarket(marketId);
         market.settled = true;
@@ -505,7 +488,7 @@ contract MarketLifecycleTest is FullSystemDeployer {
     // ============================================================
 
     function test_rejectsReSettlementAndMultiChunkOrdering() public {
-        (uint256 marketId, , ) = _createDefaultMarket();
+        (uint256 marketId,,) = _createDefaultMarket();
 
         // Mark as settled with large openPositionCount = 1025 → ceil(1025/512) = 3 chunks
         ISignalsCore.Market memory market = sys.core.harnessGetMarket(marketId);
@@ -541,7 +524,7 @@ contract MarketLifecycleTest is FullSystemDeployer {
     // ============================================================
 
     function test_handlesZeroOpenPositionsAndChunkValidation() public {
-        (uint256 marketId, , ) = _createDefaultMarket();
+        (uint256 marketId,,) = _createDefaultMarket();
 
         ISignalsCore.Market memory market = sys.core.harnessGetMarket(marketId);
         market.settled = true;

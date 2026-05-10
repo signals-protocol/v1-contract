@@ -40,17 +40,7 @@ contract FullLifecycleTest is FullSystemDeployer {
         uint64 settlement = uint64(block.timestamp + 60);
 
         vm.prank(sys.owner);
-        uint256 marketId = sys.core.createMarketUniform(
-            0,
-            4,
-            1,
-            start,
-            end,
-            settlement,
-            4,
-            WAD,
-            address(sys.feePolicy)
-        );
+        uint256 marketId = sys.core.createMarketUniform(0, 4, 1, start, end, settlement, 4, WAD, address(sys.feePolicy));
 
         // Open position
         uint128 quantity = 1_000;
@@ -77,7 +67,7 @@ contract FullLifecycleTest is FullSystemDeployer {
         sys.core.claimPayout(positionId);
 
         // Advance past claim delay
-        (, , , uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
+        (,,, uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
         vm.warp(claimOpen);
 
         // Original trader cannot claim (no longer owner)

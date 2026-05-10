@@ -32,19 +32,15 @@ library ExposureDiffLib {
      * @param delta Value to add (can be negative for removal)
      * @param numBins Total number of bins in the market
      */
-    function rangeAdd(
-        mapping(uint32 => int256) storage diff,
-        uint32 lo,
-        uint32 hi,
-        int256 delta,
-        uint32 numBins
-    ) internal {
+    function rangeAdd(mapping(uint32 => int256) storage diff, uint32 lo, uint32 hi, int256 delta, uint32 numBins)
+        internal
+    {
         if (lo > hi) revert SE.ExposureDiffInvalidRange(int256(uint256(lo)), int256(uint256(hi)));
         if (hi >= numBins) revert SE.ExposureDiffBinOutOfBounds(int256(uint256(hi)), numBins);
-        
+
         // Add delta at lo
         diff[lo] += delta;
-        
+
         // Subtract delta at hi+1 (if within bounds)
         if (hi + 1 < numBins) {
             diff[hi + 1] -= delta;
@@ -59,19 +55,15 @@ library ExposureDiffLib {
      * @param bin Bin index to query
      * @return exposure The accumulated exposure at this bin (must be >= 0)
      */
-    function pointQuery(
-        mapping(uint32 => int256) storage diff,
-        uint32 bin
-    ) internal view returns (uint256 exposure) {
+    function pointQuery(mapping(uint32 => int256) storage diff, uint32 bin) internal view returns (uint256 exposure) {
         int256 sum = 0;
         for (uint32 i = 0; i <= bin; i++) {
             sum += diff[i];
         }
-        
+
         // Exposure must be non-negative (invariant check)
         if (sum < 0) revert SE.ExposureDiffNegativeExposure(int256(uint256(bin)), sum);
-        
+
         return uint256(sum);
     }
 }
-

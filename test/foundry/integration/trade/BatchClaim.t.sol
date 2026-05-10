@@ -18,12 +18,7 @@ contract BatchClaimTest is TradeModuleDeployer {
 
         MarketConfig[] memory markets = new MarketConfig[](1);
         markets[0] = MarketConfig({
-            numBins: 4,
-            tickSpacing: 1,
-            minTick: 0,
-            maxTick: 4,
-            endOffset: 10_000,
-            liquidityParameter: WAD
+            numBins: 4, tickSpacing: 1, minTick: 0, maxTick: 4, endOffset: 10_000, liquidityParameter: WAD
         });
         sys = deployTradeModuleSystem(
             DeployOptions({markets: markets, userCount: 3, fundAmount: 100_000e6, submitWindow: 1, settlementWindow: 1})
@@ -171,7 +166,9 @@ contract BatchClaimTest is TradeModuleDeployer {
 
     function test_revertsWhenExceedingMaxBatchClaim() public {
         uint256[] memory ids = new uint256[](101);
-        for (uint256 i = 0; i < 101; i++) ids[i] = i + 1;
+        for (uint256 i = 0; i < 101; i++) {
+            ids[i] = i + 1;
+        }
         vm.prank(sys.users[0]);
         vm.expectRevert(abi.encodeWithSelector(SE.BatchClaimTooLarge.selector, uint256(101), uint256(100)));
         sys.core.batchClaimPayout(ids);

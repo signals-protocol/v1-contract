@@ -29,7 +29,7 @@ contract SignalsLPShare is
 {
     /// @notice The SignalsCore contract that manages the vault
     address public core;
-    
+
     /// @notice The underlying asset (payment token)
     address public asset;
 
@@ -43,13 +43,10 @@ contract SignalsLPShare is
         _disableInitializers();
     }
 
-    function initialize(
-        address core_,
-        address asset_,
-        string memory name_,
-        string memory symbol_,
-        address ownerSafe_
-    ) external initializer {
+    function initialize(address core_, address asset_, string memory name_, string memory symbol_, address ownerSafe_)
+        external
+        initializer
+    {
         if (core_ == address(0)) revert SignalsErrors.ZeroAddress();
         if (asset_ == address(0)) revert SignalsErrors.ZeroAddress();
         if (ownerSafe_ == address(0)) revert SignalsErrors.ZeroAddress();
@@ -95,9 +92,7 @@ contract SignalsLPShare is
     /// @dev Returns vault NAV from Core
     function totalAssets() external view returns (uint256) {
         // Call Core to get NAV
-        (bool success, bytes memory data) = core.staticcall(
-            abi.encodeWithSignature("getVaultNav()")
-        );
+        (bool success, bytes memory data) = core.staticcall(abi.encodeWithSignature("getVaultNav()"));
         if (success && data.length >= 32) {
             return abi.decode(data, (uint256));
         }
@@ -166,9 +161,7 @@ contract SignalsLPShare is
 
     /// @dev Get current vault price from Core
     function _getVaultPrice() internal view returns (uint256) {
-        (bool success, bytes memory data) = core.staticcall(
-            abi.encodeWithSignature("getVaultPrice()")
-        );
+        (bool success, bytes memory data) = core.staticcall(abi.encodeWithSignature("getVaultPrice()"));
         if (success && data.length >= 32) {
             return abi.decode(data, (uint256));
         }

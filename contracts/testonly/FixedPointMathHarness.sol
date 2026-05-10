@@ -66,16 +66,9 @@ contract FixedPointMathHarness {
     }
 
     // CLMSR cost helper: cost = alpha * ln(sumAfter / sumBefore)
-    function clmsrCost(
-        uint256 alpha,
-        uint256 sumBefore,
-        uint256 sumAfter
-    ) public pure returns (uint256) {
+    function clmsrCost(uint256 alpha, uint256 sumBefore, uint256 sumAfter) public pure returns (uint256) {
         uint256 ratio = FixedPointMathU.wDiv(sumAfter, sumBefore);
         uint256 lnRatio = FixedPointMathU.wLn(ratio);
         return FixedPointMathU.wMul(alpha, lnRatio);
     }
 }
-
-
-

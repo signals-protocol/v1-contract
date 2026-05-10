@@ -23,11 +23,11 @@ library SeedDataLib {
         }
     }
 
-    function readFactors(
-        address seedData,
-        uint32 start,
-        uint32 count
-    ) internal view returns (uint256[] memory factors) {
+    function readFactors(address seedData, uint32 start, uint32 count)
+        internal
+        view
+        returns (uint256[] memory factors)
+    {
         factors = new uint256[](count);
         if (count == 0) {
             return factors;
@@ -40,11 +40,11 @@ library SeedDataLib {
         }
     }
 
-    function computeSeedStats(
-        address seedData,
-        uint32 numBins,
-        uint256 liquidityParameter
-    ) internal view returns (uint256 rootSum, uint256 minFactor, uint256 deltaEt) {
+    function computeSeedStats(address seedData, uint32 numBins, uint256 liquidityParameter)
+        internal
+        view
+        returns (uint256 rootSum, uint256 minFactor, uint256 deltaEt)
+    {
         validateSeedData(seedData, numBins);
         if (numBins == 0) {
             return (0, 0, 0);
@@ -55,9 +55,7 @@ library SeedDataLib {
         deltaEt = RiskMath.calculateDeltaEt(liquidityParameter, numBins, rootSum, minFactor);
     }
 
-    function _computeRootSumMin(
-        uint256[] memory factors
-    ) private pure returns (uint256 rootSum, uint256 minFactor) {
+    function _computeRootSumMin(uint256[] memory factors) private pure returns (uint256 rootSum, uint256 minFactor) {
         if (factors.length == 0) {
             return (0, 0);
         }

@@ -53,11 +53,10 @@ library RedstoneHelper {
     /// @param value8dec The data point value with 8 decimals (e.g. 100000 * 1e8 for $100000)
     /// @param timestampSec The timestamp in seconds
     /// @return payload The encoded Redstone payload bytes (to be appended to calldata)
-    function buildRedstonePayload(
-        Vm vm_,
-        uint256 value8dec,
-        uint256 timestampSec
-    ) internal returns (bytes memory payload) {
+    function buildRedstonePayload(Vm vm_, uint256 value8dec, uint256 timestampSec)
+        internal
+        returns (bytes memory payload)
+    {
         uint256[3] memory keys = [LOCAL_SIGNER_KEY_0, LOCAL_SIGNER_KEY_1, LOCAL_SIGNER_KEY_2];
 
         // Build 3 signed data packages
@@ -121,12 +120,10 @@ library RedstoneHelper {
     /// DataPackage.toBytes() = [dataPoints][timestamp(6B)][valueByteSize(4B)][count(3B)]
     /// SignedDataPackage = [dataBytes][signature(65B)]
     /// Note: no dataByteSize trailer — on-chain extractor computes size from metadata.
-    function _buildSignedDataPackage(
-        Vm vm_,
-        uint256 signerKey,
-        uint256 value8dec,
-        uint256 timestampSec
-    ) private returns (bytes memory) {
+    function _buildSignedDataPackage(Vm vm_, uint256 signerKey, uint256 value8dec, uint256 timestampSec)
+        private
+        returns (bytes memory)
+    {
         // Data point: [feedId(32B)][value(32B)] — on-chain CalldataExtractor reads feedId first
         bytes memory dataPointFeedId = abi.encodePacked(DATA_FEED_ID);
         bytes memory dataPointValue = abi.encodePacked(value8dec);

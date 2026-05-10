@@ -202,7 +202,7 @@ contract UnitSystemTest is FullSystemDeployer {
 
     function test_feeWaterfallDustAttributedToLp() public view {
         // Create scenario where Fremain doesn't divide evenly
-        (, , , , , uint256 fdust, uint256 ft, , , ) = feeHarness.calculate(
+        (,,,,, uint256 fdust, uint256 ft,,,) = feeHarness.calculate(
             0, // Lt = 0
             100e18, // Ftot = 100
             1000e18, // Nprev
@@ -255,7 +255,7 @@ contract UnitSystemTest is FullSystemDeployer {
         vm.prank(owner_);
         sys.core.processDailyBatch(batchId);
 
-        (, , uint256 batchPrice, ) = sys.core.harnessGetBatchAggregation(batchId);
+        (,, uint256 batchPrice,) = sys.core.harnessGetBatchAggregation(batchId);
 
         assertGt(batchPrice, WAD); // Increased due to positive P&L
     }

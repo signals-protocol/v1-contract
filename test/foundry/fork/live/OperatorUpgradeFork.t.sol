@@ -30,9 +30,8 @@ contract OperatorUpgradeForkTest is ForkLiveMarketTest {
     bytes32 constant POS_DECREASED_SIG = keccak256("PositionDecreased(uint256,address,uint128,uint128,uint256)");
     bytes32 constant POS_CLOSED_SIG = keccak256("PositionClosed(uint256,address,uint256)");
     bytes32 constant POS_CLAIMED_SIG = keccak256("PositionClaimed(uint256,address,uint256)");
-    bytes32 constant FEE_CHARGED_SIG = keccak256(
-        "TradeFeeCharged(address,uint256,uint256,bool,uint256,uint256,address)"
-    );
+    bytes32 constant FEE_CHARGED_SIG =
+        keccak256("TradeFeeCharged(address,uint256,uint256,bool,uint256,uint256,address)");
 
     function setUp() public override {
         super.setUp();
@@ -57,12 +56,7 @@ contract OperatorUpgradeForkTest is ForkLiveMarketTest {
 
         // 2. Deploy new Router
         router = new SignalsRouter(
-            address(core),
-            address(position),
-            paymentToken,
-            swapRouterAddr,
-            address(0),
-            address(this)
+            address(core), address(position), paymentToken, swapRouterAddr, address(0), address(this)
         );
         router.setAllowedToken(address(usdcE), true);
     }
@@ -242,14 +236,7 @@ contract OperatorUpgradeForkTest is ForkLiveMarketTest {
         usdcE.approve(address(router), 10e6);
         int256 centerTick = ((m.minTick + m.maxTick) / 2 / m.tickSpacing) * m.tickSpacing;
         positionId = router.openPositionWithSwap(
-            address(usdcE),
-            5e6,
-            1,
-            marketId,
-            centerTick,
-            centerTick + m.tickSpacing,
-            5000,
-            5e6
+            address(usdcE), 5e6, 1, marketId, centerTick, centerTick + m.tickSpacing, 5000, 5e6
         );
         vm.stopPrank();
         return (true, trader, positionId);
@@ -261,9 +248,8 @@ contract OperatorUpgradeForkTest is ForkLiveMarketTest {
         uint256 tradeEventCount;
         for (uint256 i; i < logs.length; i++) {
             bytes32 sig = logs[i].topics[0];
-            if (
-                sig == POS_INCREASED_SIG || sig == POS_DECREASED_SIG || sig == POS_CLOSED_SIG || sig == POS_CLAIMED_SIG
-            ) {
+            if (sig == POS_INCREASED_SIG || sig == POS_DECREASED_SIG || sig == POS_CLOSED_SIG || sig == POS_CLAIMED_SIG)
+            {
                 // topic[2] = indexed address trader
                 address emittedTrader = address(uint160(uint256(logs[i].topics[2])));
                 assertEq(emittedTrader, expectedTrader, "trade event has wrong trader");

@@ -101,11 +101,10 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
     // ============================================================
 
     /// @notice INV-V3: Seed always returns batchPrice = WAD
-    function testFuzz_computePreBatchForSeed_alwaysReturnsWAD(
-        uint256 navPrev,
-        uint256 fees,
-        uint256 grant
-    ) public view {
+    function testFuzz_computePreBatchForSeed_alwaysReturnsWAD(uint256 navPrev, uint256 fees, uint256 grant)
+        public
+        view
+    {
         navPrev = bound(navPrev, 0, 1e27);
         fees = bound(fees, 0, 1e24);
         grant = bound(grant, 0, 1e24);
@@ -130,7 +129,7 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
 
         depositAmount = bound(depositAmount, price, 1e27);
 
-        (uint256 newNav, uint256 newShares, uint256 minted, ) = lib.applyDeposit(nav, shares, price, depositAmount);
+        (uint256 newNav, uint256 newShares, uint256 minted,) = lib.applyDeposit(nav, shares, price, depositAmount);
 
         if (minted == 0) return;
 
@@ -140,18 +139,16 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
     }
 
     /// @notice Protocol-favored rounding: mintedShares * P <= depositAmount, refund < price
-    function testFuzz_applyDeposit_protocolFavored(
-        uint256 nav,
-        uint256 shares,
-        uint256 price,
-        uint256 depositAmount
-    ) public view {
+    function testFuzz_applyDeposit_protocolFavored(uint256 nav, uint256 shares, uint256 price, uint256 depositAmount)
+        public
+        view
+    {
         nav = bound(nav, 1e18, 1e27);
         shares = bound(shares, 1e18, 1e27);
         price = bound(price, 1, 1000e18);
         depositAmount = bound(depositAmount, price, 1e27);
 
-        (, , uint256 minted, uint256 refund) = lib.applyDeposit(nav, shares, price, depositAmount);
+        (,, uint256 minted, uint256 refund) = lib.applyDeposit(nav, shares, price, depositAmount);
 
         // minted * price (wMul floor) <= depositAmount
         uint256 amountUsed = Math.mulDiv(minted, price, WAD);
@@ -174,7 +171,7 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
         // depositAmount < price/WAD in WAD terms → wDiv floors to 0
         depositAmount = bound(depositAmount, 1, price / WAD - 1);
 
-        (, , uint256 minted, uint256 refund) = lib.applyDeposit(nav, shares, price, depositAmount);
+        (,, uint256 minted, uint256 refund) = lib.applyDeposit(nav, shares, price, depositAmount);
 
         assertEq(minted, 0, "tiny deposit: 0 minted");
         assertEq(refund, depositAmount, "tiny deposit: full refund");
@@ -211,7 +208,7 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
         uint256 withdrawAmount = Math.mulDiv(withdrawShares, price, WAD);
         if (withdrawAmount > nav) return;
 
-        (uint256 newNav, uint256 newShares, ) = lib.applyWithdraw(nav, shares, price, withdrawShares);
+        (uint256 newNav, uint256 newShares,) = lib.applyWithdraw(nav, shares, price, withdrawShares);
 
         if (newShares == 0) return;
 
@@ -221,12 +218,10 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
     }
 
     /// @notice INV-V5: withdrawAmount = wMul(shares, price) — floor rounding favors protocol
-    function testFuzz_applyWithdraw_protocolFavored(
-        uint256 nav,
-        uint256 shares,
-        uint256 price,
-        uint256 withdrawShares
-    ) public view {
+    function testFuzz_applyWithdraw_protocolFavored(uint256 nav, uint256 shares, uint256 price, uint256 withdrawShares)
+        public
+        view
+    {
         nav = bound(nav, 1e18, 1e27);
         shares = bound(shares, 1e18, 1e27);
         price = bound(price, 1, 1000e18);
@@ -236,7 +231,7 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
         uint256 expectedAmount = Math.mulDiv(withdrawShares, price, WAD);
         if (expectedAmount > nav) return;
 
-        (, , uint256 withdrawAmount) = lib.applyWithdraw(nav, shares, price, withdrawShares);
+        (,, uint256 withdrawAmount) = lib.applyWithdraw(nav, shares, price, withdrawShares);
 
         // withdrawAmount = floor(withdrawShares * price / WAD)
         assertEq(withdrawAmount, expectedAmount, "withdraw uses floor rounding");
@@ -331,8 +326,8 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
         shares = bound(shares, 1e18, 1e27);
         previousPeak = bound(previousPeak, 0, 1e27);
 
-        (uint256 navOut, uint256 sharesOut, uint256 price, uint256 pricePeak, uint256 drawdown) = lib
-            .computePostBatchState(nav, shares, previousPeak);
+        (uint256 navOut, uint256 sharesOut, uint256 price, uint256 pricePeak, uint256 drawdown) =
+            lib.computePostBatchState(nav, shares, previousPeak);
 
         // nav/shares passed through
         assertEq(navOut, nav, "nav passthrough");
@@ -356,7 +351,7 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
         nav = bound(nav, 0, 1e27);
         previousPeak = bound(previousPeak, 0, 1e27);
 
-        (, , uint256 price, uint256 pricePeak, uint256 drawdown) = lib.computePostBatchState(nav, 0, previousPeak);
+        (,, uint256 price, uint256 pricePeak, uint256 drawdown) = lib.computePostBatchState(nav, 0, previousPeak);
 
         assertEq(price, WAD, "empty vault: price = WAD");
         assertEq(pricePeak, previousPeak, "empty vault: peak preserved");
@@ -380,12 +375,8 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
         depositAmount = bound(depositAmount, price, 1e27);
 
         // Deposit
-        (uint256 navAfterDeposit, uint256 sharesAfterDeposit, uint256 minted, ) = lib.applyDeposit(
-            nav,
-            shares,
-            price,
-            depositAmount
-        );
+        (uint256 navAfterDeposit, uint256 sharesAfterDeposit, uint256 minted,) =
+            lib.applyDeposit(nav, shares, price, depositAmount);
 
         if (minted == 0) return;
 
@@ -394,7 +385,7 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
         if (withdrawAmount > navAfterDeposit) return;
 
         // Withdraw same minted shares
-        (uint256 finalNav, , ) = lib.applyWithdraw(navAfterDeposit, sharesAfterDeposit, price, minted);
+        (uint256 finalNav,,) = lib.applyWithdraw(navAfterDeposit, sharesAfterDeposit, price, minted);
 
         // No value extraction: finalNav <= original nav (rounding may lose dust)
         assertLe(finalNav, nav + 1, "deposit-withdraw round trip: no value extraction");
@@ -417,15 +408,11 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
         if (expectedWithdraw > nav) return;
 
         // Withdraw
-        (uint256 navAfterWithdraw, uint256 sharesAfterWithdraw, uint256 withdrawAmount) = lib.applyWithdraw(
-            nav,
-            shares,
-            price,
-            withdrawShares
-        );
+        (uint256 navAfterWithdraw, uint256 sharesAfterWithdraw, uint256 withdrawAmount) =
+            lib.applyWithdraw(nav, shares, price, withdrawShares);
 
         // Deposit back the same amount
-        (, , uint256 reminted, ) = lib.applyDeposit(navAfterWithdraw, sharesAfterWithdraw, price, withdrawAmount);
+        (,, uint256 reminted,) = lib.applyDeposit(navAfterWithdraw, sharesAfterWithdraw, price, withdrawAmount);
 
         // No share inflation: reminted <= burned
         assertLe(reminted, withdrawShares, "withdraw-deposit round trip: no share inflation");
@@ -450,18 +437,18 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
         if (withdrawAmount > initialNav) return;
 
         // Order 1: withdraw first, then deposit
-        (uint256 nav1, uint256 shares1, ) = lib.applyWithdraw(initialNav, initialShares, batchPrice, withdrawShares);
-        (uint256 finalNav1, uint256 finalShares1, , ) = lib.applyDeposit(nav1, shares1, batchPrice, depositAmount);
+        (uint256 nav1, uint256 shares1,) = lib.applyWithdraw(initialNav, initialShares, batchPrice, withdrawShares);
+        (uint256 finalNav1, uint256 finalShares1,,) = lib.applyDeposit(nav1, shares1, batchPrice, depositAmount);
 
         // Order 2: deposit first, then withdraw
-        (uint256 nav2, uint256 shares2, , ) = lib.applyDeposit(initialNav, initialShares, batchPrice, depositAmount);
+        (uint256 nav2, uint256 shares2,,) = lib.applyDeposit(initialNav, initialShares, batchPrice, depositAmount);
 
         // Pre-check: withdraw from post-deposit state
         uint256 withdrawAmount2 = Math.mulDiv(withdrawShares, batchPrice, WAD);
         if (withdrawAmount2 > nav2) return;
         if (withdrawShares > shares2) return;
 
-        (uint256 finalNav2, uint256 finalShares2, ) = lib.applyWithdraw(nav2, shares2, batchPrice, withdrawShares);
+        (uint256 finalNav2, uint256 finalShares2,) = lib.applyWithdraw(nav2, shares2, batchPrice, withdrawShares);
 
         // Exact match for nav and shares
         assertEq(finalNav1, finalNav2, "order independence: nav");
@@ -546,13 +533,10 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
         }
     }
 
-    function _assertPreBatch(
-        uint256 navBefore,
-        uint256 sharesBefore,
-        uint256 navPre,
-        uint256 batchPrice,
-        int256 pi
-    ) internal pure {
+    function _assertPreBatch(uint256 navBefore, uint256 sharesBefore, uint256 navPre, uint256 batchPrice, int256 pi)
+        internal
+        pure
+    {
         uint256 expectedNav = pi >= 0 ? navBefore + uint256(pi) : navBefore - uint256(-pi);
         assertEq(navPre, expectedNav, "multi-step INV-V1");
         assertEq(batchPrice, Math.mulDiv(navPre, WAD, sharesBefore), "multi-step INV-V2");
@@ -564,12 +548,8 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
             if (s.batchPrice == 0) break;
             uint256 depositAmount = nextInRange(prng, 1, 101) * WAD;
 
-            (uint256 newNav, uint256 newShares, uint256 minted, uint256 refund) = lib.applyDeposit(
-                s.nav,
-                s.shares,
-                s.batchPrice,
-                depositAmount
-            );
+            (uint256 newNav, uint256 newShares, uint256 minted, uint256 refund) =
+                lib.applyDeposit(s.nav, s.shares, s.batchPrice, depositAmount);
 
             // INV-V4: price preservation
             if (minted > 0 && newShares > 0) {
@@ -597,7 +577,7 @@ contract VaultAccountingLibFuzzTest is HarnessDeployer {
             uint256 wAmount = Math.mulDiv(wShares, s.batchPrice, WAD);
             if (wAmount > s.nav) continue;
 
-            (uint256 newNav, uint256 newShares, ) = lib.applyWithdraw(s.nav, s.shares, s.batchPrice, wShares);
+            (uint256 newNav, uint256 newShares,) = lib.applyWithdraw(s.nav, s.shares, s.batchPrice, wShares);
 
             // INV-V5: price preservation
             if (newShares > 0) {

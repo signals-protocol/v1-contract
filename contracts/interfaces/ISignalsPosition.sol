@@ -10,13 +10,9 @@ interface ISignalsPosition {
         uint64 createdAt;
     }
 
-    function mintPosition(
-        address trader,
-        uint256 marketId,
-        int256 lowerTick,
-        int256 upperTick,
-        uint128 quantity
-    ) external returns (uint256 positionId);
+    function mintPosition(address trader, uint256 marketId, int256 lowerTick, int256 upperTick, uint128 quantity)
+        external
+        returns (uint256 positionId);
 
     function burn(uint256 positionId) external;
 

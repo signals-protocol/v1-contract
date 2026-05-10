@@ -40,29 +40,23 @@ contract LPVaultModule is SignalsCoreStorage {
 
     event DailyBatchProcessed(
         uint64 indexed batchId,
-        int256 lt,           // CLMSR P&L
-        uint256 ftot,        // Gross fees
-        uint256 ft,          // LP-attributed fees
-        uint256 gt,          // Backstop grant
-        uint256 navPre,      // Pre-batch NAV
-        uint256 batchPrice,  // Batch equity price
-        uint256 navPost,     // Post-batch NAV
-        uint256 pricePost,   // Post-batch price
-        uint256 drawdown     // Peak drawdown
+        int256 lt, // CLMSR P&L
+        uint256 ftot, // Gross fees
+        uint256 ft, // LP-attributed fees
+        uint256 gt, // Backstop grant
+        uint256 navPre, // Pre-batch NAV
+        uint256 batchPrice, // Batch equity price
+        uint256 navPost, // Post-batch NAV
+        uint256 pricePost, // Post-batch price
+        uint256 drawdown // Peak drawdown
     );
 
     event DepositRequestCreated(
-        uint64 indexed requestId,
-        address indexed owner,
-        uint256 amount,
-        uint64 eligibleBatchId
+        uint64 indexed requestId, address indexed owner, uint256 amount, uint64 eligibleBatchId
     );
 
     event WithdrawRequestCreated(
-        uint64 indexed requestId,
-        address indexed owner,
-        uint256 shares,
-        uint64 eligibleBatchId
+        uint64 indexed requestId, address indexed owner, uint256 shares, uint64 eligibleBatchId
     );
 
     event DepositRequestCancelled(uint64 indexed requestId, address indexed owner, uint256 amount);
@@ -75,7 +69,7 @@ contract LPVaultModule is SignalsCoreStorage {
     // ============================================================
     /// @notice Minimum dead shares locked forever to prevent shares=0 brick (ERC-4626 pattern)
     /// @dev These shares are minted to address(1) at seed time and can never be withdrawn
-    uint256 public constant MIN_DEAD_SHARES = 1000;  // 1000 wei shares
+    uint256 public constant MIN_DEAD_SHARES = 1000; // 1000 wei shares
     /// @notice Dead address that holds minimum shares (cannot withdraw)
     address public constant DEAD_ADDRESS = address(1);
 
@@ -112,7 +106,7 @@ contract LPVaultModule is SignalsCoreStorage {
         if (seedAmountWad <= MIN_DEAD_SHARES) {
             revert SE.InsufficientSeedAmount(seedAmountWad, MIN_DEAD_SHARES + 1);
         }
-        
+
         lpVault.nav = seedAmountWad;
         lpVault.shares = seedAmountWad;
         lpVault.price = VaultAccountingLib.WAD;
@@ -124,7 +118,7 @@ contract LPVaultModule is SignalsCoreStorage {
         // These shares are locked forever in DEAD_ADDRESS and can never be withdrawn
         // This ensures totalShares > MIN_DEAD_SHARES always after seeding
         uint256 seederShares = seedAmountWad - MIN_DEAD_SHARES;
-        
+
         // Mint LP share tokens (seeder gets all except dead shares)
         if (lpShareToken != address(0)) {
             ISignalsLPShare(lpShareToken).mint(msg.sender, seederShares);
@@ -216,7 +210,7 @@ contract LPVaultModule is SignalsCoreStorage {
         _depositRequests[requestId] = DepositRequest({
             id: requestId,
             owner: msg.sender,
-            amount: amountWad,  // Stored as WAD
+            amount: amountWad, // Stored as WAD
             eligibleBatchId: eligibleBatchId,
             status: RequestStatus.Pending
         });
@@ -269,7 +263,7 @@ contract LPVaultModule is SignalsCoreStorage {
         if (req.owner != msg.sender) revert SE.RequestNotOwned(requestId, req.owner, msg.sender);
         if (req.status != RequestStatus.Pending) revert SE.RequestNotPending(requestId);
 
-        uint256 amountWad = req.amount;  // Stored as WAD
+        uint256 amountWad = req.amount; // Stored as WAD
         uint64 eligibleBatchId = req.eligibleBatchId;
 
         // Prevent cancel after batch processed (too-late check)
@@ -282,7 +276,7 @@ contract LPVaultModule is SignalsCoreStorage {
 
         // Convert WAD to 6 decimals for token transfer (deposit residual refunded to depositor)
         uint256 amount6 = amountWad.fromWad();
-        
+
         // Decrease pending deposits (funds are reserved, no free balance check needed)
         _totalPendingDeposits6 -= amount6;
         paymentToken.safeTransfer(msg.sender, amount6);
@@ -372,12 +366,8 @@ contract LPVaultModule is SignalsCoreStorage {
         FeeWaterfallLib.Result memory wf = FeeWaterfallLib.calculate(params);
 
         // Step 3: Apply pre-batch with waterfall result
-        (uint256 navPre, uint256 batchPrice) = VaultAccountingLib.applyPreBatchFromWaterfall(
-            lpVault.nav,
-            lpVault.shares,
-            snap.Lt,
-            wf
-        );
+        (uint256 navPre, uint256 batchPrice) =
+            VaultAccountingLib.applyPreBatchFromWaterfall(lpVault.nav, lpVault.shares, snap.Lt, wf);
 
         // Step 4: Process withdrawals first (at batch price)
         uint256 currentNav = navPre;
@@ -385,17 +375,13 @@ contract LPVaultModule is SignalsCoreStorage {
 
         if (totalWithdraws > 0) {
             uint256 withdrawAssetsWad;
-            (currentNav, currentShares, withdrawAssetsWad) = VaultAccountingLib.applyWithdraw(
-                currentNav,
-                currentShares,
-                batchPrice,
-                totalWithdraws
-            );
-            
+            (currentNav, currentShares, withdrawAssetsWad) =
+                VaultAccountingLib.applyWithdraw(currentNav, currentShares, batchPrice, totalWithdraws);
+
             // Prevent shares from dropping below MIN_DEAD_SHARES
             // This ensures the vault can never brick due to zero shares
             if (currentShares < MIN_DEAD_SHARES) revert SE.WithdrawalWouldBrickVault(currentShares, MIN_DEAD_SHARES);
-            
+
             // Reserve withdrawal funds (conservative floor rounding)
             // Use floor to ensure we never over-reserve
             uint256 withdrawAssets6 = withdrawAssetsWad.fromWad();
@@ -405,12 +391,8 @@ contract LPVaultModule is SignalsCoreStorage {
         // Step 5: Process deposits (at batch price)
         if (totalDeposits > 0) {
             uint256 totalRefund;
-            (currentNav, currentShares, , totalRefund) = VaultAccountingLib.applyDeposit(
-                currentNav,
-                currentShares,
-                batchPrice,
-                totalDeposits
-            );
+            (currentNav, currentShares,, totalRefund) =
+                VaultAccountingLib.applyDeposit(currentNav, currentShares, batchPrice, totalDeposits);
             // Release only the "used" portion from pending deposits
             // amountUsed = totalDeposits - totalRefund
             // The "refund" portion remains in pending until individual claims release it
@@ -419,11 +401,8 @@ contract LPVaultModule is SignalsCoreStorage {
         }
 
         // Step 6: Compute final state
-        VaultAccountingLib.PostBatchState memory postBatch = VaultAccountingLib.computePostBatchState(
-            currentNav,
-            currentShares,
-            lpVault.pricePeak
-        );
+        VaultAccountingLib.PostBatchState memory postBatch =
+            VaultAccountingLib.computePostBatchState(currentNav, currentShares, lpVault.pricePeak);
 
         // Step 7: Update LP Vault storage
         lpVault.nav = postBatch.nav;
@@ -536,19 +515,19 @@ contract LPVaultModule is SignalsCoreStorage {
 
         // shares = floor(amount / batchPrice)
         shares = req.amount.wDiv(agg.batchPrice);
-        
+
         // Deposit residual refunded to depositor (vault never retains)
         // Calculate: used = shares * batchPrice, refund = amount - used
         uint256 usedWad = shares.wMul(agg.batchPrice);
         uint256 refundWad = req.amount - usedWad;
-        
+
         req.status = RequestStatus.Claimed;
 
         // Mint LP share tokens to depositor
         if (lpShareToken != address(0)) {
             ISignalsLPShare(lpShareToken).mint(msg.sender, shares);
         }
-        
+
         // Refund residual to depositor (convert WAD to 6 decimals)
         // Note: Any sub-wei residual (< 1e12) is lost, but this is negligible
         if (refundWad > 0) {
@@ -580,17 +559,17 @@ contract LPVaultModule is SignalsCoreStorage {
         BatchAggregation storage agg = _batchAggregations[req.eligibleBatchId];
         if (!agg.processed) revert SE.BatchNotProcessed(req.eligibleBatchId);
 
-        assets = req.shares.wMul(agg.batchPrice);  // WAD result
+        assets = req.shares.wMul(agg.batchPrice); // WAD result
         req.status = RequestStatus.Claimed;
 
         // Convert WAD to 6 decimals for token transfer (dust stays in vault)
         uint256 assets6 = assets.fromWad();
-        
+
         // Draw from withdrawal reserve (reserved at batch processing time)
         // Withdrawal funds were reserved in _totalPendingWithdrawals6, now release them
         // Note: No _requireFreeBalance check needed as funds are already reserved
         _totalPendingWithdrawals6 -= assets6;
-        
+
         paymentToken.safeTransfer(msg.sender, assets6);
 
         emit WithdrawClaimed(requestId, msg.sender, req.shares, assets);
@@ -628,13 +607,11 @@ contract LPVaultModule is SignalsCoreStorage {
         return (capitalStack.backstopNav, capitalStack.treasuryNav);
     }
 
-    function getFeeWaterfallConfig() external view returns (
-        int256 pdd,
-        uint256 rhoBS,
-        uint256 phiLP,
-        uint256 phiBS,
-        uint256 phiTR
-    ) {
+    function getFeeWaterfallConfig()
+        external
+        view
+        returns (int256 pdd, uint256 rhoBS, uint256 phiLP, uint256 phiBS, uint256 phiTR)
+    {
         return (
             feeWaterfallConfig.pdd,
             feeWaterfallConfig.rhoBS,
@@ -644,55 +621,43 @@ contract LPVaultModule is SignalsCoreStorage {
         );
     }
 
-    function getDailyPnl(uint64 batchId) external view returns (
-        int256 lt,
-        uint256 ftot,
-        uint256 ft,
-        uint256 gt,
-        uint256 npre,
-        uint256 pe,
-        bool processed
-    ) {
+    function getDailyPnl(uint64 batchId)
+        external
+        view
+        returns (int256 lt, uint256 ftot, uint256 ft, uint256 gt, uint256 npre, uint256 pe, bool processed)
+    {
         DailyPnlSnapshot storage snap = _dailyPnl[batchId];
         return (snap.Lt, snap.Ftot, snap.Ft, snap.Gt, snap.Npre, snap.Pe, snap.processed);
     }
 
-    function getDepositRequest(uint64 requestId) external view returns (
-        uint64 id,
-        address owner,
-        uint256 amount,
-        uint64 eligibleBatchId,
-        RequestStatus status
-    ) {
+    function getDepositRequest(uint64 requestId)
+        external
+        view
+        returns (uint64 id, address owner, uint256 amount, uint64 eligibleBatchId, RequestStatus status)
+    {
         DepositRequest storage req = _depositRequests[requestId];
         return (req.id, req.owner, req.amount, req.eligibleBatchId, req.status);
     }
 
-    function getWithdrawRequest(uint64 requestId) external view returns (
-        uint64 id,
-        address owner,
-        uint256 shares,
-        uint64 eligibleBatchId,
-        RequestStatus status
-    ) {
+    function getWithdrawRequest(uint64 requestId)
+        external
+        view
+        returns (uint64 id, address owner, uint256 shares, uint64 eligibleBatchId, RequestStatus status)
+    {
         WithdrawRequest storage req = _withdrawRequests[requestId];
         return (req.id, req.owner, req.shares, req.eligibleBatchId, req.status);
     }
 
-    function getPendingBatchTotals(uint64 batchId) external view returns (
-        uint256 deposits,
-        uint256 withdraws
-    ) {
+    function getPendingBatchTotals(uint64 batchId) external view returns (uint256 deposits, uint256 withdraws) {
         PendingBatchTotal storage totals = _pendingBatchTotals[batchId];
         return (totals.deposits, totals.withdraws);
     }
 
-    function getBatchAggregation(uint64 batchId) external view returns (
-        uint256 totalDepositAssets,
-        uint256 totalWithdrawShares,
-        uint256 batchPrice,
-        bool processed
-    ) {
+    function getBatchAggregation(uint64 batchId)
+        external
+        view
+        returns (uint256 totalDepositAssets, uint256 totalWithdrawShares, uint256 batchPrice, bool processed)
+    {
         BatchAggregation storage agg = _batchAggregations[batchId];
         return (agg.totalDepositAssets, agg.totalWithdrawShares, agg.batchPrice, agg.processed);
     }

@@ -45,18 +45,8 @@ contract RiskGateTest is FullSystemDeployer {
         // Should succeed: alpha = 0.1 WAD is within limit
         SeedData seedData2 = SeedHelper.deploySeedData(factors);
         vm.prank(sys.owner);
-        uint256 marketId = sys.core.createMarket(
-            0,
-            4,
-            1,
-            start,
-            end,
-            settlement + 100,
-            4,
-            0.1e18,
-            address(sys.feePolicy),
-            address(seedData2)
-        );
+        uint256 marketId = sys.core
+            .createMarket(0, 4, 1, start, end, settlement + 100, 4, 0.1e18, address(sys.feePolicy), address(seedData2));
 
         vm.prank(sys.owner);
         sys.core.seedNextChunks(marketId, 4);

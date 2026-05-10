@@ -38,17 +38,7 @@ contract FailurePathTest is FullSystemDeployer {
         uint64 settlement = uint64(block.timestamp + 60);
 
         vm.prank(sys.owner);
-        uint256 marketId = sys.core.createMarketUniform(
-            0,
-            4,
-            1,
-            start,
-            end,
-            settlement,
-            4,
-            WAD,
-            address(sys.feePolicy)
-        );
+        uint256 marketId = sys.core.createMarketUniform(0, 4, 1, start, end, settlement, 4, WAD, address(sys.feePolicy));
 
         // Open position
         uint128 quantity = 1_000;
@@ -78,7 +68,7 @@ contract FailurePathTest is FullSystemDeployer {
         sys.core.requestSettlementChunks(marketId, 5);
 
         // Claim payout
-        (, , , uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
+        (,,, uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
         vm.warp(claimOpen);
 
         uint256 balanceBefore = sys.payment.balanceOf(trader);

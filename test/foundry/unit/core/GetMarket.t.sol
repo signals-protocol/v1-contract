@@ -21,17 +21,8 @@ contract GetMarketTest is FullSystemDeployer {
         uint32 numBins = 4;
 
         vm.prank(sys.owner);
-        uint256 marketId = sys.core.createMarketUniform(
-            0,
-            4,
-            1,
-            start,
-            end_,
-            end_,
-            numBins,
-            WAD,
-            address(sys.feePolicy)
-        );
+        uint256 marketId =
+            sys.core.createMarketUniform(0, 4, 1, start, end_, end_, numBins, WAD, address(sys.feePolicy));
 
         ISignalsCore.Market memory m = sys.core.getMarket(marketId);
 
@@ -64,17 +55,8 @@ contract GetMarketTest is FullSystemDeployer {
         uint64 now_ = uint64(block.timestamp);
 
         vm.prank(sys.owner);
-        uint256 marketId = sys.core.createMarketUniform(
-            -2,
-            2,
-            1,
-            now_ - 50,
-            now_ + 300,
-            now_ + 300,
-            4,
-            WAD,
-            address(sys.feePolicy)
-        );
+        uint256 marketId =
+            sys.core.createMarketUniform(-2, 2, 1, now_ - 50, now_ + 300, now_ + 300, 4, WAD, address(sys.feePolicy));
 
         ISignalsCore.Market memory fromGetter = sys.core.getMarket(marketId);
         ISignalsCore.Market memory fromHarness = sys.core.harnessGetMarket(marketId);

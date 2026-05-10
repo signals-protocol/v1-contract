@@ -43,17 +43,8 @@ contract ChunksTest is FullSystemDeployer {
     function _createMarket() internal returns (uint256 marketId) {
         uint64 now_ = uint64(block.timestamp);
         vm.prank(sys.owner);
-        marketId = sys.core.createMarketUniform(
-            0,
-            4,
-            1,
-            now_ - 10,
-            now_ + 100,
-            now_ + 110,
-            4,
-            WAD,
-            address(sys.feePolicy)
-        );
+        marketId =
+            sys.core.createMarketUniform(0, 4, 1, now_ - 10, now_ + 100, now_ + 110, 4, WAD, address(sys.feePolicy));
     }
 
     function _settleMarket(uint256 marketId, uint256 priceHuman) internal {
@@ -106,10 +97,8 @@ contract ChunksTest is FullSystemDeployer {
         sys.payment.transfer(address(sys.core), 10_000e6);
 
         // Claim all positions
-        uint256 balBefore =
-            sys.payment.balanceOf(sys.users[0]) +
-                sys.payment.balanceOf(sys.users[1]) +
-                sys.payment.balanceOf(sys.users[2]);
+        uint256 balBefore = sys.payment.balanceOf(sys.users[0]) + sys.payment.balanceOf(sys.users[1])
+            + sys.payment.balanceOf(sys.users[2]);
 
         vm.prank(sys.users[0]);
         sys.core.claimPayout(1); // wins
@@ -120,10 +109,8 @@ contract ChunksTest is FullSystemDeployer {
         vm.prank(sys.users[0]);
         sys.core.claimPayout(4); // loses
 
-        uint256 balAfter =
-            sys.payment.balanceOf(sys.users[0]) +
-                sys.payment.balanceOf(sys.users[1]) +
-                sys.payment.balanceOf(sys.users[2]);
+        uint256 balAfter = sys.payment.balanceOf(sys.users[0]) + sys.payment.balanceOf(sys.users[1])
+            + sys.payment.balanceOf(sys.users[2]);
 
         // Position 1 [0,2) wins (1000), Position 3 [1,3) wins (1000)
         // Position 2 [2,4) loses, Position 4 [0,1) loses (1 not in [0,1))

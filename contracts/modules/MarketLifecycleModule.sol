@@ -32,30 +32,16 @@ contract MarketLifecycleModule is SignalsCoreStorage {
     event MarketSeedingProgress(uint256 indexed marketId, uint32 startBin, uint32 count, uint256[] factors);
     event MarketSeeded(uint256 indexed marketId);
     event MarketSettled(
-        uint256 indexed marketId,
-        int256 settlementValue,
-        int256 settlementTick,
-        uint64 settlementTimestamp
+        uint256 indexed marketId, int256 settlementValue, int256 settlementTick, uint64 settlementTimestamp
     );
     /// @dev P&L recorded to daily batch for vault accounting
-    event MarketPnlRecorded(
-        uint256 indexed marketId,
-        uint64 indexed batchId,
-        int256 lt,
-        uint256 ftot
-    );
+    event MarketPnlRecorded(uint256 indexed marketId, uint64 indexed batchId, int256 lt, uint256 ftot);
     event MarketFailed(uint256 indexed marketId, uint64 timestamp);
     event MarketSettledSecondary(
-        uint256 indexed marketId,
-        int256 settlementValue,
-        int256 settlementTick,
-        uint64 settlementFinalizedAt
+        uint256 indexed marketId, int256 settlementValue, int256 settlementTick, uint64 settlementFinalizedAt
     );
     event MarketTimingUpdated(
-        uint256 indexed marketId,
-        uint64 startTimestamp,
-        uint64 endTimestamp,
-        uint64 settlementTimestamp
+        uint256 indexed marketId, uint64 startTimestamp, uint64 endTimestamp, uint64 settlementTimestamp
     );
     event SettlementTimestampUpdated(uint256 indexed marketId, uint64 settlementTimestamp);
     event MarketFeePolicySet(uint256 indexed marketId, address indexed oldPolicy, address indexed newPolicy);
@@ -102,17 +88,14 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         require(liquidityParameter != 0, SE.InvalidLiquidityParameter());
         require(feePolicy != address(0), SE.ZeroAddress());
 
-        (uint256 rootSum, uint256 minFactor, uint256 deltaEt) = SeedDataLib.computeSeedStats(
-            seedData,
-            numBins,
-            liquidityParameter
-        );
+        (uint256 rootSum, uint256 minFactor, uint256 deltaEt) =
+            SeedDataLib.computeSeedStats(seedData, numBins, liquidityParameter);
 
         uint64 batchId = _getBatchIdForTimestamp(settlementTimestamp);
         if (batchId <= currentBatchId) revert SE.BatchAlreadyProcessed(batchId);
 
         marketId = ++nextMarketId;
-        
+
         _registerMarketForBatch(batchId);
         ISignalsCore.Market storage market = markets[marketId];
         market.isSeeded = false;
@@ -143,14 +126,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         market.initialRootSum = rootSum;
 
         emit MarketCreated(
-            marketId,
-            startTimestamp,
-            endTimestamp,
-            minTick,
-            maxTick,
-            tickSpacing,
-            numBins,
-            liquidityParameter
+            marketId, startTimestamp, endTimestamp, minTick, maxTick, tickSpacing, numBins, liquidityParameter
         );
         if (feePolicy != address(0)) {
             emit MarketFeePolicySet(marketId, address(0), feePolicy);
@@ -209,7 +185,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
 
     /**
      * @notice Finalize primary settlement after PendingOps window ends
-     * @dev Called after Tset + Δsettle + Δops. Uses the closest-sample candidate 
+     * @dev Called after Tset + Δsettle + Δops. Uses the closest-sample candidate
      *      from SettlementOpen window.
      * @param marketId Market to finalize
      */
@@ -224,12 +200,13 @@ contract MarketLifecycleModule is SignalsCoreStorage {
 
         uint64 tSet = market.settlementTimestamp;
         uint64 nowTs = uint64(block.timestamp);
-        
+
         // Can only finalize once PendingOps starts (Tset + Δsettle)
         uint64 opsStart = tSet + settlementSubmitWindow;
         require(nowTs >= opsStart, SE.PendingOpsNotStarted());
 
-        int256 settlementTick = _toSettlementTick(market.minTick, market.maxTick, market.tickSpacing, state.candidateValue);
+        int256 settlementTick =
+            _toSettlementTick(market.minTick, market.maxTick, market.tickSpacing, state.candidateValue);
 
         market.settled = true;
         market.settlementValue = state.candidateValue;
@@ -247,17 +224,17 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         // Calculate P&L with payout reserve
         uint64 batchId = _getBatchIdForMarket(marketId);
         (int256 lt, uint256 ftot, uint256 payoutReserve) = _calculateMarketPnlWithPayout(marketId, settlementTick);
-        
+
         // Store payout reserve in escrow
         _payoutReserve[marketId] = payoutReserve;
         _payoutReserveRemaining[marketId] = payoutReserve;
-        
+
         // Track total payout reserve for free balance calculation
         _totalPayoutReserve6 += payoutReserve;
-        
+
         _recordPnlToBatch(batchId, lt, ftot, market.deltaEt);
         _markMarketResolved(marketId, batchId);
-        
+
         emit MarketPnlRecorded(marketId, batchId, lt, ftot);
         emit MarketSettled(marketId, market.settlementValue, settlementTick, market.settlementFinalizedAt);
     }
@@ -278,21 +255,21 @@ contract MarketLifecycleModule is SignalsCoreStorage {
 
         uint64 tSet = market.settlementTimestamp;
         uint64 nowTs = uint64(block.timestamp);
-        
+
         // markFailed during PendingOps [Tset + Δsettle, Tset + Δsettle + Δops)
         uint64 opsStart = tSet + settlementSubmitWindow;
         uint64 opsEnd = opsStart + pendingOpsWindow;
-        
+
         // Also allow after opsEnd if no candidate (oracle sample absence case)
         SettlementOracleState storage state = settlementOracleState[marketId];
         bool hasCandidate = state.candidatePriceTimestamp != 0;
-        
+
         // Before PendingOps - not allowed
         require(nowTs >= opsStart, SE.PendingOpsNotStarted());
-        
+
         // After PendingOps with candidate: should use settleMarket instead
         require(nowTs < opsEnd || !hasCandidate, SE.SettlementOracleCandidateMissing());
-        
+
         // Clear any candidate (divergence case discards candidate)
         state.candidateValue = 0;
         state.candidatePriceTimestamp = 0;
@@ -310,10 +287,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
      * @param marketId Market to settle
      * @param settlementValue The settlement value (ops-determined)
      */
-    function finalizeSecondarySettlement(
-        uint256 marketId,
-        int256 settlementValue
-    ) external onlyDelegated {
+    function finalizeSecondarySettlement(uint256 marketId, int256 settlementValue) external onlyDelegated {
         ISignalsCore.Market storage market = markets[marketId];
         require(_marketExists(marketId), SE.MarketNotFound(marketId));
         require(!market.settled, SE.MarketAlreadySettled(marketId));
@@ -333,14 +307,14 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         // Calculate P&L with payout reserve
         uint64 batchId = _getBatchIdForMarket(marketId);
         (int256 lt, uint256 ftot, uint256 payoutReserve) = _calculateMarketPnlWithPayout(marketId, settlementTick);
-        
+
         // Store payout reserve in escrow
         _payoutReserve[marketId] = payoutReserve;
         _payoutReserveRemaining[marketId] = payoutReserve;
-        
+
         // Track total payout reserve for free balance calculation
         _totalPayoutReserve6 += payoutReserve;
-        
+
         _recordPnlToBatch(batchId, lt, ftot, market.deltaEt);
         emit MarketPnlRecorded(marketId, batchId, lt, ftot);
 
@@ -389,7 +363,11 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         emit SettlementTimestampUpdated(marketId, settlementTimestamp);
     }
 
-    function requestSettlementChunks(uint256 marketId, uint32 maxChunksPerTx) external onlyDelegated returns (uint32 emitted) {
+    function requestSettlementChunks(uint256 marketId, uint32 maxChunksPerTx)
+        external
+        onlyDelegated
+        returns (uint32 emitted)
+    {
         require(maxChunksPerTx != 0, SE.ZeroLimit());
         ISignalsCore.Market storage market = markets[marketId];
         require(_marketExists(marketId), SE.MarketNotFound(marketId));
@@ -433,7 +411,10 @@ contract MarketLifecycleModule is SignalsCoreStorage {
     }
 
     function _validateTimeRange(uint64 startTimestamp, uint64 endTimestamp, uint64 settlementTimestamp) internal pure {
-        require(startTimestamp < endTimestamp && endTimestamp <= settlementTimestamp, SE.InvalidTimeRange(startTimestamp, endTimestamp, settlementTimestamp));
+        require(
+            startTimestamp < endTimestamp && endTimestamp <= settlementTimestamp,
+            SE.InvalidTimeRange(startTimestamp, endTimestamp, settlementTimestamp)
+        );
     }
 
     function _marketExists(uint256 marketId) internal view returns (bool) {
@@ -443,22 +424,21 @@ contract MarketLifecycleModule is SignalsCoreStorage {
     /// @dev Convert settlement value to tick
     /// settlementTick = settlementValue / 1e6
     /// maxTick is exclusive upper bound, clamp to last valid tick
-    function _toSettlementTick(
-        int256 minTick,
-        int256 maxTick,
-        int256 tickSpacing,
-        int256 settlementValue
-    ) internal pure returns (int256) {
+    function _toSettlementTick(int256 minTick, int256 maxTick, int256 tickSpacing, int256 settlementValue)
+        internal
+        pure
+        returns (int256)
+    {
         int256 spacing = tickSpacing;
         int256 tick = settlementValue / 1_000_000; // Convert 6-decimal value to tick
-        
+
         // Clamp to valid range [minTick, maxTick - tickSpacing]
         // maxTick is exclusive (outcome space is [minTick, maxTick))
         // Last valid tick is maxTick - tickSpacing
         int256 lastValidTick = maxTick - spacing;
         if (tick < minTick) tick = minTick;
         if (tick > lastValidTick) tick = lastValidTick;
-        
+
         // Align to tick spacing
         int256 offset = tick - minTick;
         tick = minTick + (offset / spacing) * spacing;
@@ -472,13 +452,11 @@ contract MarketLifecycleModule is SignalsCoreStorage {
     /// @param numBins Market bin count
     /// @param tick Settlement tick (must be aligned to tickSpacing)
     /// @return exposure Total payout owed if settlement tick is `tick`
-    function _getExposureAtTick(
-        uint256 marketId,
-        int256 minTick,
-        int256 tickSpacing,
-        uint32 numBins,
-        int256 tick
-    ) internal view returns (uint256 exposure) {
+    function _getExposureAtTick(uint256 marketId, int256 minTick, int256 tickSpacing, uint32 numBins, int256 tick)
+        internal
+        view
+        returns (uint256 exposure)
+    {
         uint32 bin = TickBinLib.tickToBin(minTick, tickSpacing, numBins, tick);
         return ExposureDiffLib.pointQuery(_exposureDiff[marketId], bin);
     }
@@ -528,20 +506,20 @@ contract MarketLifecycleModule is SignalsCoreStorage {
     function _calculateMarketPnl(uint256 marketId) internal view returns (int256 lt, uint256 ftot) {
         ISignalsCore.Market storage market = markets[marketId];
         LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
-        
+
         uint256 alpha = market.liquidityParameter;
         uint256 zStart = market.initialRootSum;
-        
+
         // Get current root sum (Z_end) via totalSum() for O(1) access
         uint256 zEnd = tree.totalSum();
-        
+
         // P&L = α * (ln(Z_end) - ln(Z_start))
         // L_t = C(q_end) - C(q_start), where C(q) = α * ln(Z(q))
         // L_t > 0: cost increased → maker profit (traders net bought)
         // L_t < 0: cost decreased → maker loss (traders net sold)
         uint256 lnZEnd = zEnd.wLn();
         uint256 lnZStart = zStart.wLn();
-        
+
         if (lnZEnd >= lnZStart) {
             // Maker profit: Z increased (cost increased, traders net bought)
             lt = int256(alpha.wMul(lnZEnd - lnZStart));
@@ -549,7 +527,7 @@ contract MarketLifecycleModule is SignalsCoreStorage {
             // Maker loss: Z decreased (cost decreased, traders net sold)
             lt = -int256(alpha.wMul(lnZStart - lnZEnd));
         }
-        
+
         ftot = market.accumulatedFees;
     }
 
@@ -564,24 +542,25 @@ contract MarketLifecycleModule is SignalsCoreStorage {
      * @return ftot Gross fees collected during trading
      * @return payoutReserve Payout reserve Q_{τ_t} to be escrowed
      */
-    function _calculateMarketPnlWithPayout(
-        uint256 marketId,
-        int256 settlementTick
-    ) internal view returns (int256 lt, uint256 ftot, uint256 payoutReserve) {
+    function _calculateMarketPnlWithPayout(uint256 marketId, int256 settlementTick)
+        internal
+        view
+        returns (int256 lt, uint256 ftot, uint256 payoutReserve)
+    {
         ISignalsCore.Market storage market = markets[marketId];
         LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
-        
+
         uint256 alpha = market.liquidityParameter;
         uint256 zStart = market.initialRootSum;
-        
+
         // Get current root sum (Z_end) via totalSum() for O(1) access
         uint256 zEnd = tree.totalSum();
-        
+
         // ΔC_t = α * (ln(Z_end) - ln(Z_start)) = C(q_end) - C(q_start)
         int256 deltaC;
         uint256 lnZEnd = zEnd.wLn();
         uint256 lnZStart = zStart.wLn();
-        
+
         if (lnZEnd >= lnZStart) {
             // Maker profit: Z increased (cost increased, traders net bought)
             deltaC = int256(alpha.wMul(lnZEnd - lnZStart));
@@ -589,20 +568,20 @@ contract MarketLifecycleModule is SignalsCoreStorage {
             // Maker loss: Z decreased (cost decreased, traders net sold)
             deltaC = -int256(alpha.wMul(lnZStart - lnZEnd));
         }
-        
+
         // Payout_t := Q_{t,τ_t}
         // Get payout exposure at settlement tick using diff-array point query
         payoutReserve = _getExposureAtTick(marketId, market.minTick, market.tickSpacing, market.numBins, settlementTick);
-        
+
         // L_t := ΔC_t - Payout_t
         // Note: payoutReserve is in token units (6 decimals), need to convert to WAD for consistency
         // However, positions use quantity in token units, so payout is also in token units
         // For internal accounting consistency, we keep payoutReserve in token units
         // but L_t must be in WAD, so convert payoutReserve to WAD for subtraction
         uint256 payoutReserveWad = payoutReserve * 1e12; // 6-decimal payment token to WAD (1e6 → 1e18)
-        
+
         lt = deltaC - int256(payoutReserveWad);
-        
+
         ftot = market.accumulatedFees;
     }
 
@@ -623,9 +602,12 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         snap.Lt += lt;
         snap.Ftot += ftot;
         snap.DeltaEtSum += deltaEt;
-        
+
         // Early check: if total ΔEₜ exceeds backstopNav, batch will fail
-        require(snap.DeltaEtSum <= capitalStack.backstopNav, SE.BatchDeltaEtExceedsBackstop(snap.DeltaEtSum, capitalStack.backstopNav));
+        require(
+            snap.DeltaEtSum <= capitalStack.backstopNav,
+            SE.BatchDeltaEtExceedsBackstop(snap.DeltaEtSum, capitalStack.backstopNav)
+        );
     }
 
     function _registerMarketForBatch(uint64 batchId) internal {
@@ -647,5 +629,4 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         _marketBatchResolved[marketId] = false;
         _batchMarketState[batchId].resolved -= 1;
     }
-
 }

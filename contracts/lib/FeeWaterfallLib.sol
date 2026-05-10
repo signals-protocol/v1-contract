@@ -18,34 +18,33 @@ library FeeWaterfallLib {
 
     /// @notice Input parameters for Fee Waterfall calculation
     struct Params {
-        int256 Lt;           // P&L (signed, WAD)
-        uint256 Ftot;        // Total gross fees (WAD)
-        uint256 Nprev;       // Previous NAV (WAD)
-        uint256 Bprev;       // Previous Backstop NAV (WAD)
-        uint256 Tprev;       // Previous Treasury NAV (WAD)
-        uint256 deltaEt;     // Available backstop support limit (WAD)
-        int256 pdd;          // NAV loss floor (negative WAD, pdd := -lambda, e.g., -0.3e18)
-        uint256 rhoBS;       // Backstop coverage ratio (WAD)
-        uint256 phiLP;       // LP fee share (WAD)
-        uint256 phiBS;       // Backstop fee share (WAD)
-        uint256 phiTR;       // Treasury fee share (WAD)
+        int256 Lt; // P&L (signed, WAD)
+        uint256 Ftot; // Total gross fees (WAD)
+        uint256 Nprev; // Previous NAV (WAD)
+        uint256 Bprev; // Previous Backstop NAV (WAD)
+        uint256 Tprev; // Previous Treasury NAV (WAD)
+        uint256 deltaEt; // Available backstop support limit (WAD)
+        int256 pdd; // NAV loss floor (negative WAD, pdd := -lambda, e.g., -0.3e18)
+        uint256 rhoBS; // Backstop coverage ratio (WAD)
+        uint256 phiLP; // LP fee share (WAD)
+        uint256 phiBS; // Backstop fee share (WAD)
+        uint256 phiTR; // Treasury fee share (WAD)
     }
 
     /// @notice Output result from Fee Waterfall calculation
     struct Result {
         // Intermediate values (for audit trail)
-        uint256 Floss;       // Loss compensation fee
-        uint256 Fpool;       // Remaining fee pool after loss compensation
-        uint256 Nraw;        // NAV after loss compensation (before grant)
-        uint256 Gt;          // Backstop grant
-        uint256 Ffill;       // Backstop coverage fill
-        uint256 Fdust;       // Rounding dust (goes to LP)
-        
+        uint256 Floss; // Loss compensation fee
+        uint256 Fpool; // Remaining fee pool after loss compensation
+        uint256 Nraw; // NAV after loss compensation (before grant)
+        uint256 Gt; // Backstop grant
+        uint256 Ffill; // Backstop coverage fill
+        uint256 Fdust; // Rounding dust (goes to LP)
         // Final output values
-        uint256 Ft;          // Total fee to LP (Floss + FcoreLP + Fdust)
-        uint256 Npre;        // Pre-batch NAV (for VaultAccountingLib)
-        uint256 Bnext;       // New Backstop NAV
-        uint256 Tnext;       // New Treasury NAV
+        uint256 Ft; // Total fee to LP (Floss + FcoreLP + Fdust)
+        uint256 Npre; // Pre-batch NAV (for VaultAccountingLib)
+        uint256 Bnext; // New Backstop NAV
+        uint256 Tnext; // New Treasury NAV
     }
 
     // ============================================================
@@ -59,7 +58,7 @@ library FeeWaterfallLib {
         // Validate inputs
         // pdd must be in range (-WAD, 0) - i.e., max 100% NAV loss floor
         if (p.pdd >= 0 || p.pdd < -int256(WAD)) revert SE.InvalidDrawdownFloor(p.pdd);
-        
+
         uint256 phiSum = p.phiLP + p.phiBS + p.phiTR;
         if (phiSum != WAD) revert SE.InvalidPhiSum(phiSum);
 
@@ -68,13 +67,13 @@ library FeeWaterfallLib {
         // ========================================
         // L⁻t = max(0, -Lt)
         uint256 Lneg = p.Lt < 0 ? uint256(-p.Lt) : 0;
-        
+
         // Floss = min(Ftot, L⁻t)
         r.Floss = Lneg < p.Ftot ? Lneg : p.Ftot;
-        
+
         // Fpool = Ftot - Floss
         r.Fpool = p.Ftot - r.Floss;
-        
+
         // Nraw = Nprev + Lt + Floss
         // Note: Lt can be negative, so we handle carefully
         if (p.Lt >= 0) {
@@ -124,23 +123,23 @@ library FeeWaterfallLib {
         } else {
             grantNeed = 0;
         }
-        
+
         // Safety invariant: if G^need_t > ΔE_t, batch must revert
         if (grantNeed > p.deltaEt) {
             revert SE.GrantExceedsTailBudget(grantNeed, p.deltaEt);
         }
-        
+
         // Gt = grantNeed (no capping - either we can afford it or we revert)
         r.Gt = grantNeed;
-        
+
         // Check Backstop has enough for grant
         if (r.Gt > p.Bprev) {
             revert SE.InsufficientBackstopForGrant(r.Gt, p.Bprev);
         }
-        
+
         // Ngrant = Nraw + Gt
         uint256 Ngrant = r.Nraw + r.Gt;
-        
+
         // Bgrant = Bprev - Gt
         uint256 Bgrant = p.Bprev - r.Gt;
 
@@ -149,13 +148,13 @@ library FeeWaterfallLib {
         // ========================================
         // Btarget = rhoBS × Ngrant
         uint256 Btarget = Ngrant.wMul(p.rhoBS);
-        
+
         // dBneed = max(0, Btarget - Bgrant)
         uint256 dBneed = Btarget > Bgrant ? Btarget - Bgrant : 0;
-        
+
         // Ffill = min(dBneed, Fpool)
         r.Ffill = dBneed < r.Fpool ? dBneed : r.Fpool;
-        
+
         // Fremain = Fpool - Ffill
         uint256 Fremain = r.Fpool - r.Ffill;
 
@@ -164,13 +163,13 @@ library FeeWaterfallLib {
         // ========================================
         // FcoreLP = floor(Fremain × phiLP / WAD)
         uint256 FcoreLP = Fremain.wMul(p.phiLP);
-        
+
         // FcoreBS = floor(Fremain × phiBS / WAD)
         uint256 FcoreBS = Fremain.wMul(p.phiBS);
-        
+
         // FcoreTR = floor(Fremain × phiTR / WAD)
         uint256 FcoreTR = Fremain.wMul(p.phiTR);
-        
+
         // Fdust = Fremain - FcoreLP - FcoreBS - FcoreTR (dust goes to LP)
         r.Fdust = Fremain - FcoreLP - FcoreBS - FcoreTR;
 
@@ -179,14 +178,14 @@ library FeeWaterfallLib {
         // ========================================
         // Ft = Floss + FcoreLP + Fdust (total to LP)
         r.Ft = r.Floss + FcoreLP + r.Fdust;
-        
+
         // Npre = Ngrant + FcoreLP + Fdust (pre-batch NAV for VaultAccountingLib)
         // N^pre_t = N_{t-1} + L_t + F_t + G_t where F_t = F_loss + F_core_LP + F_dust
         r.Npre = Ngrant + FcoreLP + r.Fdust;
-        
+
         // Bnext = Bgrant + Ffill + FcoreBS
         r.Bnext = Bgrant + r.Ffill + FcoreBS;
-        
+
         // Tnext = Tprev + FcoreTR
         r.Tnext = p.Tprev + FcoreTR;
     }
