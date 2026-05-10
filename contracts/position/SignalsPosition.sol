@@ -79,12 +79,12 @@ contract SignalsPosition is
 
     function burn(uint256 positionId) external onlyCore {
         if (!_exists(positionId)) revert SignalsErrors.PositionNotFound(positionId);
-        address owner = ownerOf(positionId);
+        address positionOwner = ownerOf(positionId);
 
         _burn(positionId);
         delete _positions[positionId];
 
-        emit PositionBurned(positionId, owner);
+        emit PositionBurned(positionId, positionOwner);
     }
 
     function updateQuantity(uint256 positionId, uint128 newQuantity) external onlyCore {
