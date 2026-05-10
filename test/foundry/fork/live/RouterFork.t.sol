@@ -34,9 +34,8 @@ contract RouterForkTest is ForkLiveMarketTest {
     // ============================================================
 
     function test_exactInputSingle_selector_matches_canonical_signature() public pure {
-        bytes4 expected = bytes4(
-            keccak256("exactInputSingle((address,address,address,address,uint256,uint256,uint256,uint160))")
-        );
+        bytes4 expected =
+            bytes4(keccak256("exactInputSingle((address,address,address,address,uint256,uint256,uint256,uint160))"));
         assertEq(IAlgebraSwapRouter.exactInputSingle.selector, expected, "selector mismatch");
     }
 
@@ -81,14 +80,7 @@ contract RouterForkTest is ForkLiveMarketTest {
         vm.startPrank(trader);
         usdcE.approve(address(router), 5e6);
         uint256 positionId = router.openPositionWithSwap(
-            address(usdcE),
-            5e6,
-            1,
-            marketId,
-            m.minTick,
-            m.minTick + m.tickSpacing,
-            5000,
-            5e6
+            address(usdcE), 5e6, 1, marketId, m.minTick, m.minTick + m.tickSpacing, 5000, 5e6
         );
         vm.stopPrank();
 
@@ -120,8 +112,6 @@ contract RouterForkTest is ForkLiveMarketTest {
         if (!ok) return;
 
         uint256 qtyBefore = position.getPosition(positionId).quantity;
-        uint256 ctUSDBefore = ctUSDToken.balanceOf(trader);
-
         vm.startPrank(trader);
         position.setApprovalForAll(address(router), true);
         router.decreasePositionWithSwap(positionId, uint128(qtyBefore / 2), address(ctUSDToken), 0, 0);
@@ -154,7 +144,6 @@ contract RouterForkTest is ForkLiveMarketTest {
 
         // 1. Warp past end + settlement window + pending ops window
         uint64 submitWindow = core.settlementSubmitWindow();
-        uint64 opsWindow = core.pendingOpsWindow();
         vm.warp(uint256(m.settlementTimestamp) + submitWindow + 1);
 
         // 2. Mark settlement as failed (owner only, during PendingOps)
@@ -208,12 +197,7 @@ contract RouterForkTest is ForkLiveMarketTest {
         if (!found) return (false, router, 0, m);
 
         router = new SignalsRouter(
-            address(core),
-            address(position),
-            paymentToken,
-            address(liveSwapRouter),
-            address(0),
-            address(this)
+            address(core), address(position), paymentToken, address(liveSwapRouter), address(0), address(this)
         );
         router.setAllowedToken(address(usdcE), true);
         return (true, router, activeMarketId, activeMarket);
@@ -238,14 +222,7 @@ contract RouterForkTest is ForkLiveMarketTest {
         // Align to tick spacing
         centerTick = (centerTick / m.tickSpacing) * m.tickSpacing;
         positionId = router.openPositionWithSwap(
-            address(usdcE),
-            5e6,
-            1,
-            marketId,
-            centerTick,
-            centerTick + m.tickSpacing,
-            5000,
-            5e6
+            address(usdcE), 5e6, 1, marketId, centerTick, centerTick + m.tickSpacing, 5000, 5e6
         );
         vm.stopPrank();
         return (true, router, trader, positionId);

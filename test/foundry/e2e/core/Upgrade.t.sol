@@ -31,17 +31,7 @@ contract UpgradeTest is FullSystemDeployer {
         uint64 settlement = uint64(block.timestamp + 60);
 
         vm.prank(sys.owner);
-        uint256 marketId = sys.core.createMarketUniform(
-            0,
-            4,
-            1,
-            start,
-            end,
-            settlement,
-            4,
-            WAD,
-            address(sys.feePolicy)
-        );
+        uint256 marketId = sys.core.createMarketUniform(0, 4, 1, start, end, settlement, 4, WAD, address(sys.feePolicy));
 
         uint128 quantity = 1_000;
         uint256 cost = sys.core.calculateOpenCost(marketId, 1, 3, quantity);

@@ -17,26 +17,15 @@ contract TradeModuleHarness is TradeModule {
     }
 
     /// @notice Expose shared market validation (active + time).
-    function exposedLoadAndValidateMarket(uint256 marketId)
-        external
-        view
-        returns (ISignalsCore.Market memory)
-    {
+    function exposedLoadAndValidateMarket(uint256 marketId) external view returns (ISignalsCore.Market memory) {
         ISignalsCore.Market storage market = _loadAndValidateMarket(marketId);
         return market;
     }
 
     /// @notice Expose tick range validation via TickBinLib.ticksToBins.
-    function exposedValidateTickRange(
-        int256 lowerTick,
-        int256 upperTick,
-        uint256 marketId
-    ) external view {
+    function exposedValidateTickRange(int256 lowerTick, int256 upperTick, uint256 marketId) external view {
         ISignalsCore.Market storage market = markets[marketId];
         // TickBinLib.ticksToBins validates tick range internally
-        TickBinLib.ticksToBins(
-            market.minTick, market.maxTick, market.tickSpacing, market.numBins,
-            lowerTick, upperTick
-        );
+        TickBinLib.ticksToBins(market.minTick, market.maxTick, market.tickSpacing, market.numBins, lowerTick, upperTick);
     }
 }

@@ -26,12 +26,11 @@ library TickBinLib {
      * @param tick The tick value to convert (must be aligned to tickSpacing)
      * @return bin The 0-based bin index
      */
-    function tickToBin(
-        int256 minTick,
-        int256 tickSpacing,
-        uint32 numBins,
-        int256 tick
-    ) internal pure returns (uint32 bin) {
+    function tickToBin(int256 minTick, int256 tickSpacing, uint32 numBins, int256 tick)
+        internal
+        pure
+        returns (uint32 bin)
+    {
         int256 offset = tick - minTick;
 
         // Tick must be >= minTick and aligned to tickSpacing

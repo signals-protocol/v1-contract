@@ -45,15 +45,13 @@ contract TradeHandler is Test {
         uint256 nextId = position.nextId();
 
         vm.prank(user);
-        try
-            core.openPosition(
-                marketId,
-                int256(uint256(lo)),
-                int256(uint256(hi)),
-                quantity,
-                100_000e6 // large maxCost
-            )
-        {
+        try core.openPosition(
+            marketId,
+            int256(uint256(lo)),
+            int256(uint256(hi)),
+            quantity,
+            100_000e6 // large maxCost
+        ) {
             openPositionIds.push(nextId);
             tradeCount++;
             lastSumAfterTrade = core.getMarketTotalSum(marketId);

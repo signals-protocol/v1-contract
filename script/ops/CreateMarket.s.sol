@@ -222,7 +222,9 @@ contract CreateMarket is BaseScript {
         uint256 intPart = 0;
         if (dotIndex > 0) {
             bytes memory intBytes = new bytes(dotIndex);
-            for (uint256 i = 0; i < dotIndex; i++) intBytes[i] = b[i];
+            for (uint256 i = 0; i < dotIndex; i++) {
+                intBytes[i] = b[i];
+            }
             intPart = vm.parseUint(string(intBytes));
         }
 
@@ -230,7 +232,9 @@ contract CreateMarket is BaseScript {
         uint256 fracPart = 0;
         if (fracLen > 0) {
             bytes memory fracBytes = new bytes(fracLen);
-            for (uint256 i = 0; i < fracLen; i++) fracBytes[i] = b[dotIndex + 1 + i];
+            for (uint256 i = 0; i < fracLen; i++) {
+                fracBytes[i] = b[dotIndex + 1 + i];
+            }
             fracPart = vm.parseUint(string(fracBytes));
         }
 

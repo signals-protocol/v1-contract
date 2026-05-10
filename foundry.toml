@@ -65,6 +65,12 @@ fail_on_revert = false
 test = "test/foundry/fork"
 no_match_path = "nonexistent"
 
+[fmt]
+line_length = 120
+tab_width = 4
+quote_style = "double"
+bracket_spacing = false
+
 [rpc_endpoints]
 dev = "${DEV_RPC_URL}"
 prod = "${PROD_RPC_URL}"

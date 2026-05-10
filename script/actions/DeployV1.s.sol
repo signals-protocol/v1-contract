@@ -317,7 +317,7 @@ contract DeployV1 is BaseScript {
 
     // ── Resolution helpers ──────────────────────────────────────────────
 
-    function _resolvePaymentToken(address deployer, uint256 deployerKey) internal returns (address) {
+    function _resolvePaymentToken(address, uint256 deployerKey) internal returns (address) {
         address paymentAddr = vm.envOr("PAYMENT_TOKEN_ADDRESS", address(0));
 
         if (paymentAddr != address(0)) {
@@ -427,7 +427,7 @@ contract DeployV1 is BaseScript {
         address fee200Addr,
         address paymentAddr,
         address ownerSafe,
-        address[] memory operators,
+        address[] memory,
         DeployConfig memory cfg
     ) internal {
         string memory contracts = vm.serializeAddress("deploy-contracts", "SignalsCreate2Factory", factoryAddr);

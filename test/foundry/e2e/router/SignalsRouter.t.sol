@@ -40,29 +40,25 @@ contract SignalsRouterTest is FullSystemDeployer {
         inputToken = new MockERC20("Bridged USDC", "USDC.e", 6);
         mockSwapRouter = new MockAlgebraSwapRouter();
         router = new SignalsRouter(
-            address(sys.core),
-            address(sys.position),
-            address(sys.payment),
-            address(mockSwapRouter),
-            address(0),
-            owner
+            address(sys.core), address(sys.position), address(sys.payment), address(mockSwapRouter), address(0), owner
         );
 
         sys.payment.mint(owner, SEED_AMOUNT);
         vm.startPrank(owner);
         sys.payment.approve(address(sys.core), SEED_AMOUNT);
         sys.core.seedVault(SEED_AMOUNT);
-        marketId = sys.core.createMarketUniform(
-            0,
-            4,
-            1,
-            uint64(block.timestamp - 5),
-            uint64(block.timestamp + 50),
-            uint64(block.timestamp + 60),
-            4,
-            WAD,
-            address(sys.feePolicy)
-        );
+        marketId = sys.core
+            .createMarketUniform(
+                0,
+                4,
+                1,
+                uint64(block.timestamp - 5),
+                uint64(block.timestamp + 50),
+                uint64(block.timestamp + 60),
+                4,
+                WAD,
+                address(sys.feePolicy)
+            );
         vm.stopPrank();
 
         sys.payment.mint(user, USER_FUND);
@@ -93,14 +89,7 @@ contract SignalsRouterTest is FullSystemDeployer {
 
         vm.prank(user);
         router.openPositionWithSwap(
-            address(inputToken),
-            inputAmount,
-            inputAmount,
-            marketId,
-            LOWER_TICK,
-            UPPER_TICK,
-            POSITION_QTY,
-            inputAmount
+            address(inputToken), inputAmount, inputAmount, marketId, LOWER_TICK, UPPER_TICK, POSITION_QTY, inputAmount
         );
 
         assertEq(sys.position.ownerOf(positionId), user);
@@ -239,14 +228,7 @@ contract SignalsRouterTest is FullSystemDeployer {
         vm.prank(user);
         vm.expectRevert();
         router.openPositionWithSwap(
-            address(inputToken),
-            inputAmount,
-            1,
-            marketId,
-            LOWER_TICK,
-            UPPER_TICK,
-            POSITION_QTY,
-            openCost + 1
+            address(inputToken), inputAmount, 1, marketId, LOWER_TICK, UPPER_TICK, POSITION_QTY, openCost + 1
         );
 
         assertEq(inputToken.balanceOf(user), userInputBefore);
@@ -286,14 +268,7 @@ contract SignalsRouterTest is FullSystemDeployer {
         vm.prank(user);
         vm.expectRevert();
         router.openPositionWithSwap(
-            address(inputToken),
-            openCost,
-            openCost,
-            marketId,
-            LOWER_TICK,
-            UPPER_TICK,
-            POSITION_QTY,
-            openCost + 1
+            address(inputToken), openCost, openCost, marketId, LOWER_TICK, UPPER_TICK, POSITION_QTY, openCost + 1
         );
 
         assertEq(inputToken.balanceOf(user), userInputBefore);
@@ -531,43 +506,21 @@ contract SignalsRouterTest is FullSystemDeployer {
     function test_constructor_revertsForZeroAddressParameters() public {
         vm.expectRevert(SignalsRouter.ZeroAddress.selector);
         new SignalsRouter(
-            address(0),
-            address(sys.position),
-            address(sys.payment),
-            address(mockSwapRouter),
-            address(0),
-            owner
+            address(0), address(sys.position), address(sys.payment), address(mockSwapRouter), address(0), owner
         );
 
         vm.expectRevert(SignalsRouter.ZeroAddress.selector);
         new SignalsRouter(
-            address(sys.core),
-            address(0),
-            address(sys.payment),
-            address(mockSwapRouter),
-            address(0),
-            owner
+            address(sys.core), address(0), address(sys.payment), address(mockSwapRouter), address(0), owner
         );
 
         vm.expectRevert(SignalsRouter.ZeroAddress.selector);
         new SignalsRouter(
-            address(sys.core),
-            address(sys.position),
-            address(0),
-            address(mockSwapRouter),
-            address(0),
-            owner
+            address(sys.core), address(sys.position), address(0), address(mockSwapRouter), address(0), owner
         );
 
         vm.expectRevert(SignalsRouter.ZeroAddress.selector);
-        new SignalsRouter(
-            address(sys.core),
-            address(sys.position),
-            address(sys.payment),
-            address(0),
-            address(0),
-            owner
-        );
+        new SignalsRouter(address(sys.core), address(sys.position), address(sys.payment), address(0), address(0), owner);
 
         vm.expectRevert();
         new SignalsRouter(
@@ -598,7 +551,7 @@ contract SignalsRouterTest is FullSystemDeployer {
     }
 
     function _warpToClaimOpen() internal {
-        (, , , uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
+        (,,, uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
         vm.warp(claimOpen);
     }
 

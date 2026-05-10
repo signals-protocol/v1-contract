@@ -1,7 +1,4 @@
-export type Environment =
-  | "local"
-  | "dev"
-  | "prod";
+export type Environment = 'local' | 'dev' | 'prod';
 
 export interface DeploymentRecord {
   version: number;
@@ -44,7 +41,7 @@ export interface EnvironmentFile {
 }
 
 export const ENV_PATHS: Record<Environment, string> = {
-  "local": "scripts/environments/local.json",
-  "dev": "scripts/environments/dev.json",
-  "prod": "scripts/environments/prod.json",
+  local: 'scripts/environments/local.json',
+  dev: 'scripts/environments/dev.json',
+  prod: 'scripts/environments/prod.json',
 };

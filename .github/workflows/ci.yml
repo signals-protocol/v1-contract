@@ -35,6 +35,7 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
+          version: stable
           cache: true
 
       - name: Cache Forge build
@@ -47,8 +48,18 @@ jobs:
           restore-keys: |
             forge-build-${{ runner.os }}-
 
-      - name: Forge build
-        run: forge build
+      - name: Forge fmt check
+        run: forge fmt --check contracts script test
+
+      - name: Forge build (zero solc warnings)
+        shell: bash
+        run: |
+          set -eo pipefail
+          forge build 2>&1 | tee /tmp/build.log
+          if grep -E "^Warning \([0-9]+\):" /tmp/build.log; then
+            echo "::error::solc warnings detected"
+            exit 1
+          fi
 
       - name: Test storage comparator
         run: yarn storage:test
@@ -94,6 +105,18 @@ jobs:
 
       - name: TypeScript strict check
         run: yarn lint
+
+      - name: Install Slither
+        run: |
+          python3 -m pip install --user slither-analyzer==0.11.5
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/slither" --version
+
+      - name: Slither analysis
+        shell: bash
+        run: |
+          set -eo pipefail
+          slither contracts/ --config-file slither.config.json --fail-medium
 
   coverage:
     name: Coverage

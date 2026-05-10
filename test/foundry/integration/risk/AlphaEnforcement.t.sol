@@ -47,7 +47,7 @@ contract AlphaEnforcementTest is FullSystemDeployer {
     }
 
     function _setBackstopNav(uint256 targetWad) internal {
-        (uint256 current, ) = sys.core.getCapitalStack();
+        (uint256 current,) = sys.core.getCapitalStack();
         if (current < targetWad) {
             uint256 diff6 = (targetWad - current) / 1e12;
             if (diff6 > 0) {
@@ -82,33 +82,19 @@ contract AlphaEnforcementTest is FullSystemDeployer {
     function test_allowsMarketCreation_whenAlphaLeAlphaLimit() public {
         // NAV=10000, lambda=0.3, numBins=100: alpha_base ~651.5, no drawdown -> alpha_limit ~651.5
         vm.prank(sys.owner);
-        sys.core.createMarketUniform(
-            0,
-            1000,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            100,
-            500e18,
-            address(sys.feePolicy)
-        );
+        sys.core
+            .createMarketUniform(
+                0, 1000, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 100, 500e18, address(sys.feePolicy)
+            );
     }
 
     function test_revertsMarketCreation_whenAlphaGtAlphaLimit() public {
         vm.prank(sys.owner);
         vm.expectPartialRevert(SE.AlphaExceedsLimit.selector);
-        sys.core.createMarketUniform(
-            0,
-            1000,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            100,
-            1000e18,
-            address(sys.feePolicy)
-        );
+        sys.core
+            .createMarketUniform(
+                0, 1000, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 100, 1000e18, address(sys.feePolicy)
+            );
     }
 
     // ============================================================
@@ -117,17 +103,10 @@ contract AlphaEnforcementTest is FullSystemDeployer {
 
     function test_allowsOpenPositionFreely() public {
         vm.prank(sys.owner);
-        sys.core.createMarketUniform(
-            0,
-            1000,
-            10,
-            _ts() + 10,
-            _ts() + 3600,
-            _ts() + 3660,
-            100,
-            500e18,
-            address(sys.feePolicy)
-        );
+        sys.core
+            .createMarketUniform(
+                0, 1000, 10, _ts() + 10, _ts() + 3600, _ts() + 3660, 100, 500e18, address(sys.feePolicy)
+            );
         vm.warp(block.timestamp + 15);
 
         vm.prank(sys.users[0]);
@@ -136,17 +115,10 @@ contract AlphaEnforcementTest is FullSystemDeployer {
 
     function test_allowsIncreasePositionFreely() public {
         vm.prank(sys.owner);
-        sys.core.createMarketUniform(
-            0,
-            1000,
-            10,
-            _ts() + 10,
-            _ts() + 3600,
-            _ts() + 3660,
-            100,
-            500e18,
-            address(sys.feePolicy)
-        );
+        sys.core
+            .createMarketUniform(
+                0, 1000, 10, _ts() + 10, _ts() + 3600, _ts() + 3660, 100, 500e18, address(sys.feePolicy)
+            );
         vm.warp(block.timestamp + 15);
 
         vm.prank(sys.users[0]);
@@ -158,17 +130,10 @@ contract AlphaEnforcementTest is FullSystemDeployer {
 
     function test_allowsClosePositionFreely() public {
         vm.prank(sys.owner);
-        sys.core.createMarketUniform(
-            0,
-            1000,
-            10,
-            _ts() + 10,
-            _ts() + 3600,
-            _ts() + 3660,
-            100,
-            500e18,
-            address(sys.feePolicy)
-        );
+        sys.core
+            .createMarketUniform(
+                0, 1000, 10, _ts() + 10, _ts() + 3600, _ts() + 3660, 100, 500e18, address(sys.feePolicy)
+            );
         vm.warp(block.timestamp + 15);
 
         vm.prank(sys.users[0]);
@@ -180,17 +145,10 @@ contract AlphaEnforcementTest is FullSystemDeployer {
 
     function test_allowsDecreasePositionFreely() public {
         vm.prank(sys.owner);
-        sys.core.createMarketUniform(
-            0,
-            1000,
-            10,
-            _ts() + 10,
-            _ts() + 3600,
-            _ts() + 3660,
-            100,
-            500e18,
-            address(sys.feePolicy)
-        );
+        sys.core
+            .createMarketUniform(
+                0, 1000, 10, _ts() + 10, _ts() + 3600, _ts() + 3660, 100, 500e18, address(sys.feePolicy)
+            );
         vm.warp(block.timestamp + 15);
 
         vm.prank(sys.users[0]);
@@ -207,17 +165,10 @@ contract AlphaEnforcementTest is FullSystemDeployer {
     function test_reducesAlphaLimitProportionallyToPeakDrawdown() public {
         // Alpha=500 succeeds initially
         vm.prank(sys.owner);
-        sys.core.createMarketUniform(
-            0,
-            1000,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            100,
-            500e18,
-            address(sys.feePolicy)
-        );
+        sys.core
+            .createMarketUniform(
+                0, 1000, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 100, 500e18, address(sys.feePolicy)
+            );
 
         // Simulate 50% peak drawdown
         vm.prank(sys.owner);
@@ -226,17 +177,10 @@ contract AlphaEnforcementTest is FullSystemDeployer {
         // Same alpha=500 should now fail
         vm.prank(sys.owner);
         vm.expectPartialRevert(SE.AlphaExceedsLimit.selector);
-        sys.core.createMarketUniform(
-            0,
-            1000,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            100,
-            500e18,
-            address(sys.feePolicy)
-        );
+        sys.core
+            .createMarketUniform(
+                0, 1000, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 100, 500e18, address(sys.feePolicy)
+            );
     }
 
     function test_allowsLowerAlphaWhenPeakDrawdownReducesLimit() public {
@@ -246,17 +190,10 @@ contract AlphaEnforcementTest is FullSystemDeployer {
 
         // alpha=300 should succeed (300 < 325.75)
         vm.prank(sys.owner);
-        sys.core.createMarketUniform(
-            0,
-            1000,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            100,
-            300e18,
-            address(sys.feePolicy)
-        );
+        sys.core
+            .createMarketUniform(
+                0, 1000, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 100, 300e18, address(sys.feePolicy)
+            );
     }
 
     function test_rejectsAllMarketCreationWhenPeakDrawdownReaches100Pct() public {
@@ -267,17 +204,8 @@ contract AlphaEnforcementTest is FullSystemDeployer {
         // Even alpha=1 should fail
         vm.prank(sys.owner);
         vm.expectPartialRevert(SE.AlphaExceedsLimit.selector);
-        sys.core.createMarketUniform(
-            0,
-            1000,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            100,
-            1e18,
-            address(sys.feePolicy)
-        );
+        sys.core
+            .createMarketUniform(0, 1000, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 100, 1e18, address(sys.feePolicy));
     }
 
     // ============================================================
@@ -289,17 +217,10 @@ contract AlphaEnforcementTest is FullSystemDeployer {
         sys.core.setRiskConfig(0.3e18, 1e18, false);
 
         vm.prank(sys.owner);
-        sys.core.createMarketUniform(
-            0,
-            1000,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            100,
-            10_000e18,
-            address(sys.feePolicy)
-        );
+        sys.core
+            .createMarketUniform(
+                0, 1000, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 100, 10_000e18, address(sys.feePolicy)
+            );
     }
 
     // ============================================================
@@ -309,32 +230,14 @@ contract AlphaEnforcementTest is FullSystemDeployer {
     function test_revertsMarketCreationWithNumBins1() public {
         vm.prank(sys.owner);
         vm.expectRevert(abi.encodeWithSelector(SE.InvalidNumBins.selector, uint256(1)));
-        sys.core.createMarketUniform(
-            0,
-            10,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            1,
-            100e18,
-            address(sys.feePolicy)
-        );
+        sys.core
+            .createMarketUniform(0, 10, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 1, 100e18, address(sys.feePolicy));
     }
 
     function test_allowsMarketCreationWithNumBins2() public {
         vm.prank(sys.owner);
-        sys.core.createMarketUniform(
-            0,
-            20,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            2,
-            100e18,
-            address(sys.feePolicy)
-        );
+        sys.core
+            .createMarketUniform(0, 20, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 2, 100e18, address(sys.feePolicy));
     }
 
     function test_rejectsSetRiskConfigWhenLambdaZero() public {
@@ -353,22 +256,17 @@ contract AlphaEnforcementTest is FullSystemDeployer {
 
         // k=0 means no drawdown penalty, alpha=500 should work
         vm.prank(sys.owner);
-        sys.core.createMarketUniform(
-            0,
-            1000,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            100,
-            500e18,
-            address(sys.feePolicy)
-        );
+        sys.core
+            .createMarketUniform(
+                0, 1000, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 100, 500e18, address(sys.feePolicy)
+            );
     }
 
     function test_rejectsBaseFactorsWithZeroElement() public {
         uint256[] memory factors = new uint256[](10);
-        for (uint256 i = 0; i < 10; i++) factors[i] = WAD;
+        for (uint256 i = 0; i < 10; i++) {
+            factors[i] = WAD;
+        }
         factors[5] = 0;
         address seedData = address(SeedHelper.deploySeedData(factors));
 
@@ -376,18 +274,10 @@ contract AlphaEnforcementTest is FullSystemDeployer {
 
         vm.prank(sys.owner);
         vm.expectRevert(abi.encodeWithSelector(SE.InvalidFactor.selector, uint256(0)));
-        sys.core.createMarket(
-            0,
-            100,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            seedData
-        );
+        sys.core
+            .createMarket(
+                0, 100, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 10, 100e18, address(sys.feePolicy), seedData
+            );
     }
 
     // ============================================================
@@ -401,18 +291,10 @@ contract AlphaEnforcementTest is FullSystemDeployer {
         _setBackstopNav(100e18);
 
         vm.prank(sys.owner);
-        sys.core.createMarket(
-            0,
-            100,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            seedData
-        );
+        sys.core
+            .createMarket(
+                0, 100, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 10, 100e18, address(sys.feePolicy), seedData
+            );
     }
 
     function test_revertsMarketWhenDeltaEtGtBackstopNav() public {
@@ -423,18 +305,10 @@ contract AlphaEnforcementTest is FullSystemDeployer {
 
         vm.prank(sys.owner);
         vm.expectPartialRevert(SE.PriorNotAdmissible.selector);
-        sys.core.createMarket(
-            0,
-            100,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            seedData
-        );
+        sys.core
+            .createMarket(
+                0, 100, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 10, 100e18, address(sys.feePolicy), seedData
+            );
     }
 
     function test_boundaryDeltaEtExactlyEqualsBackstopNav() public {
@@ -444,18 +318,10 @@ contract AlphaEnforcementTest is FullSystemDeployer {
 
         // deltaEt ~= 9.53 < 10
         vm.prank(sys.owner);
-        sys.core.createMarket(
-            0,
-            100,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            seedData
-        );
+        sys.core
+            .createMarket(
+                0, 100, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 10, 100e18, address(sys.feePolicy), seedData
+            );
     }
 
     function test_uniformPriorHasDeltaEtZero() public {
@@ -465,18 +331,10 @@ contract AlphaEnforcementTest is FullSystemDeployer {
 
         // Uniform: deltaEt=0, always admissible
         vm.prank(sys.owner);
-        sys.core.createMarket(
-            0,
-            100,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            seedData
-        );
+        sys.core
+            .createMarket(
+                0, 100, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 10, 100e18, address(sys.feePolicy), seedData
+            );
     }
 
     // ============================================================
@@ -485,24 +343,18 @@ contract AlphaEnforcementTest is FullSystemDeployer {
 
     function test_storesDeltaEtGtZeroForConcentratedPrior() public {
         uint256[] memory factors = new uint256[](10);
-        for (uint256 i = 0; i < 10; i++) factors[i] = WAD;
+        for (uint256 i = 0; i < 10; i++) {
+            factors[i] = WAD;
+        }
         factors[0] = 2 * WAD;
         address seedData = address(SeedHelper.deploySeedData(factors));
         _setBackstopNav(1_000e18);
 
         vm.prank(sys.owner);
-        sys.core.createMarket(
-            0,
-            100,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            seedData
-        );
+        sys.core
+            .createMarket(
+                0, 100, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 10, 100e18, address(sys.feePolicy), seedData
+            );
 
         ISignalsCore.Market memory m = sys.core.harnessGetMarket(1);
         assertGt(m.deltaEt, 0);
@@ -516,18 +368,10 @@ contract AlphaEnforcementTest is FullSystemDeployer {
         _setBackstopNav(1_000e18);
 
         vm.prank(sys.owner);
-        sys.core.createMarket(
-            0,
-            100,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            seedData
-        );
+        sys.core
+            .createMarket(
+                0, 100, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 10, 100e18, address(sys.feePolicy), seedData
+            );
 
         ISignalsCore.Market memory m = sys.core.harnessGetMarket(1);
         assertEq(m.deltaEt, 0);
@@ -535,40 +379,35 @@ contract AlphaEnforcementTest is FullSystemDeployer {
 
     function test_deltaEtScalesProportionallyWithAlpha() public {
         uint256[] memory factors = new uint256[](10);
-        for (uint256 i = 0; i < 10; i++) factors[i] = WAD;
+        for (uint256 i = 0; i < 10; i++) {
+            factors[i] = WAD;
+        }
         factors[0] = 2 * WAD;
         address seedData = address(SeedHelper.deploySeedData(factors));
         _setBackstopNav(10_000e18);
 
         // Market 1: alpha=100
         vm.prank(sys.owner);
-        sys.core.createMarket(
-            0,
-            100,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            seedData
-        );
+        sys.core
+            .createMarket(
+                0, 100, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 10, 100e18, address(sys.feePolicy), seedData
+            );
 
         // Market 2: alpha=200 (different batch)
         vm.prank(sys.owner);
-        sys.core.createMarket(
-            200,
-            300,
-            10,
-            _ts() + 86400 + 60,
-            _ts() + 86400 + 3600,
-            _ts() + 86400 + 3660,
-            10,
-            200e18,
-            address(sys.feePolicy),
-            seedData
-        );
+        sys.core
+            .createMarket(
+                200,
+                300,
+                10,
+                _ts() + 86400 + 60,
+                _ts() + 86400 + 3600,
+                _ts() + 86400 + 3660,
+                10,
+                200e18,
+                address(sys.feePolicy),
+                seedData
+            );
 
         ISignalsCore.Market memory m1 = sys.core.harnessGetMarket(1);
         ISignalsCore.Market memory m2 = sys.core.harnessGetMarket(2);
@@ -589,42 +428,28 @@ contract AlphaEnforcementTest is FullSystemDeployer {
         _setBackstopNav(1_000e18);
 
         vm.prank(sys.owner);
-        sys.core.createMarket(
-            0,
-            100,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            seedData
-        );
+        sys.core
+            .createMarket(
+                0, 100, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 10, 100e18, address(sys.feePolicy), seedData
+            );
 
         assertEq(sys.core.harnessGetMarket(1).deltaEt, 0);
     }
 
     function test_skewedPrior_oneBin2x_deltaEtGtZero() public {
         uint256[] memory factors = new uint256[](10);
-        for (uint256 i = 0; i < 10; i++) factors[i] = WAD;
+        for (uint256 i = 0; i < 10; i++) {
+            factors[i] = WAD;
+        }
         factors[0] = 2 * WAD;
         address seedData = address(SeedHelper.deploySeedData(factors));
         _setBackstopNav(1_000e18);
 
         vm.prank(sys.owner);
-        sys.core.createMarket(
-            0,
-            100,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            seedData
-        );
+        sys.core
+            .createMarket(
+                0, 100, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 10, 100e18, address(sys.feePolicy), seedData
+            );
 
         ISignalsCore.Market memory m = sys.core.harnessGetMarket(1);
         assertGt(m.deltaEt, 0);
@@ -633,24 +458,18 @@ contract AlphaEnforcementTest is FullSystemDeployer {
 
     function test_extremeSkew_oneBin10x_largerDeltaEt() public {
         uint256[] memory factors = new uint256[](10);
-        for (uint256 i = 0; i < 10; i++) factors[i] = WAD;
+        for (uint256 i = 0; i < 10; i++) {
+            factors[i] = WAD;
+        }
         factors[0] = 10 * WAD;
         address seedData = address(SeedHelper.deploySeedData(factors));
         _setBackstopNav(10_000e18);
 
         vm.prank(sys.owner);
-        sys.core.createMarket(
-            0,
-            100,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            seedData
-        );
+        sys.core
+            .createMarket(
+                0, 100, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 10, 100e18, address(sys.feePolicy), seedData
+            );
 
         ISignalsCore.Market memory m = sys.core.harnessGetMarket(1);
         assertGt(m.deltaEt, 50e18);
@@ -659,24 +478,18 @@ contract AlphaEnforcementTest is FullSystemDeployer {
 
     function test_minFactorLtWad_increasesDeltaEt() public {
         uint256[] memory factors = new uint256[](10);
-        for (uint256 i = 0; i < 10; i++) factors[i] = WAD;
+        for (uint256 i = 0; i < 10; i++) {
+            factors[i] = WAD;
+        }
         factors[5] = WAD / 2;
         address seedData = address(SeedHelper.deploySeedData(factors));
         _setBackstopNav(10_000e18);
 
         vm.prank(sys.owner);
-        sys.core.createMarket(
-            0,
-            100,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            seedData
-        );
+        sys.core
+            .createMarket(
+                0, 100, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 10, 100e18, address(sys.feePolicy), seedData
+            );
 
         ISignalsCore.Market memory m = sys.core.harnessGetMarket(1);
         assertGt(m.deltaEt, 50e18);
@@ -692,18 +505,10 @@ contract AlphaEnforcementTest is FullSystemDeployer {
         _setBackstopNav(1_000e18);
 
         vm.prank(sys.owner);
-        sys.core.createMarket(
-            0,
-            100,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            _ts() + 3660,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            seedData
-        );
+        sys.core
+            .createMarket(
+                0, 100, 10, _ts() + 60, _ts() + 3600, _ts() + 3660, 10, 100e18, address(sys.feePolicy), seedData
+            );
     }
 
     function test_allowsSecondMarketForSameBatch() public {
@@ -714,30 +519,14 @@ contract AlphaEnforcementTest is FullSystemDeployer {
         uint64 settlementTime = _ts() + 3660;
 
         vm.startPrank(sys.owner);
-        sys.core.createMarket(
-            0,
-            100,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            settlementTime,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            seedData
-        );
-        sys.core.createMarket(
-            200,
-            300,
-            10,
-            _ts() + 100,
-            _ts() + 3500,
-            settlementTime,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            seedData
-        );
+        sys.core
+            .createMarket(
+                0, 100, 10, _ts() + 60, _ts() + 3600, settlementTime, 10, 100e18, address(sys.feePolicy), seedData
+            );
+        sys.core
+            .createMarket(
+                200, 300, 10, _ts() + 100, _ts() + 3500, settlementTime, 10, 100e18, address(sys.feePolicy), seedData
+            );
         vm.stopPrank();
     }
 
@@ -750,30 +539,23 @@ contract AlphaEnforcementTest is FullSystemDeployer {
         uint64 settlementTime2 = settlementTime1 + 86400;
 
         vm.startPrank(sys.owner);
-        sys.core.createMarket(
-            0,
-            100,
-            10,
-            _ts() + 60,
-            _ts() + 3600,
-            settlementTime1,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            seedData
-        );
-        sys.core.createMarket(
-            200,
-            300,
-            10,
-            _ts() + 60 + 86400,
-            _ts() + 3600 + 86400,
-            settlementTime2,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            seedData
-        );
+        sys.core
+            .createMarket(
+                0, 100, 10, _ts() + 60, _ts() + 3600, settlementTime1, 10, 100e18, address(sys.feePolicy), seedData
+            );
+        sys.core
+            .createMarket(
+                200,
+                300,
+                10,
+                _ts() + 60 + 86400,
+                _ts() + 3600 + 86400,
+                settlementTime2,
+                10,
+                100e18,
+                address(sys.feePolicy),
+                seedData
+            );
         vm.stopPrank();
     }
 }

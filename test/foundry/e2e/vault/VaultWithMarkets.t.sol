@@ -71,7 +71,7 @@ contract VaultWithMarketsTest is FullSystemDeployer {
         sys.core.finalizePrimarySettlement(mktId);
 
         // Check daily PnL before batch processing
-        (, , , , , , bool processedBefore) = sys.core.getDailyPnl(batchId);
+        (,,,,,, bool processedBefore) = sys.core.getDailyPnl(batchId);
         assertFalse(processedBefore);
 
         uint256 navBefore = sys.core.getVaultNav();
@@ -85,7 +85,7 @@ contract VaultWithMarketsTest is FullSystemDeployer {
         uint256 navAfter = sys.core.getVaultNav();
         assertTrue(navAfter != navBefore);
 
-        (, , , , , , bool processedAfter) = sys.core.getDailyPnl(batchId);
+        (,,,,,, bool processedAfter) = sys.core.getDailyPnl(batchId);
         assertTrue(processedAfter);
         assertEq(sys.core.currentBatchId(), batchId);
     }
@@ -101,17 +101,8 @@ contract VaultWithMarketsTest is FullSystemDeployer {
         // Create market with uniform prior → ΔEₜ = 0
         uint64 tSet = seedTime + 500;
         vm.prank(sys.owner);
-        uint256 mktId = sys.core.createMarketUniform(
-            0,
-            100,
-            10,
-            seedTime + 100,
-            tSet - 100,
-            tSet,
-            10,
-            WAD,
-            address(sys.feePolicy)
-        );
+        uint256 mktId =
+            sys.core.createMarketUniform(0, 100, 10, seedTime + 100, tSet - 100, tSet, 10, WAD, address(sys.feePolicy));
 
         // Submit oracle and settle
         uint256 priceTimestamp = uint256(tSet) + 1;
@@ -132,7 +123,7 @@ contract VaultWithMarketsTest is FullSystemDeployer {
         vm.prank(sys.owner);
         sys.core.processDailyBatch(batchId);
 
-        (, , , , , , bool processed) = sys.core.getDailyPnl(batchId);
+        (,,,,,, bool processed) = sys.core.getDailyPnl(batchId);
         assertTrue(processed);
     }
 
@@ -160,18 +151,10 @@ contract VaultWithMarketsTest is FullSystemDeployer {
         SeedData seedData = SeedHelper.deploySeedData(concentratedFactors);
 
         vm.prank(sys.owner);
-        uint256 mktId = sys.core.createMarket(
-            0,
-            100,
-            10,
-            seedTime + 100,
-            tSet - 100,
-            tSet,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            address(seedData)
-        );
+        uint256 mktId = sys.core
+            .createMarket(
+                0, 100, 10, seedTime + 100, tSet - 100, tSet, 10, 100e18, address(sys.feePolicy), address(seedData)
+            );
 
         vm.prank(sys.owner);
         sys.core.seedNextChunks(mktId, 10);
@@ -200,7 +183,7 @@ contract VaultWithMarketsTest is FullSystemDeployer {
         vm.prank(sys.owner);
         sys.core.processDailyBatch(batchId);
 
-        (, , , , , , bool processed) = sys.core.getDailyPnl(batchId);
+        (,,,,,, bool processed) = sys.core.getDailyPnl(batchId);
         assertTrue(processed);
     }
 
@@ -228,18 +211,10 @@ contract VaultWithMarketsTest is FullSystemDeployer {
         SeedData seedData = SeedHelper.deploySeedData(factors);
 
         vm.prank(sys.owner);
-        uint256 mktId = sys.core.createMarket(
-            0,
-            100,
-            10,
-            seedTime + 100,
-            tSet - 100,
-            tSet,
-            10,
-            100e18,
-            address(sys.feePolicy),
-            address(seedData)
-        );
+        uint256 mktId = sys.core
+            .createMarket(
+                0, 100, 10, seedTime + 100, tSet - 100, tSet, 10, 100e18, address(sys.feePolicy), address(seedData)
+            );
 
         vm.prank(sys.owner);
         sys.core.seedNextChunks(mktId, 10);
@@ -265,7 +240,7 @@ contract VaultWithMarketsTest is FullSystemDeployer {
         vm.prank(sys.owner);
         sys.core.processDailyBatch(batchId);
 
-        (, , , , , , bool processed) = sys.core.getDailyPnl(batchId);
+        (,,,,,, bool processed) = sys.core.getDailyPnl(batchId);
         assertTrue(processed);
     }
 }

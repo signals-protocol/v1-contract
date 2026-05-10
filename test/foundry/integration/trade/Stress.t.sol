@@ -56,20 +56,11 @@ contract StressTest is TradeModuleDeployer {
     function test_handlesExtremeQuantityValues() public {
         MarketConfig[] memory markets = new MarketConfig[](1);
         markets[0] = MarketConfig({
-            numBins: 4,
-            tickSpacing: 1,
-            minTick: 0,
-            maxTick: 4,
-            endOffset: 10_000,
-            liquidityParameter: WAD
+            numBins: 4, tickSpacing: 1, minTick: 0, maxTick: 4, endOffset: 10_000, liquidityParameter: WAD
         });
         TradeModuleSystem memory sys = deployTradeModuleSystem(
             DeployOptions({
-                markets: markets,
-                userCount: 1,
-                fundAmount: 10_000_000e6,
-                submitWindow: 300,
-                settlementWindow: 60
+                markets: markets, userCount: 1, fundAmount: 10_000_000e6, submitWindow: 300, settlementWindow: 60
             })
         );
 
@@ -89,21 +80,11 @@ contract StressTest is TradeModuleDeployer {
 
     function test_revertsTradesAfterMarketExpiry() public {
         MarketConfig[] memory markets = new MarketConfig[](1);
-        markets[0] = MarketConfig({
-            numBins: 8,
-            tickSpacing: 1,
-            minTick: 0,
-            maxTick: 8,
-            endOffset: 50,
-            liquidityParameter: WAD
-        });
+        markets[0] =
+            MarketConfig({numBins: 8, tickSpacing: 1, minTick: 0, maxTick: 8, endOffset: 50, liquidityParameter: WAD});
         TradeModuleSystem memory sys = deployTradeModuleSystem(
             DeployOptions({
-                markets: markets,
-                userCount: 1,
-                fundAmount: 100_000e6,
-                submitWindow: 300,
-                settlementWindow: 60
+                markets: markets, userCount: 1, fundAmount: 100_000e6, submitWindow: 300, settlementWindow: 60
             })
         );
 

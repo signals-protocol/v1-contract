@@ -72,49 +72,46 @@ contract SignalsDeployerTest is SignalsBaseTest {
     {
         address deployerAddr = address(deployer);
         predictedCore = Create2.computeAddress(coreSalt, _proxyInitCodeHash(address(coreImpl)), deployerAddr);
-        predictedPosition = Create2.computeAddress(
-            positionSalt,
-            _proxyInitCodeHash(address(positionImpl)),
-            deployerAddr
-        );
+        predictedPosition =
+            Create2.computeAddress(positionSalt, _proxyInitCodeHash(address(positionImpl)), deployerAddr);
         predictedLPShare = Create2.computeAddress(lpShareSalt, _proxyInitCodeHash(address(lpShareImpl)), deployerAddr);
     }
 
-    function _buildCoreParams(
-        address predictedPosition,
-        address predictedLPShare
-    ) internal view returns (SignalsCore.InitParams memory) {
+    function _buildCoreParams(address predictedPosition, address predictedLPShare)
+        internal
+        view
+        returns (SignalsCore.InitParams memory)
+    {
         address[] memory ops = new address[](1);
         ops[0] = owner;
 
-        return
-            SignalsCore.InitParams({
-                paymentToken: address(payment),
-                positionContract: predictedPosition,
-                lpShareToken: predictedLPShare,
-                tradeModule: address(tradeModule),
-                lifecycleModule: address(lifecycleModule),
-                riskModule: address(riskModule),
-                vaultModule: address(vaultModule),
-                oracleModule: address(oracleModule),
-                ownerSafe: owner,
-                settlementSubmitWindow: 60,
-                pendingOpsWindow: 30,
-                claimDelaySeconds: 90,
-                redstoneFeedId: bytes32("BTC"),
-                redstoneFeedDecimals: 8,
-                maxSampleDistance: 600,
-                futureTolerance: 60,
-                lambda: WAD / 10,
-                kDrawdown: WAD,
-                enforceAlpha: true,
-                rhoBS: WAD / 5,
-                phiLP: (WAD * 7) / 10,
-                phiBS: WAD / 5,
-                phiTR: WAD / 10,
-                withdrawalLagBatches: 1,
-                operatorAllowlist: ops
-            });
+        return SignalsCore.InitParams({
+            paymentToken: address(payment),
+            positionContract: predictedPosition,
+            lpShareToken: predictedLPShare,
+            tradeModule: address(tradeModule),
+            lifecycleModule: address(lifecycleModule),
+            riskModule: address(riskModule),
+            vaultModule: address(vaultModule),
+            oracleModule: address(oracleModule),
+            ownerSafe: owner,
+            settlementSubmitWindow: 60,
+            pendingOpsWindow: 30,
+            claimDelaySeconds: 90,
+            redstoneFeedId: bytes32("BTC"),
+            redstoneFeedDecimals: 8,
+            maxSampleDistance: 600,
+            futureTolerance: 60,
+            lambda: WAD / 10,
+            kDrawdown: WAD,
+            enforceAlpha: true,
+            rhoBS: WAD / 5,
+            phiLP: (WAD * 7) / 10,
+            phiBS: WAD / 5,
+            phiTR: WAD / 10,
+            withdrawalLagBatches: 1,
+            operatorAllowlist: ops
+        });
     }
 
     function test_deploys_deterministic_proxies_and_initializes_wiring() public {
@@ -165,7 +162,7 @@ contract SignalsDeployerTest is SignalsBaseTest {
         SignalsCore.InitParams memory coreParams = _buildCoreParams(predictedPosition, predictedLPShare);
 
         address badExpected = address(0xdead);
-        (address predictedCore2, , ) = _predictAddresses();
+        (address predictedCore2,,) = _predictAddresses();
 
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(SE.Create2AddressMismatch.selector, badExpected, predictedCore2));

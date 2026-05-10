@@ -32,7 +32,7 @@ contract CapitalFundingTest is FullSystemDeployer {
         emit SignalsCoreStorage.BackstopFunded(user, 500e6, 500e18);
         sys.core.fundBackstop(500e6);
 
-        (uint256 backstopNav, ) = sys.core.getCapitalStack();
+        (uint256 backstopNav,) = sys.core.getCapitalStack();
         assertEq(backstopNav, 500e18);
         assertEq(sys.payment.balanceOf(address(sys.core)), 500e6);
     }
@@ -68,7 +68,7 @@ contract CapitalFundingTest is FullSystemDeployer {
         emit SignalsCoreStorage.BackstopWithdrawn(sys.owner, 400e6, 600e18);
         sys.core.withdrawBackstop(400e6);
 
-        (uint256 backstopNav, ) = sys.core.getCapitalStack();
+        (uint256 backstopNav,) = sys.core.getCapitalStack();
         assertEq(backstopNav, 600e18);
         assertEq(sys.payment.balanceOf(sys.owner), ownerBefore + 400e6);
     }
@@ -141,7 +141,7 @@ contract CapitalFundingTest is FullSystemDeployer {
         sys.core.fundBackstop(300e6);
         vm.stopPrank();
 
-        (uint256 backstopNav, ) = sys.core.getCapitalStack();
+        (uint256 backstopNav,) = sys.core.getCapitalStack();
         assertEq(backstopNav, 800e18);
     }
 }

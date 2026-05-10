@@ -136,7 +136,7 @@ contract ScenariosTest is FullSystemDeployer {
         uint64 day1 = _seedVault();
 
         uint256 navBefore = sys.core.getVaultNav();
-        (uint256 backstopBefore, ) = sys.core.getCapitalStack();
+        (uint256 backstopBefore,) = sys.core.getCapitalStack();
 
         assertEq(navBefore, 10_000e18);
         assertEq(backstopBefore, 500e18);
@@ -145,7 +145,7 @@ contract ScenariosTest is FullSystemDeployer {
         _processBatchWithPnl(day1, -2000e18, 0);
 
         uint256 navAfter = sys.core.getVaultNav();
-        (uint256 backstopAfter, ) = sys.core.getCapitalStack();
+        (uint256 backstopAfter,) = sys.core.getCapitalStack();
 
         // LP should be partially protected
         assertGe(navAfter, 8000e18);
@@ -391,9 +391,7 @@ contract ScenariosTest is FullSystemDeployer {
         vm.prank(owner_);
         vm.expectRevert(
             abi.encodeWithSelector(
-                SignalsErrors.WithdrawalWouldBrickVault.selector,
-                MIN_DEAD_SHARES - 1,
-                MIN_DEAD_SHARES
+                SignalsErrors.WithdrawalWouldBrickVault.selector, MIN_DEAD_SHARES - 1, MIN_DEAD_SHARES
             )
         );
         sys.core.processDailyBatch(day1);

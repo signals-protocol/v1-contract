@@ -20,13 +20,14 @@ contract ViewGettersTest is FullSystemDeployer {
 
     function _setVaultState() internal {
         vm.prank(sys.owner);
-        sys.core.harnessSetLpVault(
-            1000e18, // nav
-            500e18, // shares
-            2e18, // price
-            2.5e18, // pricePeak
-            true // isSeeded
-        );
+        sys.core
+            .harnessSetLpVault(
+                1000e18, // nav
+                500e18, // shares
+                2e18, // price
+                2.5e18, // pricePeak
+                true // isSeeded
+            );
     }
 
     function test_getVaultNav_returns_correct_NAV() public {
@@ -62,13 +63,14 @@ contract ViewGettersTest is FullSystemDeployer {
 
     function test_getVaultDrawdown_returns_zero_when_price_gte_pricePeak() public {
         vm.prank(sys.owner);
-        sys.core.harnessSetLpVault(
-            1000e18,
-            500e18,
-            3e18, // price > pricePeak
-            2.5e18,
-            true
-        );
+        sys.core
+            .harnessSetLpVault(
+                1000e18,
+                500e18,
+                3e18, // price > pricePeak
+                2.5e18,
+                true
+            );
         assertEq(sys.core.getVaultDrawdown(), 0);
     }
 
@@ -190,12 +192,13 @@ contract ViewGettersTest is FullSystemDeployer {
             address(sys.vaultModule),
             address(sys.oracleModule)
         );
-        sys.core.setModules(
-            address(sys.tradeModule),
-            address(sys.lifecycleModule),
-            address(sys.riskModule),
-            address(sys.vaultModule),
-            address(sys.oracleModule)
-        );
+        sys.core
+            .setModules(
+                address(sys.tradeModule),
+                address(sys.lifecycleModule),
+                address(sys.riskModule),
+                address(sys.vaultModule),
+                address(sys.oracleModule)
+            );
     }
 }

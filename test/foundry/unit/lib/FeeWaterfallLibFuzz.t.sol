@@ -35,9 +35,7 @@ contract FeeWaterfallLibFuzzTest is HarnessDeployer {
     // Helpers
     // ============================================================
 
-    function _calc(
-        CalcInput memory c
-    )
+    function _calc(CalcInput memory c)
         internal
         view
         returns (
@@ -53,20 +51,9 @@ contract FeeWaterfallLibFuzzTest is HarnessDeployer {
             uint256 Tnext
         )
     {
-        return
-            harness.calculate(
-                c.Lt,
-                c.Ftot,
-                c.Nprev,
-                c.Bprev,
-                c.Tprev,
-                c.deltaEt,
-                c.pdd,
-                c.rhoBS,
-                c.phiLP,
-                c.phiBS,
-                c.phiTR
-            );
+        return harness.calculate(
+            c.Lt, c.Ftot, c.Nprev, c.Bprev, c.Tprev, c.deltaEt, c.pdd, c.rhoBS, c.phiLP, c.phiBS, c.phiTR
+        );
     }
 
     function _wMulUp(uint256 a, uint256 b) internal pure returns (uint256) {
@@ -157,19 +144,9 @@ contract FeeWaterfallLibFuzzTest is HarnessDeployer {
         uint256 rawPhiBS
     ) public view {
         CalcInput memory c = _boundValidParams(
-            rawNprev,
-            rawBprev,
-            rawTprev,
-            rawFtot,
-            rawDeltaEt,
-            rawLt,
-            ltNeg,
-            rawPdd,
-            rawRhoBS,
-            rawPhiLP,
-            rawPhiBS
+            rawNprev, rawBprev, rawTprev, rawFtot, rawDeltaEt, rawLt, ltNeg, rawPdd, rawRhoBS, rawPhiLP, rawPhiBS
         );
-        (uint256 Floss, uint256 Fpool, , , , , , , , ) = _calc(c);
+        (uint256 Floss, uint256 Fpool,,,,,,,,) = _calc(c);
         assertEq(Floss + Fpool, c.Ftot, "INV-FW1: Floss + Fpool != Ftot");
     }
 
@@ -188,19 +165,9 @@ contract FeeWaterfallLibFuzzTest is HarnessDeployer {
         uint256 rawPhiBS
     ) public view {
         CalcInput memory c = _boundValidParams(
-            rawNprev,
-            rawBprev,
-            rawTprev,
-            rawFtot,
-            rawDeltaEt,
-            rawLt,
-            ltNeg,
-            rawPdd,
-            rawRhoBS,
-            rawPhiLP,
-            rawPhiBS
+            rawNprev, rawBprev, rawTprev, rawFtot, rawDeltaEt, rawLt, ltNeg, rawPdd, rawRhoBS, rawPhiLP, rawPhiBS
         );
-        (uint256 Floss, , , , , , , , , ) = _calc(c);
+        (uint256 Floss,,,,,,,,,) = _calc(c);
 
         if (c.Lt >= 0) {
             assertEq(Floss, 0, "INV-FW2: Floss != 0 on profit");
@@ -226,19 +193,9 @@ contract FeeWaterfallLibFuzzTest is HarnessDeployer {
         uint256 rawPhiBS
     ) public view {
         CalcInput memory c = _boundValidParams(
-            rawNprev,
-            rawBprev,
-            rawTprev,
-            rawFtot,
-            rawDeltaEt,
-            rawLt,
-            ltNeg,
-            rawPdd,
-            rawRhoBS,
-            rawPhiLP,
-            rawPhiBS
+            rawNprev, rawBprev, rawTprev, rawFtot, rawDeltaEt, rawLt, ltNeg, rawPdd, rawRhoBS, rawPhiLP, rawPhiBS
         );
-        (, , , uint256 Gt, , , , , , ) = _calc(c);
+        (,,, uint256 Gt,,,,,,) = _calc(c);
         assertLe(Gt, c.deltaEt, "INV-FW3: Gt > deltaEt");
         assertLe(Gt, c.Bprev, "INV-FW3: Gt > Bprev");
     }
@@ -258,19 +215,9 @@ contract FeeWaterfallLibFuzzTest is HarnessDeployer {
         uint256 rawPhiBS
     ) public view {
         CalcInput memory c = _boundValidParams(
-            rawNprev,
-            rawBprev,
-            rawTprev,
-            rawFtot,
-            rawDeltaEt,
-            rawLt,
-            ltNeg,
-            rawPdd,
-            rawRhoBS,
-            rawPhiLP,
-            rawPhiBS
+            rawNprev, rawBprev, rawTprev, rawFtot, rawDeltaEt, rawLt, ltNeg, rawPdd, rawRhoBS, rawPhiLP, rawPhiBS
         );
-        (, , uint256 Nraw, uint256 Gt, , , , , , ) = _calc(c);
+        (,, uint256 Nraw, uint256 Gt,,,,,,) = _calc(c);
 
         // Recompute expected grant
         int256 wadPlusPdd = int256(WAD) + c.pdd;
@@ -295,19 +242,9 @@ contract FeeWaterfallLibFuzzTest is HarnessDeployer {
         uint256 rawPhiBS
     ) public view {
         CalcInput memory c = _boundValidParams(
-            rawNprev,
-            rawBprev,
-            rawTprev,
-            rawFtot,
-            rawDeltaEt,
-            rawLt,
-            ltNeg,
-            rawPdd,
-            rawRhoBS,
-            rawPhiLP,
-            rawPhiBS
+            rawNprev, rawBprev, rawTprev, rawFtot, rawDeltaEt, rawLt, ltNeg, rawPdd, rawRhoBS, rawPhiLP, rawPhiBS
         );
-        (, , , uint256 Gt, , , uint256 Ft, uint256 Npre, , ) = _calc(c);
+        (,,, uint256 Gt,,, uint256 Ft, uint256 Npre,,) = _calc(c);
 
         int256 navDelta = int256(Npre) - int256(c.Nprev);
         int256 expected = c.Lt + int256(Ft) + int256(Gt);
@@ -329,19 +266,9 @@ contract FeeWaterfallLibFuzzTest is HarnessDeployer {
         uint256 rawPhiBS
     ) public view {
         CalcInput memory c = _boundValidParams(
-            rawNprev,
-            rawBprev,
-            rawTprev,
-            rawFtot,
-            rawDeltaEt,
-            rawLt,
-            ltNeg,
-            rawPdd,
-            rawRhoBS,
-            rawPhiLP,
-            rawPhiBS
+            rawNprev, rawBprev, rawTprev, rawFtot, rawDeltaEt, rawLt, ltNeg, rawPdd, rawRhoBS, rawPhiLP, rawPhiBS
         );
-        (, , , , , , , , uint256 Bnext, ) = _calc(c);
+        (,,,,,,,, uint256 Bnext,) = _calc(c);
         assertGe(Bnext, 0, "INV-BS-POS: Bnext < 0");
     }
 
@@ -360,19 +287,9 @@ contract FeeWaterfallLibFuzzTest is HarnessDeployer {
         uint256 rawPhiBS
     ) public view {
         CalcInput memory c = _boundValidParams(
-            rawNprev,
-            rawBprev,
-            rawTprev,
-            rawFtot,
-            rawDeltaEt,
-            rawLt,
-            ltNeg,
-            rawPdd,
-            rawRhoBS,
-            rawPhiLP,
-            rawPhiBS
+            rawNprev, rawBprev, rawTprev, rawFtot, rawDeltaEt, rawLt, ltNeg, rawPdd, rawRhoBS, rawPhiLP, rawPhiBS
         );
-        (, , , , , , , , , uint256 Tnext) = _calc(c);
+        (,,,,,,,,, uint256 Tnext) = _calc(c);
         assertGe(Tnext, c.Tprev, "INV-TR: Tnext < Tprev");
     }
 
@@ -391,31 +308,10 @@ contract FeeWaterfallLibFuzzTest is HarnessDeployer {
         uint256 rawPhiBS
     ) public view {
         CalcInput memory c = _boundValidParams(
-            rawNprev,
-            rawBprev,
-            rawTprev,
-            rawFtot,
-            rawDeltaEt,
-            rawLt,
-            ltNeg,
-            rawPdd,
-            rawRhoBS,
-            rawPhiLP,
-            rawPhiBS
+            rawNprev, rawBprev, rawTprev, rawFtot, rawDeltaEt, rawLt, ltNeg, rawPdd, rawRhoBS, rawPhiLP, rawPhiBS
         );
 
-        (
-            uint256 Floss,
-            uint256 Fpool,
-            ,
-            uint256 Gt,
-            ,
-            ,
-            uint256 Ft,
-            uint256 Npre,
-            uint256 Bnext,
-            uint256 Tnext
-        ) = _calc(c);
+        (uint256 Floss, uint256 Fpool,, uint256 Gt,,, uint256 Ft, uint256 Npre, uint256 Bnext, uint256 Tnext) = _calc(c);
 
         FeeWaterfallReference.Params memory rp = FeeWaterfallReference.Params({
             Lt: c.Lt,

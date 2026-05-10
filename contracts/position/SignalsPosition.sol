@@ -54,13 +54,11 @@ contract SignalsPosition is
 
     // --- Core-only position lifecycle ---
 
-    function mintPosition(
-        address to,
-        uint256 marketId,
-        int256 lowerTick,
-        int256 upperTick,
-        uint128 quantity
-    ) external onlyCore returns (uint256 positionId) {
+    function mintPosition(address to, uint256 marketId, int256 lowerTick, int256 upperTick, uint128 quantity)
+        external
+        onlyCore
+        returns (uint256 positionId)
+    {
         if (to == address(0)) revert SignalsErrors.ZeroAddress();
         if (quantity == 0) revert SignalsErrors.InvalidQuantity(quantity);
 
@@ -81,12 +79,12 @@ contract SignalsPosition is
 
     function burn(uint256 positionId) external onlyCore {
         if (!_exists(positionId)) revert SignalsErrors.PositionNotFound(positionId);
-        address owner = ownerOf(positionId);
+        address positionOwner = ownerOf(positionId);
 
         _burn(positionId);
         delete _positions[positionId];
 
-        emit PositionBurned(positionId, owner);
+        emit PositionBurned(positionId, positionOwner);
     }
 
     function updateQuantity(uint256 positionId, uint128 newQuantity) external onlyCore {

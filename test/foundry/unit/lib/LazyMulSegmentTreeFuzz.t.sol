@@ -263,7 +263,8 @@ contract LazyMulSegmentTreeFuzzTest is HarnessDeployer {
             uint32 hi = uint32(bound(uint256(nextRand(prng)), lo, SIZE - 1));
             uint256 factor = bound(uint256(nextRand(prng)), MIN_FACTOR, MAX_FACTOR);
 
-            try h.applyRangeFactor(lo, hi, factor) {} catch (bytes memory reason) {
+            try h.applyRangeFactor(lo, hi, factor) {}
+            catch (bytes memory reason) {
                 if (reason.length >= 4) {
                     bytes4 selector;
                     assembly {

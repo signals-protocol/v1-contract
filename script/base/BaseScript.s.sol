@@ -11,9 +11,8 @@ abstract contract BaseScript is Script {
     function setUp() public virtual {
         envName = vm.envString("ENV");
         require(
-            keccak256(bytes(envName)) == keccak256("dev") ||
-                keccak256(bytes(envName)) == keccak256("prod") ||
-                keccak256(bytes(envName)) == keccak256("local"),
+            keccak256(bytes(envName)) == keccak256("dev") || keccak256(bytes(envName)) == keccak256("prod")
+                || keccak256(bytes(envName)) == keccak256("local"),
             "ENV must be dev|prod|local"
         );
         envJsonPath = string.concat("scripts/environments/", envName, ".json");

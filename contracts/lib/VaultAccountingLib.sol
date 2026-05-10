@@ -23,29 +23,29 @@ library VaultAccountingLib {
     // ============================================================
     // Structs
     // ============================================================
-    
+
     /// @notice Inputs for pre-batch NAV calculation
     struct PreBatchInputs {
-        uint256 navPrev;     // N_{t-1}: previous NAV (WAD)
-        uint256 sharesPrev;  // S_{t-1}: previous shares (WAD)
-        int256 pnl;          // L_t: CLMSR P&L, can be negative (WAD)
-        uint256 fees;        // F_t: LP-attributed fees (WAD)
-        uint256 grant;       // G_t: Backstop grant (WAD)
+        uint256 navPrev; // N_{t-1}: previous NAV (WAD)
+        uint256 sharesPrev; // S_{t-1}: previous shares (WAD)
+        int256 pnl; // L_t: CLMSR P&L, can be negative (WAD)
+        uint256 fees; // F_t: LP-attributed fees (WAD)
+        uint256 grant; // G_t: Backstop grant (WAD)
     }
 
     /// @notice Result of pre-batch calculation
     struct PreBatchResult {
-        uint256 navPre;      // N^pre_t: pre-batch NAV (WAD)
-        uint256 batchPrice;  // P^e_t: batch price (WAD)
+        uint256 navPre; // N^pre_t: pre-batch NAV (WAD)
+        uint256 batchPrice; // P^e_t: batch price (WAD)
     }
 
     /// @notice State after applying deposits and withdrawals
     struct PostBatchState {
-        uint256 nav;         // N_t: final NAV (WAD)
-        uint256 shares;      // S_t: final shares (WAD)
-        uint256 price;       // P_t: final price (WAD)
-        uint256 pricePeak;   // P^peak_t: updated peak price (WAD)
-        uint256 drawdown;    // DD_t: peak drawdown (WAD)
+        uint256 nav; // N_t: final NAV (WAD)
+        uint256 shares; // S_t: final shares (WAD)
+        uint256 price; // P_t: final price (WAD)
+        uint256 pricePeak; // P^peak_t: updated peak price (WAD)
+        uint256 drawdown; // DD_t: peak drawdown (WAD)
     }
 
     // ============================================================
@@ -70,7 +70,7 @@ library VaultAccountingLib {
         FeeWaterfallLib.Result memory wf
     ) internal pure returns (uint256 navPre, uint256 batchPrice) {
         if (sharesPrev == 0) revert SE.ZeroSharesNotAllowed();
-        
+
         // Validate invariant: Npre == Nprev + Lt + Ft + Gt
         int256 pi = lt + int256(wf.Ft) + int256(wf.Gt);
         uint256 expected;
@@ -81,10 +81,10 @@ library VaultAccountingLib {
             if (loss > navPrev) revert SE.NAVUnderflow(navPrev, loss);
             expected = navPrev - loss;
         }
-        
+
         // Consistency check: FeeWaterfallLib.Npre should match our calculation
         if (wf.Npre != expected) revert SE.PreBatchNavMismatch(expected, wf.Npre);
-        
+
         navPre = wf.Npre;
         batchPrice = navPre.wDiv(sharesPrev);
     }
@@ -102,7 +102,7 @@ library VaultAccountingLib {
     function computePreBatch(PreBatchInputs memory inputs) internal pure returns (PreBatchResult memory result) {
         // Π_t = L_t + F_t + G_t (signed addition)
         int256 pi = inputs.pnl + int256(inputs.fees) + int256(inputs.grant);
-        
+
         // N^pre_t = N_{t-1} + Π_t
         if (pi >= 0) {
             result.navPre = inputs.navPrev + uint256(pi);
@@ -133,12 +133,11 @@ library VaultAccountingLib {
      * @return navPre Pre-batch NAV
      * @return batchPrice Batch price (1e18 for seeding)
      */
-    function computePreBatchForSeed(
-        uint256 navPrev,
-        int256 pnl,
-        uint256 fees,
-        uint256 grant
-    ) internal pure returns (uint256 navPre, uint256 batchPrice) {
+    function computePreBatchForSeed(uint256 navPrev, int256 pnl, uint256 fees, uint256 grant)
+        internal
+        pure
+        returns (uint256 navPre, uint256 batchPrice)
+    {
         int256 pi = pnl + int256(fees) + int256(grant);
         if (pi >= 0) {
             navPre = navPrev + uint256(pi);
@@ -172,26 +171,25 @@ library VaultAccountingLib {
      * @return mintedShares Shares minted (WAD)
      * @return refundAmount Amount to refund to depositor (WAD)
      */
-    function applyDeposit(
-        uint256 nav,
-        uint256 shares,
-        uint256 price,
-        uint256 depositAmount
-    ) internal pure returns (uint256 newNav, uint256 newShares, uint256 mintedShares, uint256 refundAmount) {
+    function applyDeposit(uint256 nav, uint256 shares, uint256 price, uint256 depositAmount)
+        internal
+        pure
+        returns (uint256 newNav, uint256 newShares, uint256 mintedShares, uint256 refundAmount)
+    {
         if (price == 0) revert SE.ZeroPriceNotAllowed();
-        
+
         // S_mint = floor(A / P) - round down shares to favor protocol
         mintedShares = depositAmount.wDiv(price);
-        
+
         // A_used = S_mint * P - round down to favor protocol
         uint256 amountUsed = mintedShares.wMul(price);
-        
+
         // N' = N + A_used (NOT full depositAmount)
         newNav = nav + amountUsed;
-        
+
         // S' = S + S_mint
         newShares = shares + mintedShares;
-        
+
         // Refund = A - A_used (at most 1 wei due to rounding)
         refundAmount = depositAmount - amountUsed;
     }
@@ -211,27 +209,26 @@ library VaultAccountingLib {
      * @return newShares Updated shares (WAD)
      * @return withdrawAmount Asset amount paid out (WAD)
      */
-    function applyWithdraw(
-        uint256 nav,
-        uint256 shares,
-        uint256 price,
-        uint256 withdrawShares
-    ) internal pure returns (uint256 newNav, uint256 newShares, uint256 withdrawAmount) {
+    function applyWithdraw(uint256 nav, uint256 shares, uint256 price, uint256 withdrawShares)
+        internal
+        pure
+        returns (uint256 newNav, uint256 newShares, uint256 withdrawAmount)
+    {
         if (withdrawShares > shares) {
             revert SE.InsufficientShares(withdrawShares, shares);
         }
-        
+
         // W = x · P (amount to pay out)
         // Round down payout to favor protocol
         withdrawAmount = withdrawShares.wMul(price);
-        
+
         if (withdrawAmount > nav) {
             revert SE.InsufficientNAV(withdrawAmount, nav);
         }
-        
+
         // N'' = N - x·P
         newNav = nav - withdrawAmount;
-        
+
         // S'' = S - x
         newShares = shares - withdrawShares;
     }
@@ -296,23 +293,23 @@ library VaultAccountingLib {
      *      - price defaults to 1.0 (WAD)
      *      - pricePeak is preserved from previous state
      *      - peak drawdown is set to 0 (no active LP exposure)
-     * 
+     *
      *      This ensures peak drawdown-based calculations (like α_limit) don't
      *      produce misleading values when the vault is empty.
-     * 
+     *
      * @param nav Final NAV after deposits/withdrawals
      * @param shares Final shares after deposits/withdrawals
      * @param previousPeak Previous peak price
      * @return state Complete post-batch state
      */
-    function computePostBatchState(
-        uint256 nav,
-        uint256 shares,
-        uint256 previousPeak
-    ) internal pure returns (PostBatchState memory state) {
+    function computePostBatchState(uint256 nav, uint256 shares, uint256 previousPeak)
+        internal
+        pure
+        returns (PostBatchState memory state)
+    {
         state.nav = nav;
         state.shares = shares;
-        
+
         if (shares == 0) {
             // Empty vault: preserve peak, set price to 1.0, drawdown to 0
             state.price = WAD;

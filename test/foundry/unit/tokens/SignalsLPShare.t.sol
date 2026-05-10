@@ -85,13 +85,14 @@ contract SignalsLPShareTest is FullSystemDeployer {
 
     function _seedVaultForViews() internal {
         vm.prank(sys.owner);
-        sys.core.harnessSetLpVault(
-            1000e18, // nav
-            500e18, // shares
-            2e18, // price
-            2e18, // pricePeak
-            true // isSeeded
-        );
+        sys.core
+            .harnessSetLpVault(
+                1000e18, // nav
+                500e18, // shares
+                2e18, // price
+                2e18, // pricePeak
+                true // isSeeded
+            );
     }
 
     function test_view_convertToSharesReturnsCorrectValue() public {

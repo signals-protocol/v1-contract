@@ -52,17 +52,8 @@ contract EscrowSecurityTest is FullSystemDeployer {
         // Create a market for user2 to trade
         uint64 now_ = uint64(block.timestamp);
         vm.prank(sys.owner);
-        uint256 mktId = sys.core.createMarketUniform(
-            0,
-            100,
-            1,
-            now_ - 100,
-            now_ + 10000,
-            now_ + 10100,
-            100,
-            WAD,
-            address(sys.feePolicy)
-        );
+        uint256 mktId = sys.core
+            .createMarketUniform(0, 100, 1, now_ - 100, now_ + 10000, now_ + 10100, 100, WAD, address(sys.feePolicy));
 
         // User2 opens a position
         vm.prank(user2);
@@ -86,17 +77,8 @@ contract EscrowSecurityTest is FullSystemDeployer {
         uint64 settlementTs = now_ + 1000;
 
         vm.prank(sys.owner);
-        uint256 mktId = sys.core.createMarketUniform(
-            0,
-            100,
-            1,
-            now_ - 100,
-            now_ + 500,
-            settlementTs,
-            100,
-            WAD,
-            address(sys.feePolicy)
-        );
+        uint256 mktId = sys.core
+            .createMarketUniform(0, 100, 1, now_ - 100, now_ + 500, settlementTs, 100, WAD, address(sys.feePolicy));
 
         // User opens position at upper boundary
         vm.prank(user1);
@@ -116,17 +98,8 @@ contract EscrowSecurityTest is FullSystemDeployer {
         uint64 settlementTs = now_ + 1000;
 
         vm.prank(sys.owner);
-        uint256 mktId = sys.core.createMarketUniform(
-            0,
-            100,
-            1,
-            now_ - 100,
-            now_ + 500,
-            settlementTs,
-            100,
-            WAD,
-            address(sys.feePolicy)
-        );
+        uint256 mktId = sys.core
+            .createMarketUniform(0, 100, 1, now_ - 100, now_ + 500, settlementTs, 100, WAD, address(sys.feePolicy));
 
         vm.prank(user1);
         sys.core.openPosition(mktId, 90, 100, uint128(SMALL_QUANTITY), 1_000e6);
@@ -144,17 +117,8 @@ contract EscrowSecurityTest is FullSystemDeployer {
 
         // Create market with minTick = 50
         vm.prank(sys.owner);
-        uint256 mktId = sys.core.createMarketUniform(
-            50,
-            100,
-            1,
-            now_ - 100,
-            now_ + 500,
-            settlementTs,
-            50,
-            WAD,
-            address(sys.feePolicy)
-        );
+        uint256 mktId = sys.core
+            .createMarketUniform(50, 100, 1, now_ - 100, now_ + 500, settlementTs, 50, WAD, address(sys.feePolicy));
 
         vm.prank(user1);
         sys.core.openPosition(mktId, 50, 60, uint128(SMALL_QUANTITY), 1_000e6);

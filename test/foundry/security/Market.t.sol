@@ -61,18 +61,10 @@ contract MarketSecurityTest is FullSystemDeployer {
 
         vm.prank(sys.owner);
         vm.expectRevert(abi.encodeWithSelector(SE.InvalidMarketParameters.selector, minTick, maxTick, int256(1)));
-        sys.core.createMarket(
-            minTick,
-            maxTick,
-            1,
-            now_ - 100,
-            now_ + 10000,
-            now_ + 10100,
-            4,
-            WAD,
-            address(sys.feePolicy),
-            seed
-        );
+        sys.core
+            .createMarket(
+                minTick, maxTick, 1, now_ - 100, now_ + 10000, now_ + 10100, 4, WAD, address(sys.feePolicy), seed
+            );
     }
 
     function test_rejects_market_where_tick_span_exceeds_uint32_bins() public {
@@ -83,18 +75,10 @@ contract MarketSecurityTest is FullSystemDeployer {
 
         vm.prank(sys.owner);
         vm.expectRevert(abi.encodeWithSelector(SE.InvalidMarketParameters.selector, minTick, maxTick, int256(1)));
-        sys.core.createMarket(
-            minTick,
-            maxTick,
-            1,
-            now_ - 100,
-            now_ + 10000,
-            now_ + 10100,
-            4,
-            WAD,
-            address(sys.feePolicy),
-            seed
-        );
+        sys.core
+            .createMarket(
+                minTick, maxTick, 1, now_ - 100, now_ + 10000, now_ + 10100, 4, WAD, address(sys.feePolicy), seed
+            );
     }
 
     function test_rejects_market_creation_with_numBins_zero() public {
@@ -114,18 +98,7 @@ contract MarketSecurityTest is FullSystemDeployer {
 
         vm.prank(sys.owner);
         vm.expectRevert(abi.encodeWithSelector(SE.BinCountExceedsLimit.selector, uint32(257), uint32(256)));
-        sys.core.createMarket(
-            0,
-            257,
-            1,
-            now_ - 100,
-            now_ + 10000,
-            now_ + 10100,
-            257,
-            WAD,
-            address(sys.feePolicy),
-            seed
-        );
+        sys.core.createMarket(0, 257, 1, now_ - 100, now_ + 10000, now_ + 10100, 257, WAD, address(sys.feePolicy), seed);
     }
 
     function test_allows_market_creation_with_numBins_256() public {
@@ -133,18 +106,7 @@ contract MarketSecurityTest is FullSystemDeployer {
         address seed = _deploySeedData(256);
 
         vm.prank(sys.owner);
-        sys.core.createMarket(
-            0,
-            256,
-            1,
-            now_ - 100,
-            now_ + 10000,
-            now_ + 10100,
-            256,
-            WAD,
-            address(sys.feePolicy),
-            seed
-        );
+        sys.core.createMarket(0, 256, 1, now_ - 100, now_ + 10000, now_ + 10100, 256, WAD, address(sys.feePolicy), seed);
     }
 
     function test_allows_market_creation_with_numBins_100() public {
@@ -152,18 +114,7 @@ contract MarketSecurityTest is FullSystemDeployer {
         address seed = _deploySeedData(100);
 
         vm.prank(sys.owner);
-        sys.core.createMarket(
-            0,
-            100,
-            1,
-            now_ - 100,
-            now_ + 10000,
-            now_ + 10100,
-            100,
-            WAD,
-            address(sys.feePolicy),
-            seed
-        );
+        sys.core.createMarket(0, 100, 1, now_ - 100, now_ + 10000, now_ + 10100, 100, WAD, address(sys.feePolicy), seed);
     }
 
     function test_allows_market_creation_with_numBins_2() public {
@@ -181,18 +132,8 @@ contract MarketSecurityTest is FullSystemDeployer {
 
         vm.prank(sys.owner);
         vm.expectRevert(abi.encodeWithSelector(SE.SeedDataLengthMismatch.selector, 256 * 32, 1000 * 32));
-        sys.core.createMarket(
-            0,
-            1000,
-            1,
-            now_ - 100,
-            now_ + 10000,
-            now_ + 10100,
-            1000,
-            WAD,
-            address(sys.feePolicy),
-            seed
-        );
+        sys.core
+            .createMarket(0, 1000, 1, now_ - 100, now_ + 10000, now_ + 10100, 1000, WAD, address(sys.feePolicy), seed);
     }
 
     // ============================================================
@@ -212,16 +153,7 @@ contract MarketSecurityTest is FullSystemDeployer {
 
         vm.prank(sys.owner);
         vm.expectRevert(abi.encodeWithSelector(SE.BinCountExceedsLimit.selector, uint32(300), uint32(256)));
-        sys.core.createMarketUniform(
-            0,
-            300,
-            1,
-            now_ - 100,
-            now_ + 10000,
-            now_ + 10100,
-            300,
-            WAD,
-            address(sys.feePolicy)
-        );
+        sys.core
+            .createMarketUniform(0, 300, 1, now_ - 100, now_ + 10000, now_ + 10100, 300, WAD, address(sys.feePolicy));
     }
 }

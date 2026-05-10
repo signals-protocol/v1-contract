@@ -16,10 +16,8 @@ abstract contract ForkLiveMarketTest is ForkBaseTest {
         for (uint256 i = upper; i > 0; --i) {
             try core.getMarket(i) returns (ISignalsCore.Market memory candidate) {
                 if (
-                    candidate.isSeeded &&
-                    !candidate.settled &&
-                    block.timestamp >= candidate.startTimestamp &&
-                    block.timestamp <= candidate.endTimestamp
+                    candidate.isSeeded && !candidate.settled && block.timestamp >= candidate.startTimestamp
+                        && block.timestamp <= candidate.endTimestamp
                 ) {
                     return (true, i, candidate);
                 }

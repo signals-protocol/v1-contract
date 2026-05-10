@@ -52,6 +52,8 @@ contract SignalsDeployer is SignalsErrors {
         string memory lpShareName,
         string memory lpShareSymbol
     ) external onlyDeployer returns (address coreProxy, address positionProxy, address lpShareProxy) {
+        // Standard memory struct assembly: every DeployConfig field is assigned before use below.
+        // slither-disable-next-line uninitialized-local
         DeployConfig memory config;
         config.coreImpl = coreImpl;
         config.positionImpl = positionImpl;
@@ -75,18 +77,13 @@ contract SignalsDeployer is SignalsErrors {
         _validateInputs(config);
 
         address coreProxy = _deployExpectedProxy(config.coreImpl, config.coreSalt, config.expectedCoreProxy);
-        address positionProxy = _deployExpectedProxy(
-            config.positionImpl,
-            config.positionSalt,
-            config.expectedPositionProxy
-        );
-        address lpShareProxy = _deployExpectedProxy(
-            config.lpShareImpl,
-            config.lpShareSalt,
-            config.expectedLpShareProxy
-        );
+        address positionProxy =
+            _deployExpectedProxy(config.positionImpl, config.positionSalt, config.expectedPositionProxy);
+        address lpShareProxy = _deployExpectedProxy(config.lpShareImpl, config.lpShareSalt, config.expectedLpShareProxy);
 
         _verifyInitTargets(config.coreParams, positionProxy, lpShareProxy);
+        // Single-shot deployer: `executed` blocks replay, and these calls initialize newly deployed trusted proxies.
+        // slither-disable-next-line reentrancy-no-eth
         _initializeProxies(config, coreProxy, positionProxy, lpShareProxy);
         _verifyWiring(config, coreProxy, positionProxy, lpShareProxy);
 
@@ -118,11 +115,10 @@ contract SignalsDeployer is SignalsErrors {
         proxy = Create2.deploy(0, salt, initCode);
     }
 
-    function _verifyInitTargets(
-        SignalsCore.InitParams memory coreParams,
-        address positionProxy,
-        address lpShareProxy
-    ) internal pure {
+    function _verifyInitTargets(SignalsCore.InitParams memory coreParams, address positionProxy, address lpShareProxy)
+        internal
+        pure
+    {
         if (coreParams.positionContract != positionProxy) {
             revert Create2AddressMismatch(coreParams.positionContract, positionProxy);
         }
@@ -139,21 +135,20 @@ contract SignalsDeployer is SignalsErrors {
     ) internal {
         SignalsCore(coreProxy).initialize(config.coreParams);
         SignalsPosition(positionProxy).initialize(coreProxy, config.coreParams.ownerSafe);
-        SignalsLPShare(lpShareProxy).initialize(
-            coreProxy,
-            config.coreParams.paymentToken,
-            config.lpShareName,
-            config.lpShareSymbol,
-            config.coreParams.ownerSafe
-        );
+        SignalsLPShare(lpShareProxy)
+            .initialize(
+                coreProxy,
+                config.coreParams.paymentToken,
+                config.lpShareName,
+                config.lpShareSymbol,
+                config.coreParams.ownerSafe
+            );
     }
 
-    function _verifyWiring(
-        DeployConfig memory config,
-        address coreProxy,
-        address positionProxy,
-        address lpShareProxy
-    ) internal view {
+    function _verifyWiring(DeployConfig memory config, address coreProxy, address positionProxy, address lpShareProxy)
+        internal
+        view
+    {
         if (SignalsCore(coreProxy).owner() != config.coreParams.ownerSafe) {
             revert Create2AddressMismatch(config.coreParams.ownerSafe, SignalsCore(coreProxy).owner());
         }

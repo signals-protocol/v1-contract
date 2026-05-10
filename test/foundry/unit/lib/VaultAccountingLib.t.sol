@@ -35,7 +35,7 @@ contract VaultAccountingLibTest is HarnessDeployer {
         uint256 fees = 30e18;
         uint256 grant = 10e18;
 
-        (uint256 navPre, ) = lib.computePreBatch(navPrev, sharesPrev, pnl, fees, grant);
+        (uint256 navPre,) = lib.computePreBatch(navPrev, sharesPrev, pnl, fees, grant);
 
         // N_pre = 1000 - 50 + 30 + 10 = 990
         assertEq(navPre, 990e18);
@@ -48,7 +48,7 @@ contract VaultAccountingLibTest is HarnessDeployer {
         uint256 fees = 20e18;
         uint256 grant = 0;
 
-        (uint256 navPre, ) = lib.computePreBatch(navPrev, sharesPrev, pnl, fees, grant);
+        (uint256 navPre,) = lib.computePreBatch(navPrev, sharesPrev, pnl, fees, grant);
 
         // N_pre = 1000 + 100 + 20 + 0 = 1120
         assertEq(navPre, 1120e18);
@@ -58,7 +58,7 @@ contract VaultAccountingLibTest is HarnessDeployer {
         uint256 navPrev = 1000e18;
         uint256 sharesPrev = 1000e18;
 
-        (uint256 navPre, ) = lib.computePreBatch(navPrev, sharesPrev, int256(0), 0, 0);
+        (uint256 navPre,) = lib.computePreBatch(navPrev, sharesPrev, int256(0), 0, 0);
 
         assertEq(navPre, navPrev);
     }
@@ -134,12 +134,8 @@ contract VaultAccountingLibTest is HarnessDeployer {
         uint256 price = 1e18;
         uint256 deposit = 100e18;
 
-        (uint256 newNav, uint256 newShares, uint256 minted, uint256 refund) = lib.applyDeposit(
-            nav,
-            shares,
-            price,
-            deposit
-        );
+        (uint256 newNav, uint256 newShares, uint256 minted, uint256 refund) =
+            lib.applyDeposit(nav, shares, price, deposit);
 
         assertEq(newNav, 1100e18);
         assertEq(minted, 100e18);
@@ -153,7 +149,7 @@ contract VaultAccountingLibTest is HarnessDeployer {
         uint256 price = (nav * WAD) / shares; // ~1.111e18
         uint256 deposit = 100e18;
 
-        (uint256 newNav, uint256 newShares, , uint256 refund) = lib.applyDeposit(nav, shares, price, deposit);
+        (uint256 newNav, uint256 newShares,, uint256 refund) = lib.applyDeposit(nav, shares, price, deposit);
 
         uint256 newPrice = (newNav * WAD) / newShares;
 
@@ -171,7 +167,7 @@ contract VaultAccountingLibTest is HarnessDeployer {
         uint256 price = 1e18;
         uint256 deposit = 1_000_000e18;
 
-        (uint256 newNav, uint256 newShares, , uint256 refund) = lib.applyDeposit(nav, shares, price, deposit);
+        (uint256 newNav, uint256 newShares,, uint256 refund) = lib.applyDeposit(nav, shares, price, deposit);
 
         assertEq(newNav, 1_001_000e18);
         assertEq(newShares, 1_001_000e18);
@@ -190,7 +186,7 @@ contract VaultAccountingLibTest is HarnessDeployer {
         uint256 price = (nav * WAD) / shares;
         uint256 deposit = 100e18;
 
-        (uint256 newNav, , uint256 minted, uint256 refund) = lib.applyDeposit(nav, shares, price, deposit);
+        (uint256 newNav,, uint256 minted, uint256 refund) = lib.applyDeposit(nav, shares, price, deposit);
 
         // A_used = minted * price / WAD
         uint256 amountUsed = (minted * price) / WAD;
@@ -216,12 +212,8 @@ contract VaultAccountingLibTest is HarnessDeployer {
         uint256 price = 1e18;
         uint256 withdrawShares = 50e18;
 
-        (uint256 newNav, uint256 newShares, uint256 withdrawAmount) = lib.applyWithdraw(
-            nav,
-            shares,
-            price,
-            withdrawShares
-        );
+        (uint256 newNav, uint256 newShares, uint256 withdrawAmount) =
+            lib.applyWithdraw(nav, shares, price, withdrawShares);
 
         assertEq(newNav, 950e18);
         assertEq(newShares, 950e18);
@@ -234,7 +226,7 @@ contract VaultAccountingLibTest is HarnessDeployer {
         uint256 price = (nav * WAD) / shares; // 1.1e18
         uint256 withdrawShares = 100e18;
 
-        (uint256 newNav, uint256 newShares, ) = lib.applyWithdraw(nav, shares, price, withdrawShares);
+        (uint256 newNav, uint256 newShares,) = lib.applyWithdraw(nav, shares, price, withdrawShares);
 
         uint256 newPrice = newShares > 0 ? (newNav * WAD) / newShares : WAD;
 
@@ -425,8 +417,8 @@ contract VaultAccountingLibTest is HarnessDeployer {
         uint256 shares = 1000e18;
         uint256 previousPeak = 1e18;
 
-        (uint256 navOut, uint256 sharesOut, uint256 price, uint256 pricePeak, uint256 drawdown) = lib
-            .computePostBatchState(nav, shares, previousPeak);
+        (uint256 navOut, uint256 sharesOut, uint256 price, uint256 pricePeak, uint256 drawdown) =
+            lib.computePostBatchState(nav, shares, previousPeak);
 
         assertEq(navOut, nav);
         assertEq(sharesOut, shares);
@@ -440,7 +432,7 @@ contract VaultAccountingLibTest is HarnessDeployer {
         uint256 shares = 1000e18;
         uint256 previousPeak = 1.2e18;
 
-        (, , uint256 price, uint256 pricePeak, uint256 drawdown) = lib.computePostBatchState(nav, shares, previousPeak);
+        (,, uint256 price, uint256 pricePeak, uint256 drawdown) = lib.computePostBatchState(nav, shares, previousPeak);
 
         assertEq(price, 0.9e18);
         assertEq(pricePeak, previousPeak); // Peak unchanged
@@ -453,8 +445,8 @@ contract VaultAccountingLibTest is HarnessDeployer {
         uint256 shares = 0;
         uint256 previousPeak = 1.5e18;
 
-        (uint256 navOut, uint256 sharesOut, uint256 price, uint256 pricePeak, uint256 drawdown) = lib
-            .computePostBatchState(nav, shares, previousPeak);
+        (uint256 navOut, uint256 sharesOut, uint256 price, uint256 pricePeak, uint256 drawdown) =
+            lib.computePostBatchState(nav, shares, previousPeak);
 
         assertEq(navOut, 0);
         assertEq(sharesOut, 0);
@@ -474,20 +466,11 @@ contract VaultAccountingLibTest is HarnessDeployer {
         uint256 amount = 100e18;
 
         // Deposit
-        (uint256 navAfterDeposit, uint256 sharesAfterDeposit, uint256 minted, ) = lib.applyDeposit(
-            initialNav,
-            initialShares,
-            price,
-            amount
-        );
+        (uint256 navAfterDeposit, uint256 sharesAfterDeposit, uint256 minted,) =
+            lib.applyDeposit(initialNav, initialShares, price, amount);
 
         // Withdraw same shares
-        (uint256 finalNav, uint256 finalShares, ) = lib.applyWithdraw(
-            navAfterDeposit,
-            sharesAfterDeposit,
-            price,
-            minted
-        );
+        (uint256 finalNav, uint256 finalShares,) = lib.applyWithdraw(navAfterDeposit, sharesAfterDeposit, price, minted);
 
         // Should return to initial state (within rounding)
         uint256 navDiff = finalNav > initialNav ? finalNav - initialNav : initialNav - finalNav;
@@ -503,16 +486,16 @@ contract VaultAccountingLibTest is HarnessDeployer {
         uint256 price = 1e18;
 
         // Deposit 50
-        (nav, shares, , ) = lib.applyDeposit(nav, shares, price, 50e18);
+        (nav, shares,,) = lib.applyDeposit(nav, shares, price, 50e18);
 
         // Deposit 30
-        (nav, shares, , ) = lib.applyDeposit(nav, shares, price, 30e18);
+        (nav, shares,,) = lib.applyDeposit(nav, shares, price, 30e18);
 
         // Withdraw 20
-        (nav, shares, ) = lib.applyWithdraw(nav, shares, price, 20e18);
+        (nav, shares,) = lib.applyWithdraw(nav, shares, price, 20e18);
 
         // Deposit 100
-        (nav, shares, , ) = lib.applyDeposit(nav, shares, price, 100e18);
+        (nav, shares,,) = lib.applyDeposit(nav, shares, price, 100e18);
 
         // Final price should still be ~1.0
         uint256 finalPrice = shares > 0 ? (nav * WAD) / shares : WAD;
@@ -530,12 +513,12 @@ contract VaultAccountingLibTest is HarnessDeployer {
         uint256 depositAmount = 120e18;
 
         // Order 1: withdraw first, then deposit
-        (uint256 nav1, uint256 shares1, ) = lib.applyWithdraw(initialNav, initialShares, batchPrice, withdrawShares);
-        (uint256 finalNav1, uint256 finalShares1, , ) = lib.applyDeposit(nav1, shares1, batchPrice, depositAmount);
+        (uint256 nav1, uint256 shares1,) = lib.applyWithdraw(initialNav, initialShares, batchPrice, withdrawShares);
+        (uint256 finalNav1, uint256 finalShares1,,) = lib.applyDeposit(nav1, shares1, batchPrice, depositAmount);
 
         // Order 2: deposit first, then withdraw
-        (uint256 nav2, uint256 shares2, , ) = lib.applyDeposit(initialNav, initialShares, batchPrice, depositAmount);
-        (uint256 finalNav2, uint256 finalShares2, ) = lib.applyWithdraw(nav2, shares2, batchPrice, withdrawShares);
+        (uint256 nav2, uint256 shares2,,) = lib.applyDeposit(initialNav, initialShares, batchPrice, depositAmount);
+        (uint256 finalNav2, uint256 finalShares2,) = lib.applyWithdraw(nav2, shares2, batchPrice, withdrawShares);
 
         // Both orders should result in same final price (within 2 wei)
         uint256 price1 = finalShares1 > 0 ? (finalNav1 * WAD) / finalShares1 : WAD;

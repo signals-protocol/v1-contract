@@ -89,20 +89,13 @@ contract SignalsCoreHarness is SignalsCore {
      * @param upperTick Upper bound (exclusive)
      * @param quantity Position quantity (token units)
      */
-    function harnessAddExposure(
-        uint256 marketId,
-        int256 lowerTick,
-        int256 upperTick,
-        uint256 quantity
-    ) external onlyOwner {
+    function harnessAddExposure(uint256 marketId, int256 lowerTick, int256 upperTick, uint256 quantity)
+        external
+        onlyOwner
+    {
         ISignalsCore.Market storage market = markets[marketId];
         (uint32 loBin, uint32 hiBin) = TickBinLib.ticksToBins(
-            market.minTick,
-            market.maxTick,
-            market.tickSpacing,
-            market.numBins,
-            lowerTick,
-            upperTick
+            market.minTick, market.maxTick, market.tickSpacing, market.numBins, lowerTick, upperTick
         );
 
         ExposureDiffLib.rangeAdd(_exposureDiff[marketId], loBin, hiBin, int256(quantity), market.numBins);
@@ -128,11 +121,10 @@ contract SignalsCoreHarness is SignalsCore {
     }
 
     /// @notice Set reserved balances for free-balance checks (test-only)
-    function harnessSetReserves(
-        uint256 pendingDeposits6,
-        uint256 pendingWithdrawals6,
-        uint256 payoutReserve6
-    ) external onlyOwner {
+    function harnessSetReserves(uint256 pendingDeposits6, uint256 pendingWithdrawals6, uint256 payoutReserve6)
+        external
+        onlyOwner
+    {
         _totalPendingDeposits6 = pendingDeposits6;
         _totalPendingWithdrawals6 = pendingWithdrawals6;
         _totalPayoutReserve6 = payoutReserve6;
@@ -187,9 +179,7 @@ contract SignalsCoreHarness is SignalsCore {
     }
 
     /// @notice Get batch aggregation for testing
-    function harnessGetBatchAggregation(
-        uint64 batchId
-    )
+    function harnessGetBatchAggregation(uint64 batchId)
         external
         view
         returns (uint256 totalDepositAssets, uint256 totalWithdrawShares, uint256 batchPrice, bool processed)
@@ -203,13 +193,10 @@ contract SignalsCoreHarness is SignalsCore {
     // ============================================================
 
     /// @notice Set LP vault state directly for testing α safety with peak drawdown
-    function harnessSetLpVault(
-        uint256 nav,
-        uint256 shares,
-        uint256 price,
-        uint256 pricePeak,
-        bool isSeeded
-    ) external onlyOwner {
+    function harnessSetLpVault(uint256 nav, uint256 shares, uint256 price, uint256 pricePeak, bool isSeeded)
+        external
+        onlyOwner
+    {
         lpVault.nav = nav;
         lpVault.shares = shares;
         lpVault.price = price;

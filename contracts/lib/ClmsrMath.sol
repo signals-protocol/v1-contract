@@ -43,11 +43,11 @@ library ClmsrMath {
     /// @param sumBefore Total sum before factor application
     /// @param sumAfter Total sum after factor application
     /// @return costWad Exact cost in WAD
-    function computeBuyCostFromSumChange(
-        uint256 alpha,
-        uint256 sumBefore,
-        uint256 sumAfter
-    ) internal pure returns (uint256 costWad) {
+    function computeBuyCostFromSumChange(uint256 alpha, uint256 sumBefore, uint256 sumAfter)
+        internal
+        pure
+        returns (uint256 costWad)
+    {
         if (sumAfter <= sumBefore) return 0;
         uint256 ratio = sumAfter.wDivUp(sumBefore);
         return alpha.wMul(ratio.wLn());
@@ -60,11 +60,11 @@ library ClmsrMath {
     /// @param sumBefore Total sum before factor application
     /// @param sumAfter Total sum after factor application
     /// @return proceedsWad Exact proceeds in WAD
-    function computeSellProceedsFromSumChange(
-        uint256 alpha,
-        uint256 sumBefore,
-        uint256 sumAfter
-    ) internal pure returns (uint256 proceedsWad) {
+    function computeSellProceedsFromSumChange(uint256 alpha, uint256 sumBefore, uint256 sumAfter)
+        internal
+        pure
+        returns (uint256 proceedsWad)
+    {
         if (sumAfter >= sumBefore) return 0;
         // Floor division ensures we never overpay (credit safety)
         uint256 ratio = sumBefore.wDiv(sumAfter);
@@ -115,6 +115,8 @@ library ClmsrMath {
         uint256 requiredChunks = (totalQuantity + maxSafeQuantityPerChunk - 1) / maxSafeQuantityPerChunk;
         require(requiredChunks <= MAX_CHUNKS_PER_TX, SE.ChunkLimitExceeded(requiredChunks, MAX_CHUNKS_PER_TX));
 
+        // Accumulator intentionally starts from Solidity's default zero value.
+        // slither-disable-next-line uninitialized-local
         uint256 cumulativeCostWad;
         uint256 remainingQuantity = totalQuantity;
         uint256 currentSumBefore = sumBefore;
@@ -122,9 +124,8 @@ library ClmsrMath {
         uint256 chunkCount;
 
         while (remainingQuantity > 0 && chunkCount < MAX_CHUNKS_PER_TX) {
-            uint256 chunkQuantity = remainingQuantity > maxSafeQuantityPerChunk
-                ? maxSafeQuantityPerChunk
-                : remainingQuantity;
+            uint256 chunkQuantity =
+                remainingQuantity > maxSafeQuantityPerChunk ? maxSafeQuantityPerChunk : remainingQuantity;
 
             (uint256 factor, uint256 consumed) = _buyChunkFactor(
                 chunkQuantity, currentAffectedSum, alpha, remainingQuantity, MAX_CHUNKS_PER_TX - chunkCount
@@ -193,6 +194,8 @@ library ClmsrMath {
         uint256 requiredChunks = (totalQuantity + maxSafeQuantityPerChunk - 1) / maxSafeQuantityPerChunk;
         require(requiredChunks <= MAX_CHUNKS_PER_TX, SE.ChunkLimitExceeded(requiredChunks, MAX_CHUNKS_PER_TX));
 
+        // Accumulator intentionally starts from Solidity's default zero value.
+        // slither-disable-next-line uninitialized-local
         uint256 cumulativeProceeds;
         uint256 remainingQuantity = totalQuantity;
         uint256 currentSumBefore = sumBefore;
@@ -200,15 +203,16 @@ library ClmsrMath {
         uint256 chunkCount;
 
         while (remainingQuantity > 0 && chunkCount < MAX_CHUNKS_PER_TX) {
-            uint256 chunkQuantity = remainingQuantity > maxSafeQuantityPerChunk
-                ? maxSafeQuantityPerChunk
-                : remainingQuantity;
+            uint256 chunkQuantity =
+                remainingQuantity > maxSafeQuantityPerChunk ? maxSafeQuantityPerChunk : remainingQuantity;
 
             (uint256 inverseFactor, uint256 consumed) = _sellChunkFactor(
                 chunkQuantity, currentAffectedSum, alpha, remainingQuantity, MAX_CHUNKS_PER_TX - chunkCount
             );
 
-            require(currentAffectedSum == 0 || inverseFactor <= type(uint256).max / currentAffectedSum, SE.MathMulOverflow());
+            require(
+                currentAffectedSum == 0 || inverseFactor <= type(uint256).max / currentAffectedSum, SE.MathMulOverflow()
+            );
 
             uint256 newAffectedSum = currentAffectedSum.wMulNearest(inverseFactor);
             uint256 sumAfter = currentSumBefore - currentAffectedSum + newAffectedSum;
@@ -327,12 +331,11 @@ library ClmsrMath {
         consumed = chunkQuantity;
     }
 
-    function _computeSafeChunk(
-        uint256 currentSum,
-        uint256 alpha,
-        uint256 remainingQty,
-        uint256 chunksLeft
-    ) private pure returns (uint256 safeChunk) {
+    function _computeSafeChunk(uint256 currentSum, uint256 alpha, uint256 remainingQty, uint256 chunksLeft)
+        private
+        pure
+        returns (uint256 safeChunk)
+    {
         if (chunksLeft == 0) return remainingQty;
 
         uint256 minProgress = (remainingQty + chunksLeft - 1) / chunksLeft;

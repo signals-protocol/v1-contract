@@ -42,18 +42,19 @@ contract SeedChunksTest is FullSystemDeployer {
         SeedData seedData = SeedHelper.deploySeedData(factors);
 
         vm.prank(sys.owner);
-        uint256 marketId = sys.core.createMarket(
-            0,
-            int256(uint256(numBins)),
-            1,
-            start,
-            end,
-            settlement,
-            numBins,
-            WAD,
-            address(sys.feePolicy),
-            address(seedData)
-        );
+        uint256 marketId = sys.core
+            .createMarket(
+                0,
+                int256(uint256(numBins)),
+                1,
+                start,
+                end,
+                settlement,
+                numBins,
+                WAD,
+                address(sys.feePolicy),
+                address(seedData)
+            );
 
         // Market starts unseeded
         ISignalsCore.Market memory market = sys.core.harnessGetMarket(marketId);

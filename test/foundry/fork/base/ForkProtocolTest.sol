@@ -103,27 +103,16 @@ abstract contract ForkProtocolTest is ForkBaseTest {
         address seedData = _deployUniformSeedData(4);
         vm.prank(ownerSafe);
         marketId = core.createMarket(
-            0,
-            4,
-            1,
-            startTimestamp,
-            endTimestamp,
-            settlementTimestamp,
-            4,
-            WAD,
-            _defaultFeePolicy(),
-            seedData
+            0, 4, 1, startTimestamp, endTimestamp, settlementTimestamp, 4, WAD, _defaultFeePolicy(), seedData
         );
         vm.prank(ownerSafe);
         core.seedNextChunks(marketId, 4);
     }
 
-    function _createConcentratedMarketForBatch(
-        uint64 batchId,
-        uint32 numBins,
-        uint256 alpha,
-        uint256 edgeFactor
-    ) internal returns (uint256 marketId) {
+    function _createConcentratedMarketForBatch(uint64 batchId, uint32 numBins, uint256 alpha, uint256 edgeFactor)
+        internal
+        returns (uint256 marketId)
+    {
         uint64 minSettle = uint64(block.timestamp + 120);
         uint64 batchStart = _batchStartTimestamp(batchId);
         uint64 settlementTimestamp = minSettle > batchStart + 600 ? minSettle : batchStart + 600;
@@ -153,11 +142,10 @@ abstract contract ForkProtocolTest is ForkBaseTest {
         core.seedNextChunks(marketId, numBins);
     }
 
-    function _secondarySettleAndSnapshot(
-        uint256 marketId,
-        int256 settlementValue,
-        uint32 maxChunksPerTx
-    ) internal returns (uint64 batchId) {
+    function _secondarySettleAndSnapshot(uint256 marketId, int256 settlementValue, uint32 maxChunksPerTx)
+        internal
+        returns (uint64 batchId)
+    {
         ISignalsCore.Market memory market = core.getMarket(marketId);
         vm.warp(uint256(market.settlementTimestamp) + core.settlementSubmitWindow() + 1);
 
@@ -198,7 +186,8 @@ abstract contract ForkProtocolTest is ForkBaseTest {
             }
 
             vm.startPrank(ownerSafe);
-            try core.finalizePrimarySettlement(marketId) {} catch {
+            try core.finalizePrimarySettlement(marketId) {}
+            catch {
                 core.markSettlementFailed(marketId);
                 core.finalizeSecondarySettlement(marketId, _fallbackSettlementValue(market));
             }

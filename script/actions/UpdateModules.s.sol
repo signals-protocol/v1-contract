@@ -22,12 +22,8 @@ contract UpdateModules is BaseScript {
         SignalsCore core = SignalsCore(coreProxyAddr);
 
         // Determine which modules to update
-        bool anyExplicit =
-            vm.envOr("UPDATE_TRADE", false) ||
-                vm.envOr("UPDATE_LIFECYCLE", false) ||
-                vm.envOr("UPDATE_ORACLE", false) ||
-                vm.envOr("UPDATE_RISK", false) ||
-                vm.envOr("UPDATE_VAULT", false);
+        bool anyExplicit = vm.envOr("UPDATE_TRADE", false) || vm.envOr("UPDATE_LIFECYCLE", false)
+            || vm.envOr("UPDATE_ORACLE", false) || vm.envOr("UPDATE_RISK", false) || vm.envOr("UPDATE_VAULT", false);
 
         bool updateTrade = anyExplicit ? vm.envOr("UPDATE_TRADE", false) : true;
         bool updateLifecycle = anyExplicit ? vm.envOr("UPDATE_LIFECYCLE", false) : true;

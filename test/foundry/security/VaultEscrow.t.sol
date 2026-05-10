@@ -68,17 +68,8 @@ contract VaultEscrowSecurityTest is FullSystemDeployer {
         uint64 startTime = endTime - 3600;
 
         vm.prank(sys.owner);
-        uint256 marketId = sys.core.createMarketUniform(
-            0,
-            10,
-            1,
-            startTime,
-            endTime,
-            settlementTs,
-            10,
-            WAD,
-            address(sys.feePolicy)
-        );
+        uint256 marketId =
+            sys.core.createMarketUniform(0, 10, 1, startTime, endTime, settlementTs, 10, WAD, address(sys.feePolicy));
         return marketId;
     }
 
@@ -123,7 +114,6 @@ contract VaultEscrowSecurityTest is FullSystemDeployer {
         uint64 targetBatchId = currentBatchId + 1;
 
         uint256 marketId = _createMarketInBatch(targetBatchId);
-        ISignalsCore.Market memory market = sys.core.harnessGetMarket(marketId);
 
         // Settle the market using SettlementHelper
         SettlementHelper.settleMarket(vm, address(sys.core), sys.owner, marketId, 5);

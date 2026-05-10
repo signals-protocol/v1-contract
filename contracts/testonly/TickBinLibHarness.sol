@@ -7,12 +7,7 @@ import "../lib/TickBinLib.sol";
 /// @dev Exposes tick-bin conversion functions for unit testing.
 contract TickBinLibHarness {
     /// @notice Convert a single tick to bin index
-    function tickToBin(
-        int256 minTick,
-        int256 tickSpacing,
-        uint32 numBins,
-        int256 tick
-    ) external pure returns (uint32) {
+    function tickToBin(int256 minTick, int256 tickSpacing, uint32 numBins, int256 tick) external pure returns (uint32) {
         return TickBinLib.tickToBin(minTick, tickSpacing, numBins, tick);
     }
 
@@ -28,4 +23,3 @@ contract TickBinLibHarness {
         return TickBinLib.ticksToBins(minTick, maxTick, tickSpacing, numBins, lowerTick, upperTick);
     }
 }
-

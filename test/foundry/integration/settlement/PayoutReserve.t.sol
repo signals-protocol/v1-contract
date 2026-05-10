@@ -94,7 +94,7 @@ contract PayoutReserveTest is FullSystemDeployer {
     // ============================================================
 
     function test_revertsClaimPayoutWhenTimeLtClaimDelay() public {
-        (uint256 marketId, uint64 tSet, ) = _setupMarket();
+        (uint256 marketId, uint64 tSet,) = _setupMarket();
 
         _openPosition(sys.users[0], marketId, 0, 2, 1000);
 
@@ -118,7 +118,7 @@ contract PayoutReserveTest is FullSystemDeployer {
     }
 
     function test_allowsClaimPayoutAfterClaimDelay() public {
-        (uint256 marketId, uint64 tSet, uint64 batchId) = _setupMarket();
+        (uint256 marketId, uint64 tSet,) = _setupMarket();
 
         _openPosition(sys.users[0], marketId, 0, 2, 1000);
 
@@ -204,7 +204,7 @@ contract PayoutReserveTest is FullSystemDeployer {
         _submitAndFinalize(marketId, tSet, 1);
 
         // Check L_t via getDailyPnl
-        (int256 lt, , , , , , ) = sys.core.getDailyPnl(batchId);
+        (int256 lt,,,,,,) = sys.core.getDailyPnl(batchId);
         assertTrue(lt != 0, "L_t should reflect payout reserve");
     }
 
@@ -291,7 +291,7 @@ contract PayoutReserveTest is FullSystemDeployer {
     }
 
     function test_revertsClaimOnUnsettledMarket() public {
-        (uint256 marketId, , ) = _setupMarket();
+        (uint256 marketId,,) = _setupMarket();
 
         _openPosition(sys.users[0], marketId, 0, 2, 500);
 
@@ -373,7 +373,7 @@ contract PayoutReserveTest is FullSystemDeployer {
         vm.prank(sys.owner);
         sys.core.processDailyBatch(batchId);
 
-        (, , , , , , bool processed) = sys.core.getDailyPnl(batchId);
+        (,,,,,, bool processed) = sys.core.getDailyPnl(batchId);
         assertTrue(processed, "batch should be processed");
     }
 
@@ -405,7 +405,7 @@ contract PayoutReserveTest is FullSystemDeployer {
         vm.prank(sys.owner);
         sys.core.processDailyBatch(batchId);
 
-        (, , , , , , bool processed) = sys.core.getDailyPnl(batchId);
+        (,,,,,, bool processed) = sys.core.getDailyPnl(batchId);
         assertTrue(processed, "batch should be processed after secondary settlement");
 
         uint256 navAfter = sys.core.getVaultNav();

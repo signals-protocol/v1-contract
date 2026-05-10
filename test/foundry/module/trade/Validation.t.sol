@@ -20,7 +20,7 @@ contract ValidationTest is SignalsBaseTest {
 
     /// @dev Build a test market struct with configurable fields
     function _buildMarket(
-        uint64 baseTime,
+        uint64,
         uint32 numBins,
         int256 tickSpacing,
         int256 maxTick,
@@ -28,33 +28,32 @@ contract ValidationTest is SignalsBaseTest {
         uint64 startTimestamp,
         uint64 endTimestamp
     ) internal pure returns (ISignalsCore.Market memory) {
-        return
-            ISignalsCore.Market({
-                isSeeded: isSeeded,
-                settled: false,
-                snapshotChunksDone: false,
-                failed: false,
-                numBins: numBins,
-                openPositionCount: 0,
-                snapshotChunkCursor: 0,
-                seedCursor: numBins,
-                startTimestamp: startTimestamp,
-                endTimestamp: endTimestamp,
-                settlementTimestamp: uint64(uint256(endTimestamp) + 100),
-                settlementFinalizedAt: 0,
-                minTick: 0,
-                maxTick: maxTick,
-                tickSpacing: tickSpacing,
-                settlementTick: 0,
-                settlementValue: 0,
-                liquidityParameter: WAD,
-                feePolicy: DUMMY_POLICY,
-                seedData: address(0),
-                initialRootSum: uint256(numBins) * WAD,
-                accumulatedFees: 0,
-                minFactor: WAD,
-                deltaEt: 0
-            });
+        return ISignalsCore.Market({
+            isSeeded: isSeeded,
+            settled: false,
+            snapshotChunksDone: false,
+            failed: false,
+            numBins: numBins,
+            openPositionCount: 0,
+            snapshotChunkCursor: 0,
+            seedCursor: numBins,
+            startTimestamp: startTimestamp,
+            endTimestamp: endTimestamp,
+            settlementTimestamp: uint64(uint256(endTimestamp) + 100),
+            settlementFinalizedAt: 0,
+            minTick: 0,
+            maxTick: maxTick,
+            tickSpacing: tickSpacing,
+            settlementTick: 0,
+            settlementValue: 0,
+            liquidityParameter: WAD,
+            feePolicy: DUMMY_POLICY,
+            seedData: address(0),
+            initialRootSum: uint256(numBins) * WAD,
+            accumulatedFees: 0,
+            minFactor: WAD,
+            deltaEt: 0
+        });
     }
 
     function _defaultMarket() internal view returns (ISignalsCore.Market memory) {

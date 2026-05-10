@@ -50,11 +50,8 @@ contract SeedDataLibTest is HarnessDeployer {
         uint256[] memory factors = _uniformFactors(numBins);
         SeedData seedData = SeedHelper.deploySeedData(factors);
 
-        (uint256 rootSum, uint256 minFactor, uint256 deltaEt) = harness.computeSeedStats(
-            address(seedData),
-            numBins,
-            alpha
-        );
+        (uint256 rootSum, uint256 minFactor, uint256 deltaEt) =
+            harness.computeSeedStats(address(seedData), numBins, alpha);
 
         assertEq(rootSum, uint256(numBins) * WAD);
         assertEq(minFactor, WAD);
@@ -71,11 +68,8 @@ contract SeedDataLibTest is HarnessDeployer {
         factors[3] = WAD;
         SeedData seedData = SeedHelper.deploySeedData(factors);
 
-        (uint256 rootSum, uint256 minFactor, uint256 deltaEt) = harness.computeSeedStats(
-            address(seedData),
-            numBins,
-            alpha
-        );
+        (uint256 rootSum, uint256 minFactor, uint256 deltaEt) =
+            harness.computeSeedStats(address(seedData), numBins, alpha);
 
         assertEq(rootSum, 5 * WAD);
         assertEq(minFactor, WAD);

@@ -5,20 +5,19 @@ import "../lib/RiskMath.sol";
 
 /// @notice Harness exposing all RiskMath internal functions as external for fuzz testing.
 contract RiskMathHarness {
-    function calculateDeltaEtFromFactors(
-        uint256 alpha,
-        uint32 numBins,
-        uint256[] calldata baseFactors
-    ) external pure returns (uint256) {
+    function calculateDeltaEtFromFactors(uint256 alpha, uint32 numBins, uint256[] calldata baseFactors)
+        external
+        pure
+        returns (uint256)
+    {
         return RiskMath.calculateDeltaEtFromFactors(alpha, numBins, baseFactors);
     }
 
-    function calculateDeltaEt(
-        uint256 alpha,
-        uint32 numBins,
-        uint256 rootSum,
-        uint256 minFactor
-    ) external pure returns (uint256) {
+    function calculateDeltaEt(uint256 alpha, uint32 numBins, uint256 rootSum, uint256 minFactor)
+        external
+        pure
+        returns (uint256)
+    {
         return RiskMath.calculateDeltaEt(alpha, numBins, rootSum, minFactor);
     }
 

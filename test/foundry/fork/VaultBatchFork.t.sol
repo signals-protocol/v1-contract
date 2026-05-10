@@ -77,9 +77,7 @@ contract VaultBatchForkTest is ForkProtocolTest {
         core.cancelWithdraw(withdrawRequestId);
 
         assertEq(
-            lpShare.balanceOf(lp),
-            lpSharesAfterBurn + (mintedShares / 2),
-            "withdraw cancel did not restore shares"
+            lpShare.balanceOf(lp), lpSharesAfterBurn + (mintedShares / 2), "withdraw cancel did not restore shares"
         );
     }
 }

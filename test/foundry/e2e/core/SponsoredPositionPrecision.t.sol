@@ -53,17 +53,9 @@ contract SponsoredPositionPrecisionTest is FullSystemDeployer {
         uint64 settlement = uint64(block.timestamp + 60);
 
         vm.prank(sys.owner);
-        return
-            sys.core.createMarketUniform(
-                0,
-                int256(uint256(NUM_BINS)),
-                1,
-                start,
-                end,
-                settlement,
-                NUM_BINS,
-                WAD,
-                address(sys.feePolicy)
+        return sys.core
+            .createMarketUniform(
+                0, int256(uint256(NUM_BINS)), 1, start, end, settlement, NUM_BINS, WAD, address(sys.feePolicy)
             );
     }
 
@@ -71,7 +63,7 @@ contract SponsoredPositionPrecisionTest is FullSystemDeployer {
         SettlementHelper.settleMarket(vm, address(sys.core), sys.owner, marketId, tick);
         vm.prank(sys.owner);
         sys.core.requestSettlementChunks(marketId, 5);
-        (, , , uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
+        (,,, uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
         vm.warp(claimOpen);
     }
 

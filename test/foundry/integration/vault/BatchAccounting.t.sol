@@ -197,7 +197,7 @@ contract BatchAccountingTest is FullSystemDeployer {
 
         _processBatch(batchId, Lt, Ftot);
 
-        (, , uint256 ft, uint256 gt, uint256 npre, , ) = sys.core.getDailyPnl(batchId);
+        (,, uint256 ft, uint256 gt, uint256 npre,,) = sys.core.getDailyPnl(batchId);
 
         // Verify: Npre - Nprev = Lt + Ft + Gt
         int256 lhs = int256(npre) - int256(N_prev);
@@ -221,7 +221,7 @@ contract BatchAccountingTest is FullSystemDeployer {
 
         _processBatch(batchId, Lt, Ftot);
 
-        (, , uint256 ft, uint256 gt, uint256 npre, , ) = sys.core.getDailyPnl(batchId);
+        (,, uint256 ft, uint256 gt, uint256 npre,,) = sys.core.getDailyPnl(batchId);
 
         int256 lhs = int256(npre) - int256(N_prev);
         int256 rhs = Lt + int256(ft) + int256(gt);
@@ -237,7 +237,7 @@ contract BatchAccountingTest is FullSystemDeployer {
 
         _processBatch(batchId, 0, 0);
 
-        (, , uint256 ft, uint256 gt, uint256 npre, , ) = sys.core.getDailyPnl(batchId);
+        (,, uint256 ft, uint256 gt, uint256 npre,,) = sys.core.getDailyPnl(batchId);
 
         assertEq(npre, N_prev);
         assertEq(ft, 0);
@@ -256,7 +256,7 @@ contract BatchAccountingTest is FullSystemDeployer {
 
         _processBatch(batchId, Lt, Ftot);
 
-        (, , uint256 ft, uint256 gt, uint256 npre, , ) = sys.core.getDailyPnl(batchId);
+        (,, uint256 ft, uint256 gt, uint256 npre,,) = sys.core.getDailyPnl(batchId);
 
         // Grant should be 0 since we're above floor
         assertEq(gt, 0, "Grant should be 0 when above floor");
@@ -278,7 +278,7 @@ contract BatchAccountingTest is FullSystemDeployer {
 
         _processBatch(batchId, 50e18, 0);
 
-        (, , , , uint256 npre, uint256 pe, ) = sys.core.getDailyPnl(batchId);
+        (,,,, uint256 npre, uint256 pe,) = sys.core.getDailyPnl(batchId);
 
         uint256 expectedPe = (npre * WAD) / S_prev;
 
@@ -299,9 +299,8 @@ contract BatchAccountingTest is FullSystemDeployer {
         uint64 batchId = currentBatchId + 1;
         _processBatch(batchId, 30e18, 0);
 
-        (uint256 totalDeposits, uint256 totalWithdraws, uint256 batchPrice, ) = sys.core.harnessGetBatchAggregation(
-            batchId
-        );
+        (uint256 totalDeposits, uint256 totalWithdraws, uint256 batchPrice,) =
+            sys.core.harnessGetBatchAggregation(batchId);
 
         assertEq(totalDeposits, 300e18); // 100 + 200
         assertEq(totalWithdraws, 50e18);
@@ -321,7 +320,7 @@ contract BatchAccountingTest is FullSystemDeployer {
         uint64 batchId = currentBatchId + 1;
         _processBatch(batchId, 0, 0);
 
-        (, , uint256 batchPrice, ) = sys.core.harnessGetBatchAggregation(batchId);
+        (,, uint256 batchPrice,) = sys.core.harnessGetBatchAggregation(batchId);
         uint256 finalPrice = sys.core.getVaultPrice();
 
         uint256 diff = finalPrice > batchPrice ? finalPrice - batchPrice : batchPrice - finalPrice;
@@ -337,7 +336,7 @@ contract BatchAccountingTest is FullSystemDeployer {
         uint64 batchId = currentBatchId + 1;
         _processBatch(batchId, 0, 0);
 
-        (, , uint256 batchPrice, ) = sys.core.harnessGetBatchAggregation(batchId);
+        (,, uint256 batchPrice,) = sys.core.harnessGetBatchAggregation(batchId);
         uint256 finalPrice = sys.core.getVaultPrice();
 
         uint256 diff = finalPrice > batchPrice ? finalPrice - batchPrice : batchPrice - finalPrice;
@@ -359,7 +358,7 @@ contract BatchAccountingTest is FullSystemDeployer {
         vm.prank(owner_);
         sys.core.processDailyBatch(batchId);
 
-        (, , uint256 batchPrice, ) = sys.core.harnessGetBatchAggregation(batchId);
+        (,, uint256 batchPrice,) = sys.core.harnessGetBatchAggregation(batchId);
         uint256 finalPrice = sys.core.getVaultPrice();
 
         uint256 diff = finalPrice > batchPrice ? finalPrice - batchPrice : batchPrice - finalPrice;
@@ -411,7 +410,7 @@ contract BatchAccountingTest is FullSystemDeployer {
         vm.prank(owner_);
         sys.core.harnessRecordPnl(batchId, 20e18, 3e18, DEFAULT_DELTA_ET);
 
-        (int256 lt, uint256 ftot, , , , , ) = sys.core.getDailyPnl(batchId);
+        (int256 lt, uint256 ftot,,,,,) = sys.core.getDailyPnl(batchId);
 
         assertEq(lt, 50e18); // 30 + 20
         assertEq(ftot, 8e18); // 5 + 3
@@ -426,7 +425,7 @@ contract BatchAccountingTest is FullSystemDeployer {
         _processBatch(batchId, 100e18, 0);
 
         uint256 navAfter = sys.core.getVaultNav();
-        (, , , , , , bool processed) = sys.core.getDailyPnl(batchId);
+        (,,,,,, bool processed) = sys.core.getDailyPnl(batchId);
 
         assertTrue(processed);
         assertGt(navAfter, navBefore);

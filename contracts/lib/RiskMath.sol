@@ -36,13 +36,13 @@ library RiskMath {
      * @param baseFactors Prior factor weights
      * @return deltaEt Tail budget (WAD)
      */
-    function calculateDeltaEtFromFactors(
-        uint256 alpha,
-        uint32 numBins,
-        uint256[] calldata baseFactors
-    ) internal pure returns (uint256 deltaEt) {
+    function calculateDeltaEtFromFactors(uint256 alpha, uint32 numBins, uint256[] calldata baseFactors)
+        internal
+        pure
+        returns (uint256 deltaEt)
+    {
         if (baseFactors.length != numBins || numBins == 0) return 0;
-        
+
         uint256 minFactor = type(uint256).max;
         uint256 rootSum = 0;
         for (uint256 i = 0; i < numBins; i++) {
@@ -50,18 +50,18 @@ library RiskMath {
             if (baseFactors[i] < minFactor) minFactor = baseFactors[i];
             rootSum += baseFactors[i];
         }
-        
+
         uint256 uniformSum = uint256(numBins) * minFactor;
         if (rootSum <= uniformSum) {
             return 0; // Uniform prior
         }
-        
+
         // ratio = rootSum / uniformSum (WAD precision, ceiling division)
         uint256 ratio = rootSum.wDivUp(uniformSum);
-        
+
         // ln(ratio) with conservative upper bound
         uint256 lnRatio = FixedPointMathU.wLn(ratio) + 1;
-        
+
         // ΔEₜ = α * lnRatio (ceiling multiplication)
         deltaEt = alpha.wMulUp(lnRatio);
     }
@@ -75,24 +75,23 @@ library RiskMath {
      * @param minFactor Minimum factor value (WAD)
      * @return deltaEt Tail budget (WAD)
      */
-    function calculateDeltaEt(
-        uint256 alpha,
-        uint32 numBins,
-        uint256 rootSum,
-        uint256 minFactor
-    ) internal pure returns (uint256 deltaEt) {
+    function calculateDeltaEt(uint256 alpha, uint32 numBins, uint256 rootSum, uint256 minFactor)
+        internal
+        pure
+        returns (uint256 deltaEt)
+    {
         uint256 uniformSum = uint256(numBins) * minFactor;
-        
+
         if (rootSum <= uniformSum) {
             return 0; // Uniform or near-uniform prior
         }
-        
+
         // ratio = rootSum / uniformSum (ceiling division for safety)
         uint256 ratio = rootSum.wDivUp(uniformSum);
-        
+
         // ln(ratio) with conservative upper bound
         uint256 lnRatio = FixedPointMathU.wLn(ratio) + 1;
-        
+
         // ΔEₜ = α * lnRatio (ceiling multiplication)
         deltaEt = alpha.wMulUp(lnRatio);
     }
@@ -110,17 +109,13 @@ library RiskMath {
      * @param lambda Safety parameter λ (WAD, NAV loss limit per batch)
      * @return alphaBase Base liquidity parameter limit (WAD)
      */
-    function calculateAlphaBase(
-        uint256 Et,
-        uint256 numBins,
-        uint256 lambda
-    ) internal pure returns (uint256 alphaBase) {
+    function calculateAlphaBase(uint256 Et, uint256 numBins, uint256 lambda) internal pure returns (uint256 alphaBase) {
         if (numBins <= 1) revert SE.InvalidNumBins(numBins);
-        
+
         // Use safe (upward-rounded) ln to ensure conservative α_base
         uint256 lnN = FixedPointMathU.lnWadUp(numBins);
         if (lnN == 0) return type(uint256).max; // Edge case: n=1
-        
+
         // αbase = λ * E_t / ln(n)
         alphaBase = lambda.wMul(Et).wDiv(lnN);
     }
@@ -134,19 +129,19 @@ library RiskMath {
      * @param k Peak drawdown sensitivity factor (WAD, typically 1.0)
      * @return alphaLimit Effective liquidity parameter limit (WAD)
      */
-    function calculateAlphaLimit(
-        uint256 alphaBase,
-        uint256 drawdown,
-        uint256 k
-    ) internal pure returns (uint256 alphaLimit) {
+    function calculateAlphaLimit(uint256 alphaBase, uint256 drawdown, uint256 k)
+        internal
+        pure
+        returns (uint256 alphaLimit)
+    {
         // αlimit = αbase * (1 - k * DD)
         uint256 kDD = k.wMul(drawdown);
-        
+
         if (kDD >= WAD) {
             // k * DD >= 1 → factor would be negative → return 0
             return 0;
         }
-        
+
         uint256 factor = WAD - kDD; // 1 - k * DD
         alphaLimit = alphaBase.wMul(factor);
     }
@@ -158,10 +153,7 @@ library RiskMath {
      * @param pricePeak Peak price (WAD)
      * @return drawdown Peak drawdown ratio (WAD, 0 to WAD)
      */
-    function calculateDrawdown(
-        uint256 price,
-        uint256 pricePeak
-    ) internal pure returns (uint256 drawdown) {
+    function calculateDrawdown(uint256 price, uint256 pricePeak) internal pure returns (uint256 drawdown) {
         if (pricePeak == 0 || price >= pricePeak) {
             return 0;
         }
@@ -178,10 +170,7 @@ library RiskMath {
      * @param deltaEt Tail budget from prior (WAD)
      * @param effectiveBackstop Effective backstop budget B^eff (WAD)
      */
-    function enforcePriorAdmissibility(
-        uint256 deltaEt,
-        uint256 effectiveBackstop
-    ) internal pure {
+    function enforcePriorAdmissibility(uint256 deltaEt, uint256 effectiveBackstop) internal pure {
         if (deltaEt > effectiveBackstop) {
             revert SE.PriorNotAdmissible(deltaEt, effectiveBackstop);
         }
@@ -190,14 +179,11 @@ library RiskMath {
     /**
      * @notice Check if α is within limit
      * @dev Reverts with AlphaExceedsLimit if α > αlimit
-     * 
+     *
      * @param alpha Market α to validate (WAD)
      * @param alphaLimit Maximum allowed α (WAD)
      */
-    function enforceAlphaLimit(
-        uint256 alpha,
-        uint256 alphaLimit
-    ) internal pure {
+    function enforceAlphaLimit(uint256 alpha, uint256 alphaLimit) internal pure {
         if (alpha > alphaLimit) {
             revert SE.AlphaExceedsLimit(alpha, alphaLimit);
         }

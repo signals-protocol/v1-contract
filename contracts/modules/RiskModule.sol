@@ -60,13 +60,13 @@ contract RiskModule is SignalsCoreStorage {
      *        0 = uniform prior, higher = more concentrated
      * @return deltaEt Tail budget (WAD)
      */
-    function calculateDeltaEt(
-        uint256 alpha,
-        uint256 numBins,
-        uint256 priorConcentration
-    ) external pure returns (uint256 deltaEt) {
+    function calculateDeltaEt(uint256 alpha, uint256 numBins, uint256 priorConcentration)
+        external
+        pure
+        returns (uint256 deltaEt)
+    {
         if (numBins <= 1) revert SE.InvalidNumBins(numBins);
-        
+
         // For uniform prior (concentration = 0), ΔEₜ = 0
         if (priorConcentration == 0) {
             return 0;
@@ -91,11 +91,7 @@ contract RiskModule is SignalsCoreStorage {
      * @param lambda Safety parameter λ (WAD, NAV loss limit per batch)
      * @return alphaBase Base liquidity parameter limit (WAD)
      */
-    function calculateAlphaBase(
-        uint256 Et,
-        uint256 numBins,
-        uint256 lambda
-    ) external pure returns (uint256 alphaBase) {
+    function calculateAlphaBase(uint256 Et, uint256 numBins, uint256 lambda) external pure returns (uint256 alphaBase) {
         return RiskMath.calculateAlphaBase(Et, numBins, lambda);
     }
 
@@ -107,11 +103,11 @@ contract RiskModule is SignalsCoreStorage {
      * @param k Peak drawdown sensitivity factor (WAD, typically 1.0)
      * @return alphaLimit Effective liquidity parameter limit (WAD)
      */
-    function calculateAlphaLimit(
-        uint256 alphaBase,
-        uint256 drawdown,
-        uint256 k
-    ) external pure returns (uint256 alphaLimit) {
+    function calculateAlphaLimit(uint256 alphaBase, uint256 drawdown, uint256 k)
+        external
+        pure
+        returns (uint256 alphaLimit)
+    {
         return RiskMath.calculateAlphaLimit(alphaBase, drawdown, k);
     }
 
@@ -123,13 +119,14 @@ contract RiskModule is SignalsCoreStorage {
      * @param k Peak drawdown sensitivity factor (WAD)
      * @return alphaLimit Current effective α limit (WAD)
      */
-    function getAlphaLimit(
-        uint256 numBins,
-        uint256 lambda,
-        uint256 k
-    ) external view onlyDelegated returns (uint256 alphaLimit) {
+    function getAlphaLimit(uint256 numBins, uint256 lambda, uint256 k)
+        external
+        view
+        onlyDelegated
+        returns (uint256 alphaLimit)
+    {
         if (lpVault.nav == 0) return 0;
-        
+
         uint256 alphaBase = RiskMath.calculateAlphaBase(lpVault.nav, numBins, lambda);
         uint256 drawdown = RiskMath.calculateDrawdown(lpVault.price, lpVault.pricePeak);
         alphaLimit = RiskMath.calculateAlphaLimit(alphaBase, drawdown, k);
@@ -145,10 +142,7 @@ contract RiskModule is SignalsCoreStorage {
      * @param deltaEt Tail budget from prior (WAD)
      * @param effectiveBackstop Effective backstop budget B^eff (WAD)
      */
-    function checkPriorAdmissibility(
-        uint256 deltaEt,
-        uint256 effectiveBackstop
-    ) external pure {
+    function checkPriorAdmissibility(uint256 deltaEt, uint256 effectiveBackstop) external pure {
         if (deltaEt > effectiveBackstop) {
             revert SE.PriorNotAdmissible(deltaEt, effectiveBackstop);
         }
@@ -181,12 +175,14 @@ contract RiskModule is SignalsCoreStorage {
      * @param numBins Number of outcome bins
      * @param seedData Address of SeedData contract containing factors
      */
-    function gateCreateMarket(
-        uint256 liquidityParameter,
-        uint32 numBins,
-        address seedData
-    ) external view onlyDelegated {
-        (, , uint256 deltaEt) = SeedDataLib.computeSeedStats(seedData, numBins, liquidityParameter);
+    function gateCreateMarket(uint256 liquidityParameter, uint32 numBins, address seedData)
+        external
+        view
+        onlyDelegated
+    {
+        // gateCreateMarket only needs deltaEt for prior-admissibility; rootSum/minFactor are consumed by createMarket.
+        // slither-disable-next-line unused-return
+        (,, uint256 deltaEt) = SeedDataLib.computeSeedStats(seedData, numBins, liquidityParameter);
         _enforceAlphaLimit(liquidityParameter, numBins);
         _enforcePriorAdmissibility(deltaEt);
     }
@@ -205,16 +201,16 @@ contract RiskModule is SignalsCoreStorage {
     function _enforceAlphaLimit(uint256 liquidityParameter, uint32 numBins) internal view {
         if (!riskConfig.enforceAlpha) return; // Skip if enforcement disabled
         if (lpVault.nav == 0) return; // Skip if vault not seeded
-        
+
         // Calculate αbase using RiskMath
         uint256 alphaBase = RiskMath.calculateAlphaBase(lpVault.nav, numBins, riskConfig.lambda);
-        
+
         // Calculate peak drawdown using RiskMath
         uint256 drawdown = RiskMath.calculateDrawdown(lpVault.price, lpVault.pricePeak);
-        
+
         // Calculate αlimit using RiskMath
         uint256 alphaLimit = RiskMath.calculateAlphaLimit(alphaBase, drawdown, riskConfig.kDrawdown);
-        
+
         // Enforce: α ≤ αlimit (using RiskMath error)
         if (liquidityParameter > alphaLimit) {
             revert SE.AlphaExceedsLimit(liquidityParameter, alphaLimit);
@@ -232,5 +228,4 @@ contract RiskModule is SignalsCoreStorage {
             revert SE.PriorNotAdmissible(deltaEt, effectiveBackstop);
         }
     }
-
 }

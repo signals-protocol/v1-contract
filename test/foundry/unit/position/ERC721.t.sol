@@ -118,9 +118,7 @@ contract PositionERC721Test is FullSystemDeployer {
         _mintFixture();
 
         vm.prank(charlie);
-        vm.expectRevert(
-            abi.encodeWithSelector(IERC721Errors.ERC721InsufficientApproval.selector, charlie, aliceToken1)
-        );
+        vm.expectRevert(abi.encodeWithSelector(IERC721Errors.ERC721InsufficientApproval.selector, charlie, aliceToken1));
         sys.position.transferFrom(alice, bob, aliceToken1);
     }
 

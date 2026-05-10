@@ -34,13 +34,14 @@ contract RiskGateCallOrderTest is FullSystemDeployer {
         sys.core.setRiskConfig(0.001e18, 100e18, true);
 
         // 99% peak drawdown to make αlimit = 0
-        sys.core.harnessSetLpVault(
-            10_000e18, // nav
-            10_000e18, // shares
-            0.01e18, // price (1% of original)
-            1e18, // pricePeak
-            true
-        );
+        sys.core
+            .harnessSetLpVault(
+                10_000e18, // nav
+                10_000e18, // shares
+                0.01e18, // price (1% of original)
+                1e18, // pricePeak
+                true
+            );
 
         uint64 start = uint64(block.timestamp + 100);
         uint64 end = start + 86_400;

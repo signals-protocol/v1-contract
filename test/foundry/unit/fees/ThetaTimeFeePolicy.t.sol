@@ -181,10 +181,10 @@ contract ThetaTimeFeePolicyTest is TradeModuleDeployer {
     // Internal helpers
     // ============================================================
 
-    function _powWad(uint256 xWad, uint256 exp) private pure returns (uint256 result) {
+    function _powWad(uint256 xWad, uint256 exponent) private pure returns (uint256 result) {
         result = WAD;
         uint256 base = xWad;
-        uint256 e = exp;
+        uint256 e = exponent;
         while (e > 0) {
             if (e & 1 == 1) {
                 result = (result * base) / WAD;

@@ -119,9 +119,7 @@ contract SignalsCore is
 
         if (params.claimDelaySeconds != params.settlementSubmitWindow + params.pendingOpsWindow) {
             revert SignalsErrors.InvalidSettlementTimeline(
-                params.claimDelaySeconds,
-                params.settlementSubmitWindow,
-                params.pendingOpsWindow
+                params.claimDelaySeconds, params.settlementSubmitWindow, params.pendingOpsWindow
             );
         }
         if (params.phiLP + params.phiBS + params.phiTR != WAD) {
@@ -166,11 +164,7 @@ contract SignalsCore is
         }
 
         emit ModulesUpdated(
-            params.tradeModule,
-            params.lifecycleModule,
-            params.riskModule,
-            params.vaultModule,
-            params.oracleModule
+            params.tradeModule, params.lifecycleModule, params.riskModule, params.vaultModule, params.oracleModule
         );
     }
 
@@ -296,16 +290,15 @@ contract SignalsCore is
 
     // --- External stubs: delegate to modules ---
 
-    function openPosition(
-        uint256 marketId,
-        int256 lowerTick,
-        int256 upperTick,
-        uint128 quantity,
-        uint256 maxCost
-    ) external override whenNotPaused nonReentrant returns (uint256 positionId) {
+    function openPosition(uint256 marketId, int256 lowerTick, int256 upperTick, uint128 quantity, uint256 maxCost)
+        external
+        override
+        whenNotPaused
+        nonReentrant
+        returns (uint256 positionId)
+    {
         bytes memory ret = _delegate(
-            tradeModule,
-            abi.encodeCall(ISignalsCore.openPosition, (marketId, lowerTick, upperTick, quantity, maxCost))
+            tradeModule, abi.encodeCall(ISignalsCore.openPosition, (marketId, lowerTick, upperTick, quantity, maxCost))
         );
         if (ret.length > 0) positionId = abi.decode(ret, (uint256));
     }
@@ -321,26 +314,27 @@ contract SignalsCore is
         bytes memory ret = _delegate(
             tradeModule,
             abi.encodeCall(
-                ISignalsCore.openPositionFor,
-                (beneficiary, marketId, lowerTick, upperTick, quantity, maxCost)
+                ISignalsCore.openPositionFor, (beneficiary, marketId, lowerTick, upperTick, quantity, maxCost)
             )
         );
         if (ret.length > 0) positionId = abi.decode(ret, (uint256));
     }
 
-    function increasePosition(
-        uint256 positionId,
-        uint128 quantity,
-        uint256 maxCost
-    ) external override whenNotPaused nonReentrant {
+    function increasePosition(uint256 positionId, uint128 quantity, uint256 maxCost)
+        external
+        override
+        whenNotPaused
+        nonReentrant
+    {
         _delegate(tradeModule, abi.encodeCall(ISignalsCore.increasePosition, (positionId, quantity, maxCost)));
     }
 
-    function decreasePosition(
-        uint256 positionId,
-        uint128 quantity,
-        uint256 minProceeds
-    ) external override whenNotPaused nonReentrant {
+    function decreasePosition(uint256 positionId, uint128 quantity, uint256 minProceeds)
+        external
+        override
+        whenNotPaused
+        nonReentrant
+    {
         _delegate(tradeModule, abi.encodeCall(ISignalsCore.decreasePosition, (positionId, quantity, minProceeds)));
     }
 
@@ -362,51 +356,41 @@ contract SignalsCore is
 
     // ---- View stubs ----
 
-    function calculateOpenCost(
-        uint256 marketId,
-        int256 lowerTick,
-        int256 upperTick,
-        uint128 quantity
-    ) external override returns (uint256 cost) {
+    function calculateOpenCost(uint256 marketId, int256 lowerTick, int256 upperTick, uint128 quantity)
+        external
+        override
+        returns (uint256 cost)
+    {
         bytes memory ret = _delegateView(
-            tradeModule,
-            abi.encodeCall(ISignalsCore.calculateOpenCost, (marketId, lowerTick, upperTick, quantity))
+            tradeModule, abi.encodeCall(ISignalsCore.calculateOpenCost, (marketId, lowerTick, upperTick, quantity))
         );
         if (ret.length > 0) cost = abi.decode(ret, (uint256));
     }
 
     function calculateIncreaseCost(uint256 positionId, uint128 quantity) external override returns (uint256 cost) {
-        bytes memory ret = _delegateView(
-            tradeModule,
-            abi.encodeCall(ISignalsCore.calculateIncreaseCost, (positionId, quantity))
-        );
+        bytes memory ret =
+            _delegateView(tradeModule, abi.encodeCall(ISignalsCore.calculateIncreaseCost, (positionId, quantity)));
         if (ret.length > 0) cost = abi.decode(ret, (uint256));
     }
 
-    function calculateDecreaseProceeds(
-        uint256 positionId,
-        uint128 quantity
-    ) external override returns (uint256 proceeds) {
+    function calculateDecreaseProceeds(uint256 positionId, uint128 quantity)
+        external
+        override
+        returns (uint256 proceeds)
+    {
         bytes memory ret = _delegateView(
-            tradeModule,
-            abi.encodeCall(ISignalsCore.calculateDecreaseProceeds, (positionId, quantity))
+            tradeModule, abi.encodeCall(ISignalsCore.calculateDecreaseProceeds, (positionId, quantity))
         );
         if (ret.length > 0) proceeds = abi.decode(ret, (uint256));
     }
 
     function calculateCloseProceeds(uint256 positionId) external override returns (uint256 proceeds) {
-        bytes memory ret = _delegateView(
-            tradeModule,
-            abi.encodeCall(ISignalsCore.calculateCloseProceeds, (positionId))
-        );
+        bytes memory ret = _delegateView(tradeModule, abi.encodeCall(ISignalsCore.calculateCloseProceeds, (positionId)));
         if (ret.length > 0) proceeds = abi.decode(ret, (uint256));
     }
 
     function calculatePositionValue(uint256 positionId) external override returns (uint256 value) {
-        bytes memory ret = _delegateView(
-            tradeModule,
-            abi.encodeCall(ISignalsCore.calculatePositionValue, (positionId))
-        );
+        bytes memory ret = _delegateView(tradeModule, abi.encodeCall(ISignalsCore.calculatePositionValue, (positionId)));
         if (ret.length > 0) value = abi.decode(ret, (uint256));
     }
 
@@ -510,12 +494,10 @@ contract SignalsCore is
 
     /// @notice Configure Redstone oracle parameters
     /// @dev Set feed ID, decimals, and timing constraints
-    function setRedstoneConfig(
-        bytes32 feedId,
-        uint8 feedDecimals,
-        uint64 _maxSampleDistance,
-        uint64 _futureTolerance
-    ) external onlyOwner {
+    function setRedstoneConfig(bytes32 feedId, uint8 feedDecimals, uint64 _maxSampleDistance, uint64 _futureTolerance)
+        external
+        onlyOwner
+    {
         _delegate(
             oracleModule,
             abi.encodeWithSignature(
@@ -554,31 +536,29 @@ contract SignalsCore is
     }
 
     /// @notice Get settlement windows for a market
-    function getSettlementWindows(
-        uint256 marketId
-    ) external returns (uint64 tSet, uint64 settleEnd, uint64 opsEnd, uint64 claimOpen) {
-        bytes memory ret = _delegateView(
-            oracleModule,
-            abi.encodeWithSignature("getSettlementWindows(uint256)", marketId)
-        );
+    function getSettlementWindows(uint256 marketId)
+        external
+        returns (uint64 tSet, uint64 settleEnd, uint64 opsEnd, uint64 claimOpen)
+    {
+        bytes memory ret =
+            _delegateView(oracleModule, abi.encodeWithSignature("getSettlementWindows(uint256)", marketId));
         if (ret.length > 0) {
             (tSet, settleEnd, opsEnd, claimOpen) = abi.decode(ret, (uint64, uint64, uint64, uint64));
         }
     }
 
     function getSettlementPrice(uint256 marketId) external override returns (int256 price, uint64 priceTimestamp) {
-        bytes memory ret = _delegateView(
-            oracleModule,
-            abi.encodeWithSignature("getSettlementPrice(uint256)", marketId)
-        );
+        bytes memory ret = _delegateView(oracleModule, abi.encodeWithSignature("getSettlementPrice(uint256)", marketId));
         if (ret.length > 0) (price, priceTimestamp) = abi.decode(ret, (int256, uint64));
     }
 
     /// @notice Trigger settlement snapshot chunks after market settlement (owner/operator).
-    function requestSettlementChunks(
-        uint256 marketId,
-        uint32 maxChunksPerTx
-    ) external override onlyOwnerOrOperator returns (uint32 emitted) {
+    function requestSettlementChunks(uint256 marketId, uint32 maxChunksPerTx)
+        external
+        override
+        onlyOwnerOrOperator
+        returns (uint32 emitted)
+    {
         bytes memory ret = _delegate(
             lifecycleModule,
             abi.encodeWithSignature("requestSettlementChunks(uint256,uint32)", marketId, maxChunksPerTx)
@@ -709,15 +689,15 @@ contract SignalsCore is
         return withdrawalLagBatches;
     }
 
-    function getDailyPnl(
-        uint64 batchId
-    ) external returns (int256 lt, uint256 ftot, uint256 ft, uint256 gt, uint256 npre, uint256 pe, bool processed) {
+    function getDailyPnl(uint64 batchId)
+        external
+        returns (int256 lt, uint256 ftot, uint256 ft, uint256 gt, uint256 npre, uint256 pe, bool processed)
+    {
         bytes memory ret = _delegateView(vaultModule, abi.encodeWithSignature("getDailyPnl(uint64)", batchId));
-        if (ret.length > 0)
-            (lt, ftot, ft, gt, npre, pe, processed) = abi.decode(
-                ret,
-                (int256, uint256, uint256, uint256, uint256, uint256, bool)
-            );
+        if (ret.length > 0) {
+            (lt, ftot, ft, gt, npre, pe, processed) =
+                abi.decode(ret, (int256, uint256, uint256, uint256, uint256, uint256, bool));
+        }
     }
 
     function _requireAddress(address value) internal pure {
@@ -746,6 +726,8 @@ contract SignalsCore is
     /// @notice Uses delegatecall to access storage in Core's context.
     function _delegateView(address module, bytes memory callData) internal returns (bytes memory) {
         if (module == address(0)) revert SignalsErrors.ModuleNotSet();
+        // Module addresses are owner-controlled through initialize()/setModules(); delegated views are trusted protocol modules.
+        // slither-disable-next-line controlled-delegatecall
         (bool success, bytes memory ret) = module.delegatecall(callData);
         if (!success) {
             assembly ("memory-safe") {
@@ -763,6 +745,8 @@ contract SignalsCore is
     /// @param gateCalldata Encoded call to RiskModule gate function
     function _riskGate(bytes memory gateCalldata) internal {
         if (riskModule == address(0)) revert SignalsErrors.ModuleNotSet();
+        // Risk module is owner-controlled protocol code; delegatecall is the module dispatch design.
+        // slither-disable-next-line controlled-delegatecall
         (bool success, bytes memory ret) = riskModule.delegatecall(gateCalldata);
         if (!success) {
             assembly ("memory-safe") {

@@ -91,14 +91,10 @@ contract PrepareSafeUpgrade is BaseScript {
 
         // 4. Encode calldata
         bytes memory setModulesCalldata = abi.encodeCall(
-            SignalsCore.setModules,
-            (tradeModule, lifecycleModule, riskModule, vaultModule, oracleModule)
+            SignalsCore.setModules, (tradeModule, lifecycleModule, riskModule, vaultModule, oracleModule)
         );
-        bytes memory upgradeToAndCallCalldata = abi.encodeWithSignature(
-            "upgradeToAndCall(address,bytes)",
-            newCoreImpl,
-            setModulesCalldata
-        );
+        bytes memory upgradeToAndCallCalldata =
+            abi.encodeWithSignature("upgradeToAndCall(address,bytes)", newCoreImpl, setModulesCalldata);
 
         // 5. Write plan JSON
         string memory plan = _buildPlanJson(
@@ -125,15 +121,11 @@ contract PrepareSafeUpgrade is BaseScript {
         vm.writeFile(string.concat(copyDir, "/01-to.txt"), vm.toString(coreProxy));
         vm.writeFile(string.concat(copyDir, "/02-value.txt"), "0");
         vm.writeFile(
-            string.concat(copyDir, "/03-method.txt"),
-            "upgradeToAndCall(address newImplementation, bytes data)"
+            string.concat(copyDir, "/03-method.txt"), "upgradeToAndCall(address newImplementation, bytes data)"
         );
         vm.writeFile(string.concat(copyDir, "/04-arg-newImplementation.txt"), vm.toString(newCoreImpl));
         vm.writeFile(string.concat(copyDir, "/05-arg-data-setModulesCalldata.txt"), vm.toString(setModulesCalldata));
-        vm.writeFile(
-            string.concat(copyDir, "/06-calldata-upgradeToAndCall.txt"),
-            vm.toString(upgradeToAndCallCalldata)
-        );
+        vm.writeFile(string.concat(copyDir, "/06-calldata-upgradeToAndCall.txt"), vm.toString(upgradeToAndCallCalldata));
         console.log("[prepare-safe-upgrade] copy files: %s", copyDir);
 
         // 7. Print Safe manual execution instructions

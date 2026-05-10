@@ -237,12 +237,10 @@ contract ClmsrInvariantTest is TradeModuleDeployer {
     }
 
     function test_INVEC2_singleBinAtBoundaryLast() public {
-        uint256 cost = sys.core.calculateOpenCost(
-            MARKET_ID,
-            int256(uint256(NUM_BINS - 1)),
-            int256(uint256(NUM_BINS)),
-            uint128(SMALL_QUANTITY)
-        );
+        uint256 cost = sys.core
+            .calculateOpenCost(
+                MARKET_ID, int256(uint256(NUM_BINS - 1)), int256(uint256(NUM_BINS)), uint128(SMALL_QUANTITY)
+            );
         assertGt(cost, 0, "INV-EC-2: last bin buy must have positive cost");
     }
 

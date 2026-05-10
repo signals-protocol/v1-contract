@@ -6,9 +6,10 @@ import "./ForkBaseTest.sol";
 /// @title ForkRedstoneFFI
 /// @notice Minimal FFI bridge for advisory primary-settlement fork tests.
 abstract contract ForkRedstoneFFI is ForkBaseTest {
-    function _tryBuildPrimarySettlementCalldata(
-        uint256 marketId
-    ) internal returns (bool ok, bytes memory fullCalldata) {
+    function _tryBuildPrimarySettlementCalldata(uint256 marketId)
+        internal
+        returns (bool ok, bytes memory fullCalldata)
+    {
         try this.__buildPrimarySettlementCalldata(marketId) returns (bytes memory data) {
             return (true, data);
         } catch {
@@ -23,7 +24,7 @@ abstract contract ForkRedstoneFFI is ForkBaseTest {
             return false;
         }
 
-        (ok, ) = address(core).call(fullCalldata);
+        (ok,) = address(core).call(fullCalldata);
     }
 
     function __buildPrimarySettlementCalldata(uint256 marketId) external returns (bytes memory fullCalldata) {

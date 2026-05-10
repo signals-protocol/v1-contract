@@ -60,20 +60,11 @@ contract FlowTest is TradeModuleDeployer {
         // Deploy system with tickSpacing=2
         MarketConfig[] memory markets = new MarketConfig[](1);
         markets[0] = MarketConfig({
-            numBins: 4,
-            tickSpacing: 2,
-            minTick: 0,
-            maxTick: 8,
-            endOffset: 10_000,
-            liquidityParameter: WAD
+            numBins: 4, tickSpacing: 2, minTick: 0, maxTick: 8, endOffset: 10_000, liquidityParameter: WAD
         });
         TradeModuleSystem memory sys2 = deployTradeModuleSystem(
             DeployOptions({
-                markets: markets,
-                userCount: 1,
-                fundAmount: 100_000e6,
-                submitWindow: 300,
-                settlementWindow: 60
+                markets: markets, userCount: 1, fundAmount: 100_000e6, submitWindow: 300, settlementWindow: 60
             })
         );
         vm.prank(sys2.users[0]);
@@ -85,20 +76,11 @@ contract FlowTest is TradeModuleDeployer {
         // Deploy system with unseeded market
         MarketConfig[] memory markets = new MarketConfig[](1);
         markets[0] = MarketConfig({
-            numBins: 4,
-            tickSpacing: 1,
-            minTick: 0,
-            maxTick: 4,
-            endOffset: 10_000,
-            liquidityParameter: WAD
+            numBins: 4, tickSpacing: 1, minTick: 0, maxTick: 4, endOffset: 10_000, liquidityParameter: WAD
         });
         TradeModuleSystem memory sys2 = deployTradeModuleSystem(
             DeployOptions({
-                markets: markets,
-                userCount: 1,
-                fundAmount: 100_000e6,
-                submitWindow: 300,
-                settlementWindow: 60
+                markets: markets, userCount: 1, fundAmount: 100_000e6, submitWindow: 300, settlementWindow: 60
             })
         );
 
@@ -207,20 +189,11 @@ contract FlowTest is TradeModuleDeployer {
         // Deploy with 1% fee
         MarketConfig[] memory markets = new MarketConfig[](1);
         markets[0] = MarketConfig({
-            numBins: 4,
-            tickSpacing: 1,
-            minTick: 0,
-            maxTick: 4,
-            endOffset: 10_000,
-            liquidityParameter: WAD
+            numBins: 4, tickSpacing: 1, minTick: 0, maxTick: 4, endOffset: 10_000, liquidityParameter: WAD
         });
         TradeModuleSystem memory sys2 = deployTradeModuleSystem(
             DeployOptions({
-                markets: markets,
-                userCount: 1,
-                fundAmount: 100_000e6,
-                submitWindow: 300,
-                settlementWindow: 60
+                markets: markets, userCount: 1, fundAmount: 100_000e6, submitWindow: 300, settlementWindow: 60
             })
         );
 
@@ -278,21 +251,11 @@ contract FlowTest is TradeModuleDeployer {
 
     function test_revertsTradeAfterMarketEnd() public {
         MarketConfig[] memory markets = new MarketConfig[](1);
-        markets[0] = MarketConfig({
-            numBins: 4,
-            tickSpacing: 1,
-            minTick: 0,
-            maxTick: 4,
-            endOffset: 50,
-            liquidityParameter: WAD
-        });
+        markets[0] =
+            MarketConfig({numBins: 4, tickSpacing: 1, minTick: 0, maxTick: 4, endOffset: 50, liquidityParameter: WAD});
         TradeModuleSystem memory sys2 = deployTradeModuleSystem(
             DeployOptions({
-                markets: markets,
-                userCount: 1,
-                fundAmount: 100_000e6,
-                submitWindow: 300,
-                settlementWindow: 60
+                markets: markets, userCount: 1, fundAmount: 100_000e6, submitWindow: 300, settlementWindow: 60
             })
         );
         ISignalsCore.Market memory m = sys2.core.harnessGetMarket(1);
@@ -306,20 +269,11 @@ contract FlowTest is TradeModuleDeployer {
     function test_revertsTradeBeforeMarketStart() public {
         MarketConfig[] memory markets = new MarketConfig[](1);
         markets[0] = MarketConfig({
-            numBins: 4,
-            tickSpacing: 1,
-            minTick: 0,
-            maxTick: 4,
-            endOffset: 10_000,
-            liquidityParameter: WAD
+            numBins: 4, tickSpacing: 1, minTick: 0, maxTick: 4, endOffset: 10_000, liquidityParameter: WAD
         });
         TradeModuleSystem memory sys2 = deployTradeModuleSystem(
             DeployOptions({
-                markets: markets,
-                userCount: 1,
-                fundAmount: 100_000e6,
-                submitWindow: 300,
-                settlementWindow: 60
+                markets: markets, userCount: 1, fundAmount: 100_000e6, submitWindow: 300, settlementWindow: 60
             })
         );
         // Overwrite start to future

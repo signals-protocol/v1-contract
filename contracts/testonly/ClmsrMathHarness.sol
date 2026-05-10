@@ -31,30 +31,27 @@ contract ClmsrMathHarness {
         return tree.getRangeSum(loBin, hiBin);
     }
 
-    function quoteBuy(
-        uint256 alpha,
-        uint32 loBin,
-        uint32 hiBin,
-        uint256 quantityWad
-    ) external view returns (uint256 costWad) {
+    function quoteBuy(uint256 alpha, uint32 loBin, uint32 hiBin, uint256 quantityWad)
+        external
+        view
+        returns (uint256 costWad)
+    {
         costWad = ClmsrMath.calculateTradeCost(tree, alpha, loBin, hiBin, quantityWad);
     }
 
-    function quoteSell(
-        uint256 alpha,
-        uint32 loBin,
-        uint32 hiBin,
-        uint256 quantityWad
-    ) external view returns (uint256 proceedsWad) {
+    function quoteSell(uint256 alpha, uint32 loBin, uint32 hiBin, uint256 quantityWad)
+        external
+        view
+        returns (uint256 proceedsWad)
+    {
         proceedsWad = ClmsrMath.calculateSellProceeds(tree, alpha, loBin, hiBin, quantityWad);
     }
 
-    function quantityFromCost(
-        uint256 alpha,
-        uint32 loBin,
-        uint32 hiBin,
-        uint256 costWad
-    ) external view returns (uint256 quantityWad) {
+    function quantityFromCost(uint256 alpha, uint32 loBin, uint32 hiBin, uint256 costWad)
+        external
+        view
+        returns (uint256 quantityWad)
+    {
         quantityWad = ClmsrMath.calculateQuantityFromCost(tree, alpha, loBin, hiBin, costWad);
     }
 
@@ -71,19 +68,19 @@ contract ClmsrMathHarness {
         return ClmsrMath.maxSafeChunkQuantity(alpha);
     }
 
-    function computeBuyCostFromSumChange(
-        uint256 alpha,
-        uint256 sumBefore,
-        uint256 sumAfter
-    ) external pure returns (uint256) {
+    function computeBuyCostFromSumChange(uint256 alpha, uint256 sumBefore, uint256 sumAfter)
+        external
+        pure
+        returns (uint256)
+    {
         return ClmsrMath.computeBuyCostFromSumChange(alpha, sumBefore, sumAfter);
     }
 
-    function computeSellProceedsFromSumChange(
-        uint256 alpha,
-        uint256 sumBefore,
-        uint256 sumAfter
-    ) external pure returns (uint256) {
+    function computeSellProceedsFromSumChange(uint256 alpha, uint256 sumBefore, uint256 sumAfter)
+        external
+        pure
+        returns (uint256)
+    {
         return ClmsrMath.computeSellProceedsFromSumChange(alpha, sumBefore, sumAfter);
     }
 }

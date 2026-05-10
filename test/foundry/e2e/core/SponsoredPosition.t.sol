@@ -58,17 +58,9 @@ contract SponsoredPositionTest is FullSystemDeployer {
         uint64 settlement = uint64(block.timestamp + 60);
 
         vm.prank(sys.owner);
-        return
-            sys.core.createMarketUniform(
-                0,
-                int256(uint256(NUM_BINS)),
-                1,
-                start,
-                end,
-                settlement,
-                NUM_BINS,
-                WAD,
-                address(sys.feePolicy)
+        return sys.core
+            .createMarketUniform(
+                0, int256(uint256(NUM_BINS)), 1, start, end, settlement, NUM_BINS, WAD, address(sys.feePolicy)
             );
     }
 
@@ -348,7 +340,7 @@ contract SponsoredPositionTest is FullSystemDeployer {
         sys.core.requestSettlementChunks(marketId, 5);
 
         // Wait for claim delay
-        (, , , uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
+        (,,, uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
         vm.warp(claimOpen);
 
         uint256 sponsorBefore = sys.payment.balanceOf(sponsor);
@@ -385,7 +377,7 @@ contract SponsoredPositionTest is FullSystemDeployer {
         vm.prank(sys.owner);
         sys.core.requestSettlementChunks(marketId, 5);
 
-        (, , , uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
+        (,,, uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
         vm.warp(claimOpen);
 
         uint256 sponsorBefore = sys.payment.balanceOf(sponsor);
@@ -410,7 +402,7 @@ contract SponsoredPositionTest is FullSystemDeployer {
         vm.prank(sys.owner);
         sys.core.requestSettlementChunks(marketId, 5);
 
-        (, , , uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
+        (,,, uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
         vm.warp(claimOpen);
 
         uint256 userBefore = sys.payment.balanceOf(otherUser);
@@ -441,7 +433,7 @@ contract SponsoredPositionTest is FullSystemDeployer {
         vm.prank(sys.owner);
         sys.core.requestSettlementChunks(marketId, 5);
 
-        (, , , uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
+        (,,, uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
         vm.warp(claimOpen);
 
         uint256 sponsorBefore = sys.payment.balanceOf(sponsor);
@@ -483,7 +475,7 @@ contract SponsoredPositionTest is FullSystemDeployer {
         vm.prank(sys.owner);
         sys.core.requestSettlementChunks(marketId, 5);
 
-        (, , , uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
+        (,,, uint64 claimOpen) = sys.core.getSettlementWindows(marketId);
         vm.warp(claimOpen);
 
         // Claim sponsored

@@ -137,55 +137,30 @@ abstract contract TradeModuleDeployer is SignalsBaseTest {
     function deployMinimalTradeSystem() internal returns (TradeModuleSystem memory) {
         MarketConfig[] memory markets = new MarketConfig[](1);
         markets[0] = MarketConfig({
-            numBins: 4,
-            tickSpacing: 1,
-            minTick: 0,
-            maxTick: 4,
-            endOffset: 10_000,
-            liquidityParameter: WAD
+            numBins: 4, tickSpacing: 1, minTick: 0, maxTick: 4, endOffset: 10_000, liquidityParameter: WAD
         });
 
-        return
-            deployTradeModuleSystem(
-                DeployOptions({
-                    markets: markets,
-                    userCount: 1,
-                    fundAmount: 100_000e6,
-                    submitWindow: 300,
-                    settlementWindow: 60
-                })
-            );
+        return deployTradeModuleSystem(
+            DeployOptions({
+                markets: markets, userCount: 1, fundAmount: 100_000e6, submitWindow: 300, settlementWindow: 60
+            })
+        );
     }
 
     function deployMultiMarketSystem() internal returns (TradeModuleSystem memory) {
         MarketConfig[] memory markets = new MarketConfig[](2);
         markets[0] = MarketConfig({
-            numBins: 4,
-            tickSpacing: 1,
-            minTick: 0,
-            maxTick: 4,
-            endOffset: 10_000,
-            liquidityParameter: WAD
+            numBins: 4, tickSpacing: 1, minTick: 0, maxTick: 4, endOffset: 10_000, liquidityParameter: WAD
         });
         markets[1] = MarketConfig({
-            numBins: 4,
-            tickSpacing: 1,
-            minTick: -2,
-            maxTick: 2,
-            endOffset: 10_000,
-            liquidityParameter: WAD
+            numBins: 4, tickSpacing: 1, minTick: -2, maxTick: 2, endOffset: 10_000, liquidityParameter: WAD
         });
 
-        return
-            deployTradeModuleSystem(
-                DeployOptions({
-                    markets: markets,
-                    userCount: 5,
-                    fundAmount: 100_000e6,
-                    submitWindow: 300,
-                    settlementWindow: 60
-                })
-            );
+        return deployTradeModuleSystem(
+            DeployOptions({
+                markets: markets, userCount: 5, fundAmount: 100_000e6, submitWindow: 300, settlementWindow: 60
+            })
+        );
     }
 
     function deployLargeBinSystem(uint32 numBins) internal returns (TradeModuleSystem memory) {
@@ -199,15 +174,10 @@ abstract contract TradeModuleDeployer is SignalsBaseTest {
             liquidityParameter: WAD
         });
 
-        return
-            deployTradeModuleSystem(
-                DeployOptions({
-                    markets: markets,
-                    userCount: 5,
-                    fundAmount: 1_000_000e6,
-                    submitWindow: 300,
-                    settlementWindow: 60
-                })
-            );
+        return deployTradeModuleSystem(
+            DeployOptions({
+                markets: markets, userCount: 5, fundAmount: 1_000_000e6, submitWindow: 300, settlementWindow: 60
+            })
+        );
     }
 }
