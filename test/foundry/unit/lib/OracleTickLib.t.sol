@@ -29,6 +29,16 @@ contract OracleTickLibTest is SignalsBaseTest {
         assertEq(harness.toSettlementTick(10_000), 100);
     }
 
+    function test_zeroTickScaleCausesEvmPanic() public {
+        // All production call sites guard tickScale before entering the lib:
+        // submitSettlementSample, finalizePrimarySettlement, and finalizeSecondarySettlement.
+        // A future unguarded caller would hit the EVM division-by-zero panic here.
+        _setMarket(0, 10, 1, 0);
+
+        vm.expectRevert();
+        harness.toSettlementTick(2_000_000);
+    }
+
     function testFuzz_btcScaleParityWithLegacyAlgorithm(int256 settlementValue) public {
         settlementValue = bound(settlementValue, -1_000_000_000_000, 1_000_000_000_000);
         _setMarket(-1000, 1000, 10, 1_000_000);
