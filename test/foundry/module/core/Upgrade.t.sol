@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "../../base/SignalsBaseTest.sol";
+import "../../base/FullSystemDeployer.sol";
 import {SignalsErrors as SE} from "../../../../contracts/errors/SignalsErrors.sol";
 
 import "../../../../contracts/testonly/SignalsUSDToken.sol";
@@ -12,10 +12,13 @@ import "../../../../contracts/modules/MarketLifecycleModule.sol";
 import "../../../../contracts/modules/LPVaultModule.sol";
 import "../../../../contracts/modules/OracleModule.sol";
 import "../../../../contracts/modules/RiskModule.sol";
+import "../../../../contracts/interfaces/ISignalsCore.sol";
 
 /// @title Access / Upgrade Guards Foundry Tests
 /// @notice Converted from test/module/core/upgrade.spec.ts (8 tests)
-contract UpgradeTest is SignalsBaseTest {
+contract UpgradeTest is FullSystemDeployer {
+    event OracleConfigBackfilled(uint256 marketCount);
+
     // ============================================================
     // Test: prevents re-initialization of SignalsPosition proxy
     // ============================================================
@@ -66,7 +69,8 @@ contract UpgradeTest is SignalsBaseTest {
             10, // numBins
             WAD, // liquidityParameter
             address(0), // feePolicy
-            address(0) // seedData
+            address(0), // seedData
+            ISignalsCore.MarketOracleConfig({feedId: bytes32("BTC"), feedDecimals: 8, tickScale: 1_000_000})
         );
     }
 
@@ -75,8 +79,6 @@ contract UpgradeTest is SignalsBaseTest {
 
         vm.expectRevert(SE.NotDelegated.selector);
         oracleModule.setRedstoneConfig(
-            bytes32("TEST"),
-            8, // feedDecimals
             3600, // maxSampleDistance
             300 // futureTolerance
         );
@@ -108,5 +110,42 @@ contract UpgradeTest is SignalsBaseTest {
         vm.prank(attacker);
         vm.expectRevert();
         SignalsPosition(address(proxy)).upgradeToAndCall(address(newImpl), "");
+    }
+
+    function test_reinitializeV2BackfillsExistingMarkets() public {
+        FullSystem memory sys = deployFullSystem();
+        uint64 now_ = uint64(block.timestamp);
+
+        vm.prank(sys.owner);
+        uint256 marketId =
+            sys.core.createMarketUniform(0, 4, 1, now_ + 10, now_ + 100, now_ + 150, 4, WAD, address(sys.feePolicy));
+
+        ISignalsCore.Market memory market = sys.core.harnessGetMarket(marketId);
+        market.feedId = bytes32(0);
+        market.feedDecimals = 0;
+        market.tickScale = 0;
+        vm.prank(sys.owner);
+        sys.core.harnessSetMarket(marketId, market);
+
+        vm.prank(sys.owner);
+        vm.expectEmit(false, false, false, true, address(sys.core));
+        emit OracleConfigBackfilled(1);
+        sys.core.reinitializeV2();
+
+        market = sys.core.harnessGetMarket(marketId);
+        assertEq(market.feedId, bytes32("BTC"));
+        assertEq(market.feedDecimals, 8);
+        assertEq(market.tickScale, 1_000_000);
+    }
+
+    function test_reinitializeV2CannotRunTwice() public {
+        FullSystem memory sys = deployFullSystem();
+
+        vm.prank(sys.owner);
+        sys.core.reinitializeV2();
+
+        vm.prank(sys.owner);
+        vm.expectRevert();
+        sys.core.reinitializeV2();
     }
 }

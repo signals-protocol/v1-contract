@@ -65,11 +65,9 @@ contract CreateMarket is BaseScript {
             uint64 claimDelay = uint64(vm.parseJsonUint(json, ".settlement.claimDelaySec"));
             core.setSettlementTimeline(submitWindow, pendingOps, claimDelay);
 
-            string memory feedId = vm.parseJsonString(json, ".redstone.feedId");
-            uint8 feedDecimals = uint8(vm.parseJsonUint(json, ".redstone.feedDecimals"));
             uint64 maxSampleDist = uint64(vm.parseJsonUint(json, ".redstone.maxSampleDistanceSec"));
             uint64 futureTol = uint64(vm.parseJsonUint(json, ".redstone.futureToleranceSec"));
-            core.setRedstoneConfig(_toBytes32(feedId), feedDecimals, maxSampleDist, futureTol);
+            core.setRedstoneConfig(maxSampleDist, futureTol);
         }
 
         // ── Step 6-9: Funding ───────────────────────────────────────────
@@ -175,7 +173,8 @@ contract CreateMarket is BaseScript {
             numBins,
             alphaWad,
             feePolicyAddress,
-            address(seedData)
+            address(seedData),
+            ISignalsCore.MarketOracleConfig({feedId: bytes32("BTC"), feedDecimals: 8, tickScale: 1_000_000})
         );
 
         console.log("[create-market] marketId=%s", marketId);

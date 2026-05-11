@@ -43,6 +43,16 @@ interface ISignalsCore {
         // ΔEₜ := E_ent(q₀,t) - αₜ ln n
         // Used in batch processing: grantNeed > ΔEₜ → revert
         uint256 deltaEt;
+        // Per-market oracle configuration
+        bytes32 feedId;
+        uint8 feedDecimals;
+        uint64 tickScale;
+    }
+
+    struct MarketOracleConfig {
+        bytes32 feedId;
+        uint8 feedDecimals;
+        uint64 tickScale;
     }
 
     // Trade / lifecycle entrypoints
@@ -119,7 +129,8 @@ interface ISignalsCore {
         uint32 numBins,
         uint256 liquidityParameter,
         address feePolicy,
-        address seedData
+        address seedData,
+        MarketOracleConfig calldata oracleConfig
     ) external returns (uint256 marketId);
 
     function finalizePrimarySettlement(uint256 marketId) external;
@@ -137,8 +148,7 @@ interface ISignalsCore {
     function submitSettlementSample(uint256 marketId) external;
 
     /// @notice Configure Redstone oracle parameters
-    function setRedstoneConfig(bytes32 feedId, uint8 feedDecimals, uint64 maxSampleDistance, uint64 futureTolerance)
-        external;
+    function setRedstoneConfig(uint64 maxSampleDistance, uint64 futureTolerance) external;
 
     /// @notice Set settlement timeline parameters
     function setSettlementTimeline(uint64 sampleWindow, uint64 opsWindow, uint64 claimDelay) external;

@@ -53,7 +53,10 @@ contract OracleTest is FullSystemDeployer {
             initialRootSum: 4 * WAD,
             accumulatedFees: 0,
             minFactor: WAD,
-            deltaEt: 0
+            deltaEt: 0,
+            feedId: bytes32("BTC"),
+            feedDecimals: 8,
+            tickScale: 1_000_000
         });
         vm.prank(sys.owner);
         sys.core.harnessSetMarket(1, market);
@@ -77,6 +80,17 @@ contract OracleTest is FullSystemDeployer {
         // Submit without payload — just call submitSettlementSample with no Redstone data
         vm.prank(sys.owner);
         vm.expectRevert(); // CalldataMustHaveValidPayload
+        sys.core.submitSettlementSample(1);
+    }
+
+    function test_submitSettlementSampleRevertsWhenOracleConfigMissing() public {
+        ISignalsCore.Market memory market = sys.core.harnessGetMarket(1);
+        market.feedId = bytes32(0);
+        vm.prank(sys.owner);
+        sys.core.harnessSetMarket(1, market);
+
+        vm.warp(uint256(tSet) + 1);
+        vm.expectRevert(abi.encodeWithSelector(SE.OracleConfigMissing.selector, 1));
         sys.core.submitSettlementSample(1);
     }
 
@@ -337,6 +351,21 @@ contract OracleTest is FullSystemDeployer {
         sys.core.finalizePrimarySettlement(1);
     }
 
+    function test_finalizePrimarySettlementRevertsWhenOracleConfigMissing() public {
+        vm.prank(sys.owner);
+        sys.core.harnessSetSettlementCandidate(1, 2_000_000, tSet);
+
+        ISignalsCore.Market memory market = sys.core.harnessGetMarket(1);
+        market.tickScale = 0;
+        vm.prank(sys.owner);
+        sys.core.harnessSetMarket(1, market);
+
+        vm.warp(uint256(tSet) + SUBMIT_WINDOW + 1);
+        vm.prank(sys.owner);
+        vm.expectRevert(abi.encodeWithSelector(SE.OracleConfigMissing.selector, 1));
+        sys.core.finalizePrimarySettlement(1);
+    }
+
     // ============================================================
     // getSettlementPrice
     // ============================================================
@@ -350,17 +379,13 @@ contract OracleTest is FullSystemDeployer {
     // setRedstoneConfig
     // ============================================================
 
-    function test_setRedstoneConfigUpdatesFeedIdAndParams() public {
-        bytes32 newFeedId = bytes32("NEW_FEED");
-        uint8 newDecimals = 6;
+    function test_setRedstoneConfigUpdatesTimingParams() public {
         uint64 newMaxDistance = 1200;
         uint64 newFutureTolerance = 120;
 
         vm.prank(sys.owner);
-        sys.core.setRedstoneConfig(newFeedId, newDecimals, newMaxDistance, newFutureTolerance);
+        sys.core.setRedstoneConfig(newMaxDistance, newFutureTolerance);
 
-        assertEq(sys.core.redstoneFeedId(), newFeedId);
-        assertEq(sys.core.redstoneFeedDecimals(), newDecimals);
         assertEq(sys.core.maxSampleDistance(), newMaxDistance);
         assertEq(sys.core.futureTolerance(), newFutureTolerance);
     }

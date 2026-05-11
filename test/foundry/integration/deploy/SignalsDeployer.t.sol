@@ -98,8 +98,6 @@ contract SignalsDeployerTest is SignalsBaseTest {
             settlementSubmitWindow: 60,
             pendingOpsWindow: 30,
             claimDelaySeconds: 90,
-            redstoneFeedId: bytes32("BTC"),
-            redstoneFeedDecimals: 8,
             maxSampleDistance: 600,
             futureTolerance: 60,
             lambda: WAD / 10,

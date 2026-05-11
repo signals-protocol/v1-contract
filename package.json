@@ -10,7 +10,7 @@
     "snapshot": "forge snapshot --no-match-test 'testFuzz|invariant_'",
     "snapshot:check": "forge snapshot --no-match-test 'testFuzz|invariant_' --check --tolerance 15",
     "test:fork:baseline": "FOUNDRY_PROFILE=fork FORK_ENV=prod forge test --match-path 'test/foundry/fork/**/*.sol' --no-match-path 'test/foundry/fork/live/**' -vvv",
-    "test:fork:advisory:prod": "FOUNDRY_PROFILE=fork FORK_ENV=prod forge test --match-path 'test/foundry/fork/live/**' -vvv",
+    "test:fork:advisory:prod": "FORK_SKIP_V2_UPGRADE=true FOUNDRY_PROFILE=fork FORK_ENV=prod forge test --match-path 'test/foundry/fork/live/**' -vvv",
     "test:fork:dev": "FOUNDRY_PROFILE=fork FORK_ENV=dev forge test --match-path 'test/foundry/fork/**/*.sol' --no-match-path 'test/foundry/fork/live/**' -vvv",
     "test:fork:prod": "yarn test:fork:baseline",
     "test:cov": "FOUNDRY_PROFILE=coverage forge coverage --report lcov",

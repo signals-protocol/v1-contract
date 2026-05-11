@@ -22,6 +22,11 @@ contract SignalsCoreHarness is SignalsCore {
         markets[marketId] = market;
     }
 
+    function harnessSetSettlementCandidate(uint256 marketId, int256 value, uint64 priceTimestamp) external onlyOwner {
+        settlementOracleState[marketId].candidateValue = value;
+        settlementOracleState[marketId].candidatePriceTimestamp = priceTimestamp;
+    }
+
     function harnessSeedTree(uint256 marketId, uint256[] calldata factors) external onlyOwner {
         LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
         if (tree.size == 0) {
@@ -217,6 +222,33 @@ contract SignalsCoreHarness is SignalsCore {
     // Backward-compatible createMarket for tests
     // ============================================================
 
+    function createMarket(
+        int256 minTick,
+        int256 maxTick,
+        int256 tickSpacing,
+        uint64 startTimestamp,
+        uint64 endTimestamp,
+        uint64 settlementTimestamp,
+        uint32 numBins,
+        uint256 liquidityParameter,
+        address feePolicy,
+        address seedData
+    ) public returns (uint256 marketId) {
+        return SignalsCore.createMarket(
+            minTick,
+            maxTick,
+            tickSpacing,
+            startTimestamp,
+            endTimestamp,
+            settlementTimestamp,
+            numBins,
+            liquidityParameter,
+            feePolicy,
+            seedData,
+            ISignalsCore.MarketOracleConfig({feedId: bytes32("BTC"), feedDecimals: 8, tickScale: 1_000_000})
+        );
+    }
+
     /// @notice Create market with uniform prior (backward compatible for tests)
     /// @dev Generates uniform factors (all 1 WAD) internally and wraps them in SeedData.
     function createMarketUniform(
@@ -247,7 +279,8 @@ contract SignalsCoreHarness is SignalsCore {
             numBins,
             liquidityParameter,
             feePolicy,
-            address(seedData)
+            address(seedData),
+            ISignalsCore.MarketOracleConfig({feedId: bytes32("BTC"), feedDecimals: 8, tickScale: 1_000_000})
         );
         seedNextChunks(marketId, numBins);
         return marketId;

@@ -23,8 +23,6 @@ contract DeployIntegration is Script {
     struct IntegrationConfig {
         uint256 submitWindowSec;
         uint256 pendingOpsWindowSec;
-        string feedId;
-        uint256 feedDecimals;
         uint256 maxSampleDistanceSec;
         uint256 futureToleranceSec;
         uint256 lambdaWad;
@@ -90,8 +88,6 @@ contract DeployIntegration is Script {
             settlementSubmitWindow: uint64(cfg.submitWindowSec),
             pendingOpsWindow: uint64(cfg.pendingOpsWindowSec),
             claimDelaySeconds: uint64(claimDelay),
-            redstoneFeedId: bytes32(bytes(cfg.feedId)),
-            redstoneFeedDecimals: uint8(cfg.feedDecimals),
             maxSampleDistance: uint64(cfg.maxSampleDistanceSec),
             futureTolerance: uint64(cfg.futureToleranceSec),
             lambda: cfg.lambdaWad,
@@ -151,8 +147,6 @@ contract DeployIntegration is Script {
 
         cfg.submitWindowSec = vm.parseJsonUint(json, ".settlement.submitWindowSec");
         cfg.pendingOpsWindowSec = vm.parseJsonUint(json, ".settlement.pendingOpsWindowSec");
-        cfg.feedId = vm.parseJsonString(json, ".redstone.feedId");
-        cfg.feedDecimals = vm.parseJsonUint(json, ".redstone.feedDecimals");
         cfg.maxSampleDistanceSec = vm.parseJsonUint(json, ".redstone.maxSampleDistanceSec");
         cfg.futureToleranceSec = vm.parseJsonUint(json, ".redstone.futureToleranceSec");
 

@@ -14,12 +14,13 @@ import {console} from "forge-std/console.sol";
 /// @notice Env vars:
 ///   ENV          — dev|prod (required)
 ///   PRIVATE_KEY  — deployer key (required)
-///   MODULES      — comma-separated list: trade,lifecycle,oracle,risk,vault (default: trade,lifecycle,vault)
+///   MODULES      — comma-separated list: trade,lifecycle,oracle,risk,vault (default: lifecycle,oracle)
 contract PrepareSafeUpgrade is BaseScript {
     function run() external {
         _enforceChainId();
 
         address coreProxy = _contractAddr("SignalsCoreProxy");
+        address multiSendAddress = _multiSendAddress();
 
         // Parse which modules to deploy
         bool deployTrade;
@@ -93,11 +94,17 @@ contract PrepareSafeUpgrade is BaseScript {
         bytes memory setModulesCalldata = abi.encodeCall(
             SignalsCore.setModules, (tradeModule, lifecycleModule, riskModule, vaultModule, oracleModule)
         );
+        bytes memory reinitializeCalldata = abi.encodeCall(SignalsCore.reinitializeV2, ());
         bytes memory upgradeToAndCallCalldata =
-            abi.encodeWithSignature("upgradeToAndCall(address,bytes)", newCoreImpl, setModulesCalldata);
+            abi.encodeWithSignature("upgradeToAndCall(address,bytes)", newCoreImpl, reinitializeCalldata);
+        bytes memory packedTransactions = bytes.concat(
+            _encodeMultiSendTx(coreProxy, upgradeToAndCallCalldata), _encodeMultiSendTx(coreProxy, setModulesCalldata)
+        );
+        bytes memory multiSendCalldata = abi.encodeWithSignature("multiSend(bytes)", packedTransactions);
 
         // 5. Write plan JSON
         string memory plan = _buildPlanJson(
+            multiSendAddress,
             coreProxy,
             newCoreImpl,
             tradeModule,
@@ -107,6 +114,7 @@ contract PrepareSafeUpgrade is BaseScript {
             vaultModule,
             setModulesCalldata,
             upgradeToAndCallCalldata,
+            multiSendCalldata,
             deployer
         );
         string memory releasesDir = string.concat("releases/", envName);
@@ -118,14 +126,12 @@ contract PrepareSafeUpgrade is BaseScript {
         // 6. Write copy files for Safe manual execution
         string memory copyDir = string.concat(releasesDir, "/safe-upgrade-copy");
         vm.createDir(copyDir, true);
-        vm.writeFile(string.concat(copyDir, "/01-to.txt"), vm.toString(coreProxy));
-        vm.writeFile(string.concat(copyDir, "/02-value.txt"), "0");
-        vm.writeFile(
-            string.concat(copyDir, "/03-method.txt"), "upgradeToAndCall(address newImplementation, bytes data)"
-        );
-        vm.writeFile(string.concat(copyDir, "/04-arg-newImplementation.txt"), vm.toString(newCoreImpl));
-        vm.writeFile(string.concat(copyDir, "/05-arg-data-setModulesCalldata.txt"), vm.toString(setModulesCalldata));
-        vm.writeFile(string.concat(copyDir, "/06-calldata-upgradeToAndCall.txt"), vm.toString(upgradeToAndCallCalldata));
+        vm.writeFile(string.concat(copyDir, "/01-target.txt"), vm.toString(multiSendAddress));
+        vm.writeFile(string.concat(copyDir, "/02-arg-operation.txt"), "1");
+        vm.writeFile(string.concat(copyDir, "/03-arg-value.txt"), "0");
+        vm.writeFile(string.concat(copyDir, "/04-arg-data-multiSendCalldata.txt"), vm.toString(multiSendCalldata));
+        vm.writeFile(string.concat(copyDir, "/sub-tx-1-upgradeToAndCall.txt"), vm.toString(upgradeToAndCallCalldata));
+        vm.writeFile(string.concat(copyDir, "/sub-tx-2-setModules.txt"), vm.toString(setModulesCalldata));
         console.log("[prepare-safe-upgrade] copy files: %s", copyDir);
 
         // 7. Print Safe manual execution instructions
@@ -133,9 +139,8 @@ contract PrepareSafeUpgrade is BaseScript {
         console.log("Safe Manual Execution [OWNER ONLY]");
         console.log("==============================================");
         console.log("1) Safe -> New Transaction -> Contract Interaction");
-        console.log("2) To = Core proxy, Value = 0");
-        console.log("3) Paste ABI, choose upgradeToAndCall");
-        console.log("4) Fill args or paste calldata in Data field");
+        console.log("2) To = MultiSend, Value = 0, Operation = DelegateCall");
+        console.log("3) Paste multiSend(bytes) calldata in Data field");
 
         // 8. Write script output for post-deploy.ts
         // NOTE: LazyMulSegmentTree address comes from broadcast JSON (auto-deployed library),
@@ -157,8 +162,8 @@ contract PrepareSafeUpgrade is BaseScript {
     function _parseModules() internal view returns (bool trade, bool lifecycle, bool oracle, bool risk, bool vault) {
         string memory raw = vm.envOr("MODULES", string(""));
         if (bytes(raw).length == 0) {
-            // Default: trade, lifecycle, vault
-            return (true, true, false, false, true);
+            // SIG-755 cutover requires lifecycle + oracle together.
+            return (false, true, true, false, false);
         }
 
         // Parse comma-separated list
@@ -169,6 +174,19 @@ contract PrepareSafeUpgrade is BaseScript {
         vault = _containsModule(raw, "vault");
 
         require(trade || lifecycle || oracle || risk || vault, "MODULES set but no valid module parsed");
+        require(lifecycle && oracle, "MODULES must include lifecycle,oracle for SIG-755");
+    }
+
+    function _multiSendAddress() internal view returns (address) {
+        string memory configPath = string.concat("script/config/deploy-", envName, ".json");
+        string memory json = vm.readFile(configPath);
+        address multiSend = vm.parseJsonAddress(json, ".safe.multiSendAddress");
+        require(multiSend != address(0), "safe.multiSendAddress missing");
+        return multiSend;
+    }
+
+    function _encodeMultiSendTx(address to, bytes memory data) internal pure returns (bytes memory) {
+        return abi.encodePacked(uint8(0), to, uint256(0), uint256(data.length), data);
     }
 
     function _containsModule(string memory raw, string memory module) internal pure returns (bool) {
@@ -196,6 +214,7 @@ contract PrepareSafeUpgrade is BaseScript {
     }
 
     function _buildPlanJson(
+        address multiSendAddress,
         address coreProxy,
         address newCoreImpl,
         address tradeModule,
@@ -205,6 +224,7 @@ contract PrepareSafeUpgrade is BaseScript {
         address vaultModule,
         bytes memory setModulesCalldata,
         bytes memory upgradeToAndCallCalldata,
+        bytes memory multiSendCalldata,
         address deployer
     ) internal returns (string memory) {
         // Build deployed object
@@ -215,16 +235,30 @@ contract PrepareSafeUpgrade is BaseScript {
         deployed = vm.serializeAddress("deployed", "RiskModule", riskModule);
         deployed = vm.serializeAddress("deployed", "LPVaultModule", vaultModule);
 
-        // Build safe.args object
-        string memory safeArgs = vm.serializeAddress("safe_args", "newImplementation", newCoreImpl);
-        safeArgs = vm.serializeString("safe_args", "data", vm.toString(setModulesCalldata));
+        string memory subTx1 = vm.serializeAddress("sub_tx_1", "to", coreProxy);
+        subTx1 = vm.serializeString("sub_tx_1", "value", "0");
+        subTx1 = vm.serializeUint("sub_tx_1", "operation", 0);
+        subTx1 = vm.serializeString("sub_tx_1", "data", vm.toString(upgradeToAndCallCalldata));
+
+        string memory subTx2 = vm.serializeAddress("sub_tx_2", "to", coreProxy);
+        subTx2 = vm.serializeString("sub_tx_2", "value", "0");
+        subTx2 = vm.serializeUint("sub_tx_2", "operation", 0);
+        subTx2 = vm.serializeString("sub_tx_2", "data", vm.toString(setModulesCalldata));
+
+        string memory subTxs = vm.serializeString("sub_transactions", "upgradeToAndCallReinitializeV2", subTx1);
+        subTxs = vm.serializeString("sub_transactions", "setModules", subTx2);
+
+        string memory safeArgs = vm.serializeAddress("safe_args", "to", multiSendAddress);
+        safeArgs = vm.serializeString("safe_args", "value", "0");
+        safeArgs = vm.serializeUint("safe_args", "operation", 1);
+        safeArgs = vm.serializeString("safe_args", "data", vm.toString(multiSendCalldata));
 
         // Build safe object
-        string memory safe = vm.serializeAddress("safe", "to", coreProxy);
+        string memory safe = vm.serializeAddress("safe", "to", multiSendAddress);
         safe = vm.serializeString("safe", "value", "0");
-        safe = vm.serializeString("safe", "method", "upgradeToAndCall(address newImplementation, bytes data)");
-        safe = vm.serializeString("safe", "args", safeArgs);
-        safe = vm.serializeString("safe", "calldata", vm.toString(upgradeToAndCallCalldata));
+        safe = vm.serializeUint("safe", "operation", 1);
+        safe = vm.serializeString("safe", "method", "multiSend(bytes)");
+        safe = vm.serializeString("safe", "calldata", vm.toString(multiSendCalldata));
 
         // Build root
         string memory root = vm.serializeString("plan", "network", envName);
@@ -232,6 +266,8 @@ contract PrepareSafeUpgrade is BaseScript {
         root = vm.serializeAddress("plan", "deployer", deployer);
         root = vm.serializeAddress("plan", "coreProxy", coreProxy);
         root = vm.serializeString("plan", "deployed", deployed);
+        root = vm.serializeString("plan", "sub_transactions", subTxs);
+        root = vm.serializeString("plan", "safe_args", safeArgs);
         root = vm.serializeString("plan", "safe", safe);
 
         return root;

@@ -1,7 +1,7 @@
 {
   "storage": [
     {
-      "astId": 26328,
+      "astId": 593,
       "contract": "contracts/tokens/SignalsLPShare.sol:SignalsLPShare",
       "label": "core",
       "offset": 0,
@@ -9,7 +9,7 @@
       "type": "t_address"
     },
     {
-      "astId": 26331,
+      "astId": 596,
       "contract": "contracts/tokens/SignalsLPShare.sol:SignalsLPShare",
       "label": "asset",
       "offset": 0,

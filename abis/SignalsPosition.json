@@ -1590,6 +1590,11 @@
     },
     {
       "type": "error",
+      "name": "InvalidOracleConfig",
+      "inputs": []
+    },
+    {
+      "type": "error",
       "name": "InvalidPhiSum",
       "inputs": [
         {
@@ -1937,6 +1942,17 @@
       "type": "error",
       "name": "OnlyCore",
       "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "OracleConfigMissing",
+      "inputs": [
+        {
+          "name": "marketId",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
     },
     {
       "type": "error",

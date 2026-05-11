@@ -71,6 +71,10 @@ abstract contract ForkProtocolTest is ForkBaseTest {
         return feePolicy;
     }
 
+    function _btcOracleConfig() internal pure returns (ISignalsCore.MarketOracleConfig memory) {
+        return ISignalsCore.MarketOracleConfig({feedId: bytes32("BTC"), feedDecimals: 8, tickScale: 1_000_000});
+    }
+
     function _deployUniformSeedData(uint32 numBins) internal returns (address) {
         uint256[] memory factors = new uint256[](numBins);
         for (uint32 i = 0; i < numBins; i++) {
@@ -103,7 +107,17 @@ abstract contract ForkProtocolTest is ForkBaseTest {
         address seedData = _deployUniformSeedData(4);
         vm.prank(ownerSafe);
         marketId = core.createMarket(
-            0, 4, 1, startTimestamp, endTimestamp, settlementTimestamp, 4, WAD, _defaultFeePolicy(), seedData
+            0,
+            4,
+            1,
+            startTimestamp,
+            endTimestamp,
+            settlementTimestamp,
+            4,
+            WAD,
+            _defaultFeePolicy(),
+            seedData,
+            _btcOracleConfig()
         );
         vm.prank(ownerSafe);
         core.seedNextChunks(marketId, 4);
@@ -136,7 +150,8 @@ abstract contract ForkProtocolTest is ForkBaseTest {
             numBins,
             alpha,
             _defaultFeePolicy(),
-            seedData
+            seedData,
+            _btcOracleConfig()
         );
         vm.prank(ownerSafe);
         core.seedNextChunks(marketId, numBins);
@@ -164,7 +179,7 @@ abstract contract ForkProtocolTest is ForkBaseTest {
         if (midpointTick > lastValidTick) {
             midpointTick = lastValidTick;
         }
-        return midpointTick * 1_000_000;
+        return midpointTick * int256(uint256(market.tickScale));
     }
 
     function _resolveAmbientBatchMarkets(uint64 batchId) internal {
@@ -186,10 +201,14 @@ abstract contract ForkProtocolTest is ForkBaseTest {
             }
 
             vm.startPrank(ownerSafe);
-            try core.finalizePrimarySettlement(marketId) {}
-            catch {
-                core.markSettlementFailed(marketId);
+            if (market.failed) {
                 core.finalizeSecondarySettlement(marketId, _fallbackSettlementValue(market));
+            } else {
+                try core.finalizePrimarySettlement(marketId) {}
+                catch {
+                    core.markSettlementFailed(marketId);
+                    core.finalizeSecondarySettlement(marketId, _fallbackSettlementValue(market));
+                }
             }
             vm.stopPrank();
 

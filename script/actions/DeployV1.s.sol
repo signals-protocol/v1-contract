@@ -34,8 +34,6 @@ contract DeployV1 is BaseScript {
     struct DeployConfig {
         uint256 submitWindowSec;
         uint256 pendingOpsWindowSec;
-        string feedId;
-        uint256 feedDecimals;
         uint256 maxSampleDistanceSec;
         uint256 futureToleranceSec;
         uint256 lambdaWad;
@@ -169,8 +167,6 @@ contract DeployV1 is BaseScript {
             settlementSubmitWindow: uint64(cfg.submitWindowSec),
             pendingOpsWindow: uint64(cfg.pendingOpsWindowSec),
             claimDelaySeconds: uint64(claimDelay),
-            redstoneFeedId: _toBytes32(cfg.feedId),
-            redstoneFeedDecimals: uint8(cfg.feedDecimals),
             maxSampleDistance: uint64(cfg.maxSampleDistanceSec),
             futureTolerance: uint64(cfg.futureToleranceSec),
             lambda: cfg.lambdaWad,
@@ -243,8 +239,6 @@ contract DeployV1 is BaseScript {
 
         cfg.submitWindowSec = vm.parseJsonUint(json, ".settlement.submitWindowSec");
         cfg.pendingOpsWindowSec = vm.parseJsonUint(json, ".settlement.pendingOpsWindowSec");
-        cfg.feedId = vm.parseJsonString(json, ".redstone.feedId");
-        cfg.feedDecimals = vm.parseJsonUint(json, ".redstone.feedDecimals");
         cfg.maxSampleDistanceSec = vm.parseJsonUint(json, ".redstone.maxSampleDistanceSec");
         cfg.futureToleranceSec = vm.parseJsonUint(json, ".redstone.futureToleranceSec");
 
@@ -455,8 +449,6 @@ contract DeployV1 is BaseScript {
         string memory config = vm.serializeUint("deploy-config", "settlementSubmitWindow", cfg.submitWindowSec);
         config = vm.serializeUint("deploy-config", "pendingOpsWindow", cfg.pendingOpsWindowSec);
         config = vm.serializeUint("deploy-config", "settlementFinalizeDeadline", claimDelay);
-        config = vm.serializeString("deploy-config", "redstoneFeedId", cfg.feedId);
-        config = vm.serializeUint("deploy-config", "redstoneFeedDecimals", cfg.feedDecimals);
         config = vm.serializeUint("deploy-config", "redstoneMaxSampleDistance", cfg.maxSampleDistanceSec);
         config = vm.serializeUint("deploy-config", "redstoneFutureTolerance", cfg.futureToleranceSec);
         config = vm.serializeString("deploy-config", "lpShareTokenName", cfg.lpShareName);

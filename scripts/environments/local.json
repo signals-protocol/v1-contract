@@ -33,8 +33,6 @@
       "position": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
       "lpShare": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
     },
-    "redstoneFeedId": "BTC",
-    "redstoneFeedDecimals": 8,
     "redstoneMaxSampleDistance": "600",
     "redstoneFutureTolerance": "60",
     "lpShareTokenName": "Signals LP",

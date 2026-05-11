@@ -100,6 +100,104 @@ contract MarketLifecycleTest is FullSystemDeployer {
         assertEq(sys.core.harnessGetTreeSum(marketId), 4 * WAD);
     }
 
+    function test_createMarketStoresOracleConfig() public {
+        uint64 now_ = uint64(block.timestamp);
+        SeedData seedData = _uniformSeedData(4);
+        ISignalsCore.MarketOracleConfig memory oracleConfig =
+            ISignalsCore.MarketOracleConfig({feedId: bytes32("ETH"), feedDecimals: 18, tickScale: 1_000_000_000_000});
+
+        vm.prank(sys.owner);
+        uint256 marketId = sys.core
+            .createMarket(
+                0,
+                4,
+                1,
+                now_ + 10,
+                now_ + 100,
+                now_ + 150,
+                4,
+                WAD,
+                address(sys.feePolicy),
+                address(seedData),
+                oracleConfig
+            );
+
+        ISignalsCore.Market memory market = sys.core.harnessGetMarket(marketId);
+        assertEq(market.feedId, oracleConfig.feedId);
+        assertEq(market.feedDecimals, oracleConfig.feedDecimals);
+        assertEq(market.tickScale, oracleConfig.tickScale);
+    }
+
+    function test_createMarketRejectsInvalidOracleConfig() public {
+        uint64 now_ = uint64(block.timestamp);
+        SeedData seedData = _uniformSeedData(4);
+
+        _expectInvalidOracleConfig(
+            now_, seedData, ISignalsCore.MarketOracleConfig({feedId: bytes32(0), feedDecimals: 8, tickScale: 1_000_000})
+        );
+        _expectInvalidOracleConfig(
+            now_,
+            seedData,
+            ISignalsCore.MarketOracleConfig({feedId: bytes32("BTC"), feedDecimals: 0, tickScale: 1_000_000})
+        );
+        _expectInvalidOracleConfig(
+            now_,
+            seedData,
+            ISignalsCore.MarketOracleConfig({feedId: bytes32("BTC"), feedDecimals: 19, tickScale: 1_000_000})
+        );
+        _expectInvalidOracleConfig(
+            now_, seedData, ISignalsCore.MarketOracleConfig({feedId: bytes32("BTC"), feedDecimals: 8, tickScale: 0})
+        );
+    }
+
+    function test_finalizeSecondarySettlementUsesMarketTickScale() public {
+        uint64 now_ = uint64(block.timestamp);
+        uint64 start = now_ + 10;
+        uint64 settlementTs = now_ + 100;
+        SeedData seedData = _uniformSeedData(4);
+
+        vm.prank(sys.owner);
+        uint256 marketId = sys.core
+            .createMarket(
+                0,
+                400,
+                100,
+                start,
+                settlementTs,
+                settlementTs,
+                4,
+                WAD,
+                address(sys.feePolicy),
+                address(seedData),
+                ISignalsCore.MarketOracleConfig({feedId: bytes32("BTC"), feedDecimals: 8, tickScale: 100})
+            );
+        vm.prank(sys.owner);
+        sys.core.seedNextChunks(marketId, 4);
+
+        vm.warp(uint256(settlementTs) + SUBMIT_WINDOW + 1);
+        vm.startPrank(sys.owner);
+        sys.core.markSettlementFailed(marketId);
+        sys.core.finalizeSecondarySettlement(marketId, 25_000);
+        vm.stopPrank();
+
+        assertEq(sys.core.harnessGetMarket(marketId).settlementTick, 200);
+    }
+
+    function test_finalizeSecondarySettlementRevertsWhenOracleConfigMissing() public {
+        (uint256 marketId,, uint64 settlementTs) = _createDefaultMarket();
+        ISignalsCore.Market memory market = sys.core.harnessGetMarket(marketId);
+        market.tickScale = 0;
+        vm.prank(sys.owner);
+        sys.core.harnessSetMarket(marketId, market);
+
+        vm.warp(uint256(settlementTs) + SUBMIT_WINDOW + 1);
+        vm.startPrank(sys.owner);
+        sys.core.markSettlementFailed(marketId);
+        vm.expectRevert(abi.encodeWithSelector(SE.OracleConfigMissing.selector, marketId));
+        sys.core.finalizeSecondarySettlement(marketId, 1_000_000);
+        vm.stopPrank();
+    }
+
     // ============================================================
     // Test: reverts seeding for unknown market
     // ============================================================
@@ -108,6 +206,37 @@ contract MarketLifecycleTest is FullSystemDeployer {
         vm.prank(sys.owner);
         vm.expectRevert(abi.encodeWithSelector(SE.MarketNotFound.selector, 999));
         sys.core.seedNextChunks(999, 1);
+    }
+
+    function _uniformSeedData(uint32 numBins) internal returns (SeedData seedData) {
+        uint256[] memory factors = new uint256[](numBins);
+        for (uint256 i = 0; i < numBins; i++) {
+            factors[i] = WAD;
+        }
+        seedData = SeedHelper.deploySeedData(factors);
+    }
+
+    function _expectInvalidOracleConfig(
+        uint64 now_,
+        SeedData seedData,
+        ISignalsCore.MarketOracleConfig memory oracleConfig
+    ) internal {
+        vm.prank(sys.owner);
+        vm.expectRevert(SE.InvalidOracleConfig.selector);
+        sys.core
+            .createMarket(
+                0,
+                4,
+                1,
+                now_ + 10,
+                now_ + 100,
+                now_ + 150,
+                4,
+                WAD,
+                address(sys.feePolicy),
+                address(seedData),
+                oracleConfig
+            );
     }
 
     // ============================================================

@@ -145,7 +145,10 @@ contract BoundariesTest is TradeModuleDeployer {
             initialRootSum: 10 * WAD,
             accumulatedFees: 0,
             minFactor: WAD,
-            deltaEt: 0
+            deltaEt: 0,
+            feedId: bytes32("BTC"),
+            feedDecimals: 8,
+            tickScale: 1_000_000
         });
         sys.core.setMarket(2, market);
         sys.core.seedTree(2, uniformFactors(10));
@@ -180,7 +183,10 @@ contract BoundariesTest is TradeModuleDeployer {
             initialRootSum: 10 * WAD,
             accumulatedFees: 0,
             minFactor: WAD,
-            deltaEt: 0
+            deltaEt: 0,
+            feedId: bytes32("BTC"),
+            feedDecimals: 8,
+            tickScale: 1_000_000
         });
         sys.core.setMarket(3, market);
         sys.core.seedTree(3, uniformFactors(10));
@@ -215,7 +221,10 @@ contract BoundariesTest is TradeModuleDeployer {
             initialRootSum: 10 * WAD,
             accumulatedFees: 0,
             minFactor: WAD,
-            deltaEt: 0
+            deltaEt: 0,
+            feedId: bytes32("BTC"),
+            feedDecimals: 8,
+            tickScale: 1_000_000
         });
         sys.core.setMarket(4, market);
         sys.core.seedTree(4, uniformFactors(10));
@@ -275,7 +284,10 @@ contract BoundariesTest is TradeModuleDeployer {
             initialRootSum: 10 * WAD,
             accumulatedFees: 0,
             minFactor: WAD,
-            deltaEt: 0
+            deltaEt: 0,
+            feedId: bytes32("BTC"),
+            feedDecimals: 8,
+            tickScale: 1_000_000
         });
         sys.core.setMarket(5, market);
         sys.core.seedTree(5, uniformFactors(10));
@@ -310,7 +322,10 @@ contract BoundariesTest is TradeModuleDeployer {
             initialRootSum: 10 * WAD,
             accumulatedFees: 0,
             minFactor: WAD,
-            deltaEt: 0
+            deltaEt: 0,
+            feedId: bytes32("BTC"),
+            feedDecimals: 8,
+            tickScale: 1_000_000
         });
         sys.core.setMarket(6, market);
         sys.core.seedTree(6, uniformFactors(10));

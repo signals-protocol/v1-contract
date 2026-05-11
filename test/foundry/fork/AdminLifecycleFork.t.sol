@@ -30,7 +30,17 @@ contract AdminLifecycleForkTest is ForkProtocolTest {
         vm.prank(ownerSafe);
         vm.expectPartialRevert(SignalsErrors.AlphaExceedsLimit.selector);
         core.createMarket(
-            0, 4, 1, startTimestamp, endTimestamp, settlementTimestamp, 4, WAD, _defaultFeePolicy(), seedData
+            0,
+            4,
+            1,
+            startTimestamp,
+            endTimestamp,
+            settlementTimestamp,
+            4,
+            WAD,
+            _defaultFeePolicy(),
+            seedData,
+            _btcOracleConfig()
         );
 
         vm.prank(ownerSafe);
@@ -43,7 +53,17 @@ contract AdminLifecycleForkTest is ForkProtocolTest {
 
         vm.prank(ownerSafe);
         uint256 marketId = core.createMarket(
-            0, 4, 1, startTimestamp, endTimestamp, settlementTimestamp, 4, WAD, _defaultFeePolicy(), seedData
+            0,
+            4,
+            1,
+            startTimestamp,
+            endTimestamp,
+            settlementTimestamp,
+            4,
+            WAD,
+            _defaultFeePolicy(),
+            seedData,
+            _btcOracleConfig()
         );
 
         vm.prank(ownerSafe);
@@ -67,7 +87,17 @@ contract AdminLifecycleForkTest is ForkProtocolTest {
 
         vm.prank(operator);
         uint256 marketId = core.createMarket(
-            0, 4, 1, startTimestamp, endTimestamp, settlementTimestamp, 4, WAD, _defaultFeePolicy(), seedData
+            0,
+            4,
+            1,
+            startTimestamp,
+            endTimestamp,
+            settlementTimestamp,
+            4,
+            WAD,
+            _defaultFeePolicy(),
+            seedData,
+            _btcOracleConfig()
         );
 
         vm.prank(operator);
