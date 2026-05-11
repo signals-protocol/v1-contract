@@ -130,7 +130,10 @@ contract SlippageTest is TradeModuleDeployer {
             initialRootSum: 4 * WAD,
             accumulatedFees: 0,
             minFactor: WAD,
-            deltaEt: 0
+            deltaEt: 0,
+            feedId: bytes32("BTC"),
+            feedDecimals: 8,
+            tickScale: 1_000_000
         });
         sys.core.setMarket(1, settledMarket);
 

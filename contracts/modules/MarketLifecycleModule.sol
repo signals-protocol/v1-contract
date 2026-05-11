@@ -8,6 +8,7 @@ import "../lib/FixedPointMathU.sol";
 import "../lib/ExposureDiffLib.sol";
 import "../lib/TickBinLib.sol";
 import "../lib/SeedDataLib.sol";
+import "../lib/OracleTickLib.sol";
 
 /// @notice Delegate-only lifecycle module (skeleton)
 contract MarketLifecycleModule is SignalsCoreStorage {
@@ -27,7 +28,10 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         int256 maxTick,
         int256 tickSpacing,
         uint32 numBins,
-        uint256 liquidityParameter
+        uint256 liquidityParameter,
+        bytes32 feedId,
+        uint8 feedDecimals,
+        uint64 tickScale
     );
     event MarketSeedingProgress(uint256 indexed marketId, uint32 startBin, uint32 count, uint256[] factors);
     event MarketSeeded(uint256 indexed marketId);
@@ -74,9 +78,11 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         uint32 numBins,
         uint256 liquidityParameter,
         address feePolicy,
-        address seedData
+        address seedData,
+        ISignalsCore.MarketOracleConfig calldata oracleConfig
     ) external onlyDelegated returns (uint256 marketId) {
         _validateMarketParams(minTick, maxTick, tickSpacing, startTimestamp, endTimestamp, settlementTimestamp);
+        _validateOracleConfig(oracleConfig);
         require(numBins != 0, SE.BinCountExceedsLimit(0, MAX_BIN_COUNT));
         require(numBins <= MAX_BIN_COUNT, SE.BinCountExceedsLimit(numBins, MAX_BIN_COUNT));
         uint256 binsRange = uint256((maxTick - minTick) / tickSpacing);
@@ -118,6 +124,9 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         market.seedData = seedData;
         market.minFactor = minFactor;
         market.deltaEt = deltaEt; // Store ΔEₜ for batch processing
+        market.feedId = oracleConfig.feedId;
+        market.feedDecimals = oracleConfig.feedDecimals;
+        market.tickScale = oracleConfig.tickScale;
 
         LazyMulSegmentTree.Tree storage tree = marketTrees[marketId];
         tree.init(numBins);
@@ -126,7 +135,17 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         market.initialRootSum = rootSum;
 
         emit MarketCreated(
-            marketId, startTimestamp, endTimestamp, minTick, maxTick, tickSpacing, numBins, liquidityParameter
+            marketId,
+            startTimestamp,
+            endTimestamp,
+            minTick,
+            maxTick,
+            tickSpacing,
+            numBins,
+            liquidityParameter,
+            oracleConfig.feedId,
+            oracleConfig.feedDecimals,
+            oracleConfig.tickScale
         );
         if (feePolicy != address(0)) {
             emit MarketFeePolicySet(marketId, address(0), feePolicy);
@@ -205,8 +224,8 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         uint64 opsStart = tSet + settlementSubmitWindow;
         require(nowTs >= opsStart, SE.PendingOpsNotStarted());
 
-        int256 settlementTick =
-            _toSettlementTick(market.minTick, market.maxTick, market.tickSpacing, state.candidateValue);
+        require(market.tickScale != 0, SE.OracleConfigMissing(marketId));
+        int256 settlementTick = OracleTickLib.toSettlementTick(market, state.candidateValue);
 
         market.settled = true;
         market.settlementValue = state.candidateValue;
@@ -295,7 +314,8 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         require(!market.settled, SE.MarketAlreadySettled(marketId));
         require(market.failed, SE.MarketNotFailed(marketId));
 
-        int256 settlementTick = _toSettlementTick(market.minTick, market.maxTick, market.tickSpacing, settlementValue);
+        require(market.tickScale != 0, SE.OracleConfigMissing(marketId));
+        int256 settlementTick = OracleTickLib.toSettlementTick(market, settlementValue);
 
         market.settled = true;
         market.settlementValue = settlementValue;
@@ -421,40 +441,15 @@ contract MarketLifecycleModule is SignalsCoreStorage {
         );
     }
 
+    function _validateOracleConfig(ISignalsCore.MarketOracleConfig calldata oracleConfig) internal pure {
+        require(oracleConfig.feedId != bytes32(0), SE.InvalidOracleConfig());
+        require(oracleConfig.feedDecimals > 0 && oracleConfig.feedDecimals <= 18, SE.InvalidOracleConfig());
+        require(oracleConfig.tickScale != 0, SE.InvalidOracleConfig());
+    }
+
     function _marketExists(uint256 marketId) internal view returns (bool) {
         return markets[marketId].numBins > 0;
     }
-
-    /// @dev Convert settlement value to tick
-    /// settlementTick = settlementValue / 1e6
-    /// maxTick is exclusive upper bound, clamp to last valid tick
-    // Clamp then snap to the tick-spacing grid. Truncating the spacing division is the intended floor alignment,
-    // and the second write reads the clamped tick through `offset` before assigning the aligned value.
-    // slither-disable-start divide-before-multiply
-    // slither-disable-start write-after-write
-    function _toSettlementTick(int256 minTick, int256 maxTick, int256 tickSpacing, int256 settlementValue)
-        internal
-        pure
-        returns (int256)
-    {
-        int256 spacing = tickSpacing;
-        int256 tick = settlementValue / 1_000_000; // Convert 6-decimal value to tick
-
-        // Clamp to valid range [minTick, maxTick - tickSpacing]
-        // maxTick is exclusive (outcome space is [minTick, maxTick))
-        // Last valid tick is maxTick - tickSpacing
-        int256 lastValidTick = maxTick - spacing;
-        if (tick < minTick) tick = minTick;
-        if (tick > lastValidTick) tick = lastValidTick;
-
-        // Align to tick spacing
-        int256 offset = tick - minTick;
-        tick = minTick + (offset / spacing) * spacing;
-        return tick;
-    }
-
-    // slither-disable-end write-after-write
-    // slither-disable-end divide-before-multiply
 
     /// @dev Get payout exposure at a specific tick using diff-array point query
     /// @param marketId Market identifier

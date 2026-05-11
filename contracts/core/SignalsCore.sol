@@ -41,6 +41,7 @@ contract SignalsCore is
     event FeeWaterfallConfigUpdated(uint256 rhoBS, int256 pdd, uint256 phiLP, uint256 phiBS, uint256 phiTR);
     event WithdrawalLagUpdated(uint64 lag);
     event ModulesUpdated(address trade, address lifecycle, address risk, address vault, address oracle);
+    event OracleConfigBackfilled(uint256 marketCount);
 
     // ============================================================
     // Modifiers
@@ -76,8 +77,6 @@ contract SignalsCore is
         uint64 settlementSubmitWindow;
         uint64 pendingOpsWindow;
         uint64 claimDelaySeconds;
-        bytes32 redstoneFeedId;
-        uint8 redstoneFeedDecimals;
         uint64 maxSampleDistance;
         uint64 futureTolerance;
         uint256 lambda;
@@ -139,8 +138,6 @@ contract SignalsCore is
         settlementSubmitWindow = params.settlementSubmitWindow;
         pendingOpsWindow = params.pendingOpsWindow;
         claimDelaySeconds = params.claimDelaySeconds;
-        redstoneFeedId = params.redstoneFeedId;
-        redstoneFeedDecimals = params.redstoneFeedDecimals;
         maxSampleDistance = params.maxSampleDistance;
         futureTolerance = params.futureTolerance;
 
@@ -166,6 +163,21 @@ contract SignalsCore is
         emit ModulesUpdated(
             params.tradeModule, params.lifecycleModule, params.riskModule, params.vaultModule, params.oracleModule
         );
+    }
+
+    /// @notice Backfill existing BTC markets with per-market oracle configuration.
+    function reinitializeV2() external reinitializer(2) onlyOwner {
+        uint256 marketCount = 0;
+        uint256 lastMarketId = nextMarketId;
+        for (uint256 marketId = 1; marketId <= lastMarketId; marketId++) {
+            ISignalsCore.Market storage market = markets[marketId];
+            if (market.numBins == 0) continue;
+            market.feedId = bytes32("BTC");
+            market.feedDecimals = 8;
+            market.tickScale = 1_000_000;
+            marketCount++;
+        }
+        emit OracleConfigBackfilled(marketCount);
     }
 
     /// @notice Set module addresses
@@ -420,7 +432,8 @@ contract SignalsCore is
         uint32 numBins,
         uint256 liquidityParameter,
         address feePolicy,
-        address seedData
+        address seedData,
+        ISignalsCore.MarketOracleConfig memory oracleConfig
     ) public override onlyOwnerOrOperator returns (uint256 marketId) {
         // Risk gate first: validate α bounds and prior admissibility
         _riskGate(abi.encodeCall(IRiskModule.gateCreateMarket, (liquidityParameter, numBins, seedData)));
@@ -429,7 +442,7 @@ contract SignalsCore is
         bytes memory ret = _delegate(
             lifecycleModule,
             abi.encodeWithSignature(
-                "createMarket(int256,int256,int256,uint64,uint64,uint64,uint32,uint256,address,address)",
+                "createMarket(int256,int256,int256,uint64,uint64,uint64,uint32,uint256,address,address,(bytes32,uint8,uint64))",
                 minTick,
                 maxTick,
                 tickSpacing,
@@ -439,7 +452,8 @@ contract SignalsCore is
                 numBins,
                 liquidityParameter,
                 feePolicy,
-                seedData
+                seedData,
+                oracleConfig
             )
         );
         if (ret.length > 0) marketId = abi.decode(ret, (uint256));
@@ -492,21 +506,11 @@ contract SignalsCore is
         _delegate(oracleModule, msg.data);
     }
 
-    /// @notice Configure Redstone oracle parameters
-    /// @dev Set feed ID, decimals, and timing constraints
-    function setRedstoneConfig(bytes32 feedId, uint8 feedDecimals, uint64 _maxSampleDistance, uint64 _futureTolerance)
-        external
-        onlyOwner
-    {
+    /// @notice Configure Redstone oracle timing constraints
+    function setRedstoneConfig(uint64 newMaxSampleDistance, uint64 newFutureTolerance) external onlyOwner {
         _delegate(
             oracleModule,
-            abi.encodeWithSignature(
-                "setRedstoneConfig(bytes32,uint8,uint64,uint64)",
-                feedId,
-                feedDecimals,
-                _maxSampleDistance,
-                _futureTolerance
-            )
+            abi.encodeWithSignature("setRedstoneConfig(uint64,uint64)", newMaxSampleDistance, newFutureTolerance)
         );
     }
 

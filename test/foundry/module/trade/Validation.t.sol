@@ -52,7 +52,10 @@ contract ValidationTest is SignalsBaseTest {
             initialRootSum: uint256(numBins) * WAD,
             accumulatedFees: 0,
             minFactor: WAD,
-            deltaEt: 0
+            deltaEt: 0,
+            feedId: bytes32("BTC"),
+            feedDecimals: 8,
+            tickScale: 1_000_000
         });
     }
 

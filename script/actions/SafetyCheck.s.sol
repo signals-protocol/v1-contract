@@ -100,17 +100,7 @@ contract SafetyCheck is BaseScript {
             require(claimDelay == submitWindow + pendingOps, "claimDelay invariant mismatch");
         }
 
-        // ── Redstone config ─────────────────────────────────────────────
-        string memory feedIdStr = _tryConfigString("redstoneFeedId");
-        if (bytes(feedIdStr).length > 0) {
-            require(core.redstoneFeedId() == _toBytes32(feedIdStr), "redstoneFeedId mismatch");
-        }
-
-        uint256 feedDecimals = _tryConfigUint("redstoneFeedDecimals");
-        if (feedDecimals > 0) {
-            require(core.redstoneFeedDecimals() == feedDecimals, "redstoneFeedDecimals mismatch");
-        }
-
+        // ── Redstone timing constraints ────────────────────────────────
         uint256 maxSampleDist = _tryConfigUint("redstoneMaxSampleDistance");
         if (maxSampleDist > 0) {
             require(core.maxSampleDistance() == maxSampleDist, "maxSampleDistance mismatch");

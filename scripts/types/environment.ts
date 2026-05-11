@@ -16,8 +16,6 @@ export interface EnvironmentConfig {
   settlementSubmitWindow?: string;
   settlementFinalizeDeadline?: string;
   pendingOpsWindow?: string;
-  redstoneFeedId?: string;
-  redstoneFeedDecimals?: number;
   redstoneMaxSampleDistance?: string;
   redstoneFutureTolerance?: string;
   lpShareTokenName?: string;

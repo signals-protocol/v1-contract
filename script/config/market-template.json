@@ -27,8 +27,6 @@
     "claimDelaySec": 900
   },
   "redstone": {
-    "feedId": "BTC",
-    "feedDecimals": 8,
     "maxSampleDistanceSec": 600,
     "futureToleranceSec": 60
   },

@@ -4,10 +4,11 @@
     "pendingOpsWindowSec": 300
   },
   "redstone": {
-    "feedId": "BTC",
-    "feedDecimals": 8,
     "maxSampleDistanceSec": 600,
     "futureToleranceSec": 60
+  },
+  "safe": {
+    "multiSendAddress": "0x38869bf66a61cF6bDB996A6aE40D5853Fd43B526"
   },
   "risk": {
     "lambda": "0.3",

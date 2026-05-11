@@ -31,8 +31,6 @@
     "settlementSubmitWindow": "600",
     "settlementFinalizeDeadline": "900",
     "pendingOpsWindow": "300",
-    "redstoneFeedId": "BTC",
-    "redstoneFeedDecimals": 8,
     "redstoneMaxSampleDistance": "600",
     "redstoneFutureTolerance": "60",
     "lpShareTokenName": "Signals LP",

@@ -27,6 +27,8 @@ import {
   createWalletClient,
   http,
   defineChain,
+  encodeFunctionData,
+  decodeAbiParameters,
   type PublicClient,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -110,6 +112,7 @@ interface Config {
   rpcUrl: string;
   txServiceUrl: string;
   safeAddress: string;
+  multiSendAddress: string;
 }
 
 function resolveConfig(env: string, args: string[]): Config {
@@ -132,7 +135,30 @@ function resolveConfig(env: string, args: string[]): Config {
     }
   }
 
-  return { env, chainId, rpcUrl, txServiceUrl, safeAddress };
+  const multiSendAddress = loadDeployConfigMultiSendAddress(env);
+  const knownMultiSend =
+    SAFE_CONTRACT_NETWORKS[chainId.toString()]?.multiSendAddress;
+  if (
+    knownMultiSend &&
+    knownMultiSend.toLowerCase() !== multiSendAddress.toLowerCase()
+  ) {
+    throw new Error(
+      `safe.multiSendAddress mismatch: deploy config=${multiSendAddress}, Safe network=${knownMultiSend}`,
+    );
+  }
+
+  return { env, chainId, rpcUrl, txServiceUrl, safeAddress, multiSendAddress };
+}
+
+function loadDeployConfigMultiSendAddress(env: string): string {
+  const configPath = path.join('script', 'config', `deploy-${env}.json`);
+  const raw = fs.readFileSync(configPath, 'utf8');
+  const parsed = JSON.parse(raw) as { safe?: { multiSendAddress?: string } };
+  const multiSendAddress = parsed.safe?.multiSendAddress;
+  if (!multiSendAddress) {
+    throw new Error(`Missing safe.multiSendAddress in ${configPath}`);
+  }
+  return multiSendAddress;
 }
 
 function resolveProposerKey(): string {
@@ -163,7 +189,12 @@ async function initProtocolKit(
     signer: proposerKey,
     safeAddress: config.safeAddress,
     contractNetworks: SAFE_CONTRACT_NETWORKS[chainIdStr]
-      ? { [chainIdStr]: SAFE_CONTRACT_NETWORKS[chainIdStr] }
+      ? {
+          [chainIdStr]: {
+            ...SAFE_CONTRACT_NETWORKS[chainIdStr],
+            multiSendAddress: config.multiSendAddress,
+          },
+        }
       : undefined,
   });
 
@@ -214,6 +245,63 @@ interface TxInput {
   to: string;
   data: string;
   value: string;
+  operation?: 0 | 1;
+}
+
+const SAFE_SIMULATION_ABI = [
+  {
+    type: 'function',
+    name: 'simulateAndRevert',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'targetContract', type: 'address' },
+      { name: 'calldataPayload', type: 'bytes' },
+    ],
+    outputs: [],
+  },
+] as const;
+
+function extractHexData(err: unknown): `0x${string}` | undefined {
+  if (!err || typeof err !== 'object') return undefined;
+  const e = err as Record<string, unknown>;
+  for (const key of ['data', 'raw', 'details']) {
+    const value = e[key];
+    if (typeof value === 'string' && value.startsWith('0x')) {
+      return value as `0x${string}`;
+    }
+  }
+  if (e.cause) return extractHexData(e.cause);
+  return undefined;
+}
+
+function decodeSimulateAndRevert(
+  err: unknown,
+): { success: boolean; response: `0x${string}` } | undefined {
+  const data = extractHexData(err);
+  if (!data || data.length < 130) return undefined;
+
+  try {
+    const [success, response] = decodeAbiParameters(
+      [{ type: 'bool' }, { type: 'bytes' }],
+      data,
+    ) as [boolean, `0x${string}`];
+    return { success, response };
+  } catch {
+    // Safe's simulateAndRevert reverts with a compact payload:
+    // word 0 = success, word 1 = returndata length, then raw returndata.
+    try {
+      const success = BigInt(`0x${data.slice(2, 66)}`) === 1n;
+      const byteLength = Number(BigInt(`0x${data.slice(66, 130)}`));
+      const responseEnd = 130 + byteLength * 2;
+      if (data.length < responseEnd) return undefined;
+      return {
+        success,
+        response: `0x${data.slice(130, responseEnd)}` as `0x${string}`,
+      };
+    } catch {
+      return undefined;
+    }
+  }
 }
 
 async function simulateTx(
@@ -231,15 +319,39 @@ async function simulateTx(
   for (let i = 0; i < transactions.length; i++) {
     const tx = transactions[i];
     try {
-      await client.call({
-        account: safeAddress as `0x${string}`,
-        to: tx.to as `0x${string}`,
-        data: (tx.data && tx.data !== '0x' ? tx.data : undefined) as
-          | `0x${string}`
-          | undefined,
-        value: BigInt(tx.value || '0'),
-      });
+      if ((tx.operation ?? 0) === 1) {
+        const simulationData = encodeFunctionData({
+          abi: SAFE_SIMULATION_ABI,
+          functionName: 'simulateAndRevert',
+          args: [tx.to as `0x${string}`, (tx.data || '0x') as `0x${string}`],
+        });
+        await client.call({
+          account: safeAddress as `0x${string}`,
+          to: safeAddress as `0x${string}`,
+          data: simulationData,
+        });
+      } else {
+        await client.call({
+          account: safeAddress as `0x${string}`,
+          to: tx.to as `0x${string}`,
+          data: (tx.data && tx.data !== '0x' ? tx.data : undefined) as
+            | `0x${string}`
+            | undefined,
+          value: BigInt(tx.value || '0'),
+        });
+      }
     } catch (err) {
+      if ((tx.operation ?? 0) === 1) {
+        const simulated = decodeSimulateAndRevert(err);
+        if (simulated?.success) continue;
+        if (simulated) {
+          return {
+            success: false,
+            error: `Safe simulateAndRevert failed: ${simulated.response}`,
+            failedIndex: i,
+          };
+        }
+      }
       return {
         success: false,
         error: extractRevertReason(err),
@@ -264,6 +376,7 @@ async function proposeTx(
       to: tx.to,
       data: tx.data || '0x',
       value: tx.value || '0',
+      operation: tx.operation ?? 0,
     })),
   });
 
@@ -363,7 +476,12 @@ async function handlePropose(config: Config, args: string[]) {
     if (!to) throw new Error('--to is required');
     if (!data) throw new Error('--data is required');
     const value = parseFlag(args, 'value') || '0';
-    transactions = [{ to, data, value }];
+    const operationRaw = parseFlag(args, 'operation') || '0';
+    const operation = Number(operationRaw);
+    if (operation !== 0 && operation !== 1) {
+      throw new Error('--operation must be 0 or 1');
+    }
+    transactions = [{ to, data, value, operation: operation as 0 | 1 }];
   }
 
   // Simulate
@@ -500,7 +618,18 @@ async function handleProposeUpgrade(config: Config, args: string[]) {
   const plan = JSON.parse(raw) as {
     network?: string;
     deployed?: Record<string, string>;
-    safe?: { to?: string; value?: string; calldata?: string };
+    safe?: {
+      to?: string;
+      value?: string;
+      calldata?: string;
+      operation?: number;
+    };
+    safe_args?: {
+      to?: string;
+      value?: string;
+      data?: string;
+      operation?: number;
+    };
   };
 
   if (plan.network && plan.network !== config.env) {
@@ -509,8 +638,16 @@ async function handleProposeUpgrade(config: Config, args: string[]) {
     );
   }
 
-  if (!plan.safe?.to || !plan.safe?.calldata) {
-    throw new Error(`Plan missing safe.to or safe.calldata: ${selectedPlan}`);
+  const safeTo = plan.safe_args?.to ?? plan.safe?.to;
+  const safeData = plan.safe_args?.data ?? plan.safe?.calldata;
+  const safeValue = plan.safe_args?.value ?? plan.safe?.value ?? '0';
+  const safeOperation = plan.safe_args?.operation ?? plan.safe?.operation ?? 0;
+
+  if (!safeTo || !safeData) {
+    throw new Error(`Plan missing safe target or calldata: ${selectedPlan}`);
+  }
+  if (safeOperation !== 0 && safeOperation !== 1) {
+    throw new Error(`Plan has invalid Safe operation: ${safeOperation}`);
   }
 
   console.log(`Plan: ${selectedPlan}`);
@@ -520,8 +657,9 @@ async function handleProposeUpgrade(config: Config, args: string[]) {
       console.log(`  ${name}: ${addr}`);
     }
   }
-  console.log(`Target: ${plan.safe.to}`);
-  console.log(`Calldata: ${plan.safe.calldata.slice(0, 20)}...`);
+  console.log(`Target: ${safeTo}`);
+  console.log(`Operation: ${safeOperation}`);
+  console.log(`Calldata: ${safeData.slice(0, 20)}...`);
   console.log();
 
   // Delegate to propose with parsed values
@@ -532,9 +670,10 @@ async function handleProposeUpgrade(config: Config, args: string[]) {
 
   const transactions: TxInput[] = [
     {
-      to: plan.safe.to,
-      data: plan.safe.calldata,
-      value: plan.safe.value || '0',
+      to: safeTo,
+      data: safeData,
+      value: safeValue,
+      operation: safeOperation as 0 | 1,
     },
   ];
 

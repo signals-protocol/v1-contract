@@ -110,8 +110,6 @@ abstract contract FullSystemDeployer is SignalsBaseTest {
             settlementSubmitWindow: submitWindow,
             pendingOpsWindow: opsWindow,
             claimDelaySeconds: claimDelay,
-            redstoneFeedId: bytes32("BTC"),
-            redstoneFeedDecimals: 8,
             maxSampleDistance: 600,
             futureTolerance: 60,
             lambda: WAD / 10,

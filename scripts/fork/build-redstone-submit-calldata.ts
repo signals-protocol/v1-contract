@@ -12,7 +12,7 @@ const REDSTONE_DATA_SERVICE_ID: DataServiceIds = 'redstone-primary-prod';
 const REDSTONE_UNIQUE_SIGNERS = 3;
 const CORE_ABI = [
   'function submitSettlementSample(uint256)',
-  'function redstoneFeedId() view returns (bytes32)',
+  'function getMarket(uint256) view returns (tuple(bool isSeeded,bool settled,bool snapshotChunksDone,bool failed,uint32 numBins,uint32 openPositionCount,uint32 snapshotChunkCursor,uint32 seedCursor,uint64 startTimestamp,uint64 endTimestamp,uint64 settlementTimestamp,uint64 settlementFinalizedAt,int256 minTick,int256 maxTick,int256 tickSpacing,int256 settlementTick,int256 settlementValue,uint256 liquidityParameter,address feePolicy,address seedData,uint256 initialRootSum,uint256 accumulatedFees,uint256 minFactor,uint256 deltaEt,bytes32 feedId,uint8 feedDecimals,uint64 tickScale))',
   'function maxSampleDistance() view returns (uint64)',
 ] as const;
 
@@ -58,24 +58,19 @@ function resolveCoreAddress(
   return fromEnvFile;
 }
 
-function resolveFeedIdFallback(envData: EnvironmentFile): string {
-  const configuredFeedId = envData.config?.redstoneFeedId;
-  if (!configuredFeedId) {
-    fail('Missing redstoneFeedId in environment file');
-  }
-  return configuredFeedId;
-}
-
 async function resolveFeedId(
   contract: Contract,
-  envData: EnvironmentFile,
+  marketId: string,
 ): Promise<string> {
-  try {
-    const onchainFeedId = (await contract.redstoneFeedId()) as string;
-    return utils.parseBytes32String(onchainFeedId);
-  } catch {
-    return resolveFeedIdFallback(envData);
+  const market = (await contract.getMarket(marketId)) as {
+    feedId?: string;
+    [index: number]: unknown;
+  };
+  const feedId = market.feedId ?? market[24];
+  if (typeof feedId !== 'string') {
+    fail(`Market ${marketId} has no feedId`);
   }
+  return utils.parseBytes32String(feedId);
 }
 
 async function resolveMaxTimestampDeviationMs(
@@ -112,7 +107,7 @@ async function main() {
   const provider = new providers.JsonRpcProvider(resolveRpcUrl(env));
   const core = new Contract(coreAddress, CORE_ABI, provider);
 
-  const feedId = await resolveFeedId(core, envData);
+  const feedId = await resolveFeedId(core, marketIdArg);
   const maxTimestampDeviationMS = await resolveMaxTimestampDeviationMs(
     core,
     envData,

@@ -41,6 +41,8 @@ interface SignalsErrors {
     error SettlementWindowClosed();
     error PendingOpsNotStarted();
     error NotInPendingOps();
+    error InvalidOracleConfig();
+    error OracleConfigMissing(uint256 marketId);
     error InvalidSettlementTimeline(uint64 claimDelay, uint64 submitWindow, uint64 opsWindow);
     error ClaimTooEarly(uint64 claimOpenTimestamp, uint64 currentTimestamp);
     error PriceOverflow(uint256 scaled);

@@ -37,8 +37,8 @@ abstract contract SignalsCoreStorage {
     //
     // (A) Set in SignalsCore.initialize() and updateable through owner-only setters:
     //     settlementSubmitWindow, claimDelaySeconds, pendingOpsWindow, maxSampleDistance,
-    //     futureTolerance, redstoneFeedId, redstoneFeedDecimals, paymentToken, positionContract,
-    //     lpShareToken, riskConfig, feeWaterfallConfig, withdrawalLagBatches, _operators.
+    //     futureTolerance, paymentToken, positionContract, lpShareToken, riskConfig,
+    //     feeWaterfallConfig, withdrawalLagBatches, _operators.
     //
     // (B) Module-owned operational state written by protocol flows:
     //     markets, marketTrees, nextMarketId, lpVault, currentBatchId, capitalStack, _dailyPnl,
@@ -86,11 +86,13 @@ abstract contract SignalsCoreStorage {
     /// @dev Samples with priceTimestamp > block.timestamp + futureTolerance are rejected
     uint64 public futureTolerance;
 
-    /// @notice Redstone data feed ID (e.g., bytes32("BTC"))
-    bytes32 public redstoneFeedId;
+    /// @custom:oz-renamed-from redstoneFeedId
+    // slither-disable-next-line naming-convention,constable-states
+    bytes32 private __deprecated_redstoneFeedId;
 
-    /// @notice Redstone feed decimals (e.g., 8 for BTC/USD)
-    uint8 public redstoneFeedDecimals;
+    /// @custom:oz-renamed-from redstoneFeedDecimals
+    // slither-disable-next-line naming-convention,constable-states
+    uint8 private __deprecated_redstoneFeedDecimals;
 
     // ============================================================
     // Operator Access Control

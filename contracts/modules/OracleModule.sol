@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import "../core/SignalsCoreStorage.sol";
 import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
+import "../lib/OracleTickLib.sol";
 import "@redstone-finance/evm-connector/contracts/data-services/PrimaryProdDataServiceConsumerBase.sol";
 
 /// @title OracleModule
@@ -36,26 +37,19 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
         uint256 indexed marketId, int256 settlementValue, int256 settlementTick, uint64 priceTimestamp, uint64 distance
     );
 
-    event OracleConfigUpdated(bytes32 feedId, uint8 feedDecimals, uint64 maxSampleDistance, uint64 futureTolerance);
+    event OracleConfigUpdated(uint64 maxSampleDistance, uint64 futureTolerance);
 
     // ============================================================
     // Configuration
     // ============================================================
 
-    /// @notice Set Redstone oracle configuration
-    /// @param feedId Redstone data feed ID (e.g., bytes32("BTC"))
-    /// @param feedDecimals Decimals of the feed price (e.g., 8 for BTC/USD)
-    /// @param _maxSampleDistance Δmax: maximum |priceTimestamp - Tset|
-    /// @param _futureTolerance δfuture: maximum priceTimestamp - block.timestamp
-    function setRedstoneConfig(bytes32 feedId, uint8 feedDecimals, uint64 _maxSampleDistance, uint64 _futureTolerance)
-        external
-        onlyDelegated
-    {
-        redstoneFeedId = feedId;
-        redstoneFeedDecimals = feedDecimals;
-        maxSampleDistance = _maxSampleDistance;
-        futureTolerance = _futureTolerance;
-        emit OracleConfigUpdated(feedId, feedDecimals, _maxSampleDistance, _futureTolerance);
+    /// @notice Set protocol-wide Redstone oracle timing constraints
+    /// @param newMaxSampleDistance Δmax: maximum |priceTimestamp - Tset|
+    /// @param newFutureTolerance δfuture: maximum priceTimestamp - block.timestamp
+    function setRedstoneConfig(uint64 newMaxSampleDistance, uint64 newFutureTolerance) external onlyDelegated {
+        maxSampleDistance = newMaxSampleDistance;
+        futureTolerance = newFutureTolerance;
+        emit OracleConfigUpdated(newMaxSampleDistance, newFutureTolerance);
     }
 
     // ============================================================
@@ -72,6 +66,7 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
         require(market.numBins != 0, SE.MarketNotFound(marketId));
         require(!market.settled, SE.MarketAlreadySettled(marketId));
         require(!market.failed, SE.MarketAlreadyFailed(marketId));
+        require(market.feedId != bytes32(0) && market.tickScale != 0, SE.OracleConfigMissing(marketId));
 
         uint64 tSet = market.settlementTimestamp;
         uint64 nowTs = uint64(block.timestamp);
@@ -82,7 +77,7 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
 
         // Extract price and timestamp from Redstone payload in calldata
         // PrimaryProdDataServiceConsumerBase validates signatures and unique signer threshold
-        uint256 price = getOracleNumericValueFromTxMsg(redstoneFeedId);
+        uint256 price = getOracleNumericValueFromTxMsg(market.feedId);
         uint256 timestampMs = extractTimestampsAndAssertAllAreEqual();
         uint64 priceTimestamp = uint64(timestampMs / 1000);
 
@@ -97,7 +92,7 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
         );
 
         // Convert price to settlementValue (scale from feedDecimals to 6 decimals)
-        int256 settlementValue = _convertPriceToSettlementValue(price);
+        int256 settlementValue = _convertPriceToSettlementValue(price, market.feedDecimals);
 
         // Closest-sample selection: prefer sample closest to Tset
         _updateCandidate(marketId, settlementValue, priceTimestamp, tSet);
@@ -122,7 +117,7 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
             state.candidateValue = settlementValue;
             state.candidatePriceTimestamp = priceTimestamp;
 
-            int256 tick = _toSettlementTick(markets[marketId], settlementValue);
+            int256 tick = OracleTickLib.toSettlementTick(markets[marketId], settlementValue);
             emit SettlementCandidateUpdated(marketId, settlementValue, tick, priceTimestamp, newDistance);
         } else {
             // Compare distances to Tset (absolute value)
@@ -137,7 +132,7 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
                 state.candidateValue = settlementValue;
                 state.candidatePriceTimestamp = priceTimestamp;
 
-                int256 tick = _toSettlementTick(markets[marketId], settlementValue);
+                int256 tick = OracleTickLib.toSettlementTick(markets[marketId], settlementValue);
                 emit SettlementCandidateUpdated(marketId, settlementValue, tick, priceTimestamp, newDistance);
             }
             // If not closer, silently ignore (existing candidate preferred)
@@ -203,49 +198,19 @@ contract OracleModule is SignalsCoreStorage, PrimaryProdDataServiceConsumerBase 
     // ============================================================
 
     /// @dev Convert Redstone price (feedDecimals) to settlementValue (6 decimals)
-    function _convertPriceToSettlementValue(uint256 price) internal view returns (int256) {
-        if (redstoneFeedDecimals <= 6) {
+    function _convertPriceToSettlementValue(uint256 price, uint8 feedDecimals) internal pure returns (int256) {
+        if (feedDecimals <= 6) {
             // Scale up if feed has fewer decimals
-            uint256 scaleFactor = 10 ** uint256(6 - redstoneFeedDecimals);
+            uint256 scaleFactor = 10 ** uint256(6 - feedDecimals);
             uint256 scaled = price * scaleFactor;
             if (scaled > uint256(type(int256).max)) revert SE.PriceOverflow(scaled);
             return int256(scaled);
         } else {
             // Scale down if feed has more decimals
-            uint256 scaleDivisor = 10 ** uint256(redstoneFeedDecimals - 6);
+            uint256 scaleDivisor = 10 ** uint256(feedDecimals - 6);
             uint256 scaled = price / scaleDivisor;
             if (scaled > uint256(type(int256).max)) revert SE.PriceOverflow(scaled);
             return int256(scaled);
         }
     }
-
-    /// @dev Convert settlement value to tick
-    /// settlementTick = settlementValue / 1e6
-    /// maxTick is exclusive upper bound, clamp to last valid tick
-    // Clamp then snap to the tick-spacing grid. Truncating the spacing division is the intended floor alignment,
-    // and the second write reads the clamped tick through `offset` before assigning the aligned value.
-    // slither-disable-start divide-before-multiply
-    // slither-disable-start write-after-write
-    function _toSettlementTick(ISignalsCore.Market storage market, int256 settlementValue)
-        internal
-        view
-        returns (int256)
-    {
-        int256 spacing = market.tickSpacing;
-        int256 tick = settlementValue / 1_000_000; // Convert 6-decimal value to tick
-
-        // Clamp to valid range [minTick, maxTick - tickSpacing]
-        // maxTick is exclusive (outcome space is [minTick, maxTick))
-        // Last valid tick is maxTick - tickSpacing
-        int256 lastValidTick = market.maxTick - spacing;
-        if (tick < market.minTick) tick = market.minTick;
-        if (tick > lastValidTick) tick = lastValidTick;
-
-        // Align to tick spacing
-        int256 offset = tick - market.minTick;
-        tick = market.minTick + (offset / spacing) * spacing;
-        return tick;
-    }
-    // slither-disable-end write-after-write
-    // slither-disable-end divide-before-multiply
 }
