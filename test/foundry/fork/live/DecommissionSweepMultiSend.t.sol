@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import "../base/ForkBaseTest.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "forge-std/console.sol";
 
 interface IGnosisSafe {
     function getOwners() external view returns (address[] memory);
@@ -42,6 +43,9 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
     uint8 internal constant CALL_OPERATION = 0;
     uint8 internal constant DELEGATECALL_OPERATION = 1;
     uint256 internal constant MULTISEND_TX_HEADER_LENGTH = 85;
+    uint256 internal constant TOTAL_PENDING_DEPOSITS_SLOT = 34;
+    uint256 internal constant TOTAL_PAYOUT_RESERVE_SLOT = 35;
+    uint256 internal constant TOTAL_PENDING_WITHDRAWALS_SLOT = 36;
 
     IERC20 internal ctUSD;
     IGnosisSafe internal safe;
@@ -60,6 +64,14 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         address to;
         uint256 value;
         bytes data;
+    }
+
+    struct WaivedLiabilities {
+        uint256 totalPendingDeposits6;
+        uint256 totalPayoutReserve6;
+        uint256 totalPendingWithdrawals6;
+        uint256 totalReservedLiabilities6;
+        uint256 corePaymentTokenBalance6;
     }
 
     function setUp() public override {
@@ -99,6 +111,7 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
 
         ModulePointers memory originalModules = _readModules();
         _assertMultiSendPayloadShape(multiSendCalldata, decommissionModule, originalModules);
+        _assertWaivedLiabilitiesCurrent(plan);
 
         uint256 corePre = ctUSD.balanceOf(address(core));
         uint256 safePre = ctUSD.balanceOf(ownerSafe);
@@ -133,6 +146,60 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
             to, value, data, operation, safeTxGas, baseGas, gasPrice, gasToken, payable(refundReceiver), signatures
         );
         assertTrue(success, "Safe execTransaction failed");
+    }
+
+    function _assertWaivedLiabilitiesCurrent(string memory plan) internal view {
+        WaivedLiabilities memory recorded = _readPlanWaivedLiabilities(plan);
+        WaivedLiabilities memory current = _readCurrentWaivedLiabilities();
+
+        console.log("SIG-820 waived liabilities from live fork:");
+        console.log("_totalPendingDeposits6 slot 34: %s", current.totalPendingDeposits6);
+        console.log("_totalPayoutReserve6 slot 35: %s", current.totalPayoutReserve6);
+        console.log("_totalPendingWithdrawals6 slot 36: %s", current.totalPendingWithdrawals6);
+        console.log("total reserved liabilities: %s", current.totalReservedLiabilities6);
+        console.log("Core payment-token balance: %s", current.corePaymentTokenBalance6);
+
+        assertEq(current.totalPendingDeposits6, recorded.totalPendingDeposits6, "stale pending deposits waiver");
+        assertEq(current.totalPayoutReserve6, recorded.totalPayoutReserve6, "stale payout reserve waiver");
+        assertEq(
+            current.totalPendingWithdrawals6, recorded.totalPendingWithdrawals6, "stale pending withdrawals waiver"
+        );
+        assertEq(
+            current.totalReservedLiabilities6, recorded.totalReservedLiabilities6, "stale reserved-liability total"
+        );
+        assertEq(
+            current.corePaymentTokenBalance6, recorded.corePaymentTokenBalance6, "stale Core payment-token balance"
+        );
+    }
+
+    function _readPlanWaivedLiabilities(string memory plan)
+        internal
+        view
+        returns (WaivedLiabilities memory liabilities)
+    {
+        require(vm.keyExistsJson(plan, ".waivedLiabilities.totalPendingDeposits6"), "plan missing waived liabilities");
+        liabilities.totalPendingDeposits6 = vm.parseJsonUint(plan, ".waivedLiabilities.totalPendingDeposits6");
+        liabilities.totalPayoutReserve6 = vm.parseJsonUint(plan, ".waivedLiabilities.totalPayoutReserve6");
+        liabilities.totalPendingWithdrawals6 = vm.parseJsonUint(plan, ".waivedLiabilities.totalPendingWithdrawals6");
+        liabilities.totalReservedLiabilities6 = vm.parseJsonUint(plan, ".waivedLiabilities.totalReservedLiabilities6");
+        liabilities.corePaymentTokenBalance6 = vm.parseJsonUint(plan, ".waivedLiabilities.corePaymentTokenBalance6");
+
+        uint256 expectedTotal =
+            liabilities.totalPendingDeposits6 + liabilities.totalPayoutReserve6 + liabilities.totalPendingWithdrawals6;
+        assertEq(liabilities.totalReservedLiabilities6, expectedTotal, "plan reserved-liability total mismatch");
+    }
+
+    function _readCurrentWaivedLiabilities() internal view returns (WaivedLiabilities memory liabilities) {
+        liabilities.totalPendingDeposits6 = _readStorageUint(TOTAL_PENDING_DEPOSITS_SLOT);
+        liabilities.totalPayoutReserve6 = _readStorageUint(TOTAL_PAYOUT_RESERVE_SLOT);
+        liabilities.totalPendingWithdrawals6 = _readStorageUint(TOTAL_PENDING_WITHDRAWALS_SLOT);
+        liabilities.totalReservedLiabilities6 =
+            liabilities.totalPendingDeposits6 + liabilities.totalPayoutReserve6 + liabilities.totalPendingWithdrawals6;
+        liabilities.corePaymentTokenBalance6 = ctUSD.balanceOf(address(core));
+    }
+
+    function _readStorageUint(uint256 slot) internal view returns (uint256) {
+        return uint256(vm.load(address(core), bytes32(slot)));
     }
 
     function _readSafeTarget(string memory plan) internal view returns (address) {

@@ -3,12 +3,25 @@ pragma solidity ^0.8.28;
 
 import {BaseScript} from "../base/BaseScript.s.sol";
 import {SignalsCore} from "../../contracts/core/SignalsCore.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {console} from "forge-std/console.sol";
 
 /// @title PrepareDecommissionSweep
 /// @notice Emits the exact Safe MultiSend payload for SIG-820: swap vault module, sweep, restore vault module.
 /// @dev Reads live module addresses from Core. The only module address sourced from env JSON is DecommissionModule.
 contract PrepareDecommissionSweep is BaseScript {
+    uint256 internal constant TOTAL_PENDING_DEPOSITS_SLOT = 34;
+    uint256 internal constant TOTAL_PAYOUT_RESERVE_SLOT = 35;
+    uint256 internal constant TOTAL_PENDING_WITHDRAWALS_SLOT = 36;
+
+    struct WaivedLiabilities {
+        uint256 totalPendingDeposits6;
+        uint256 totalPayoutReserve6;
+        uint256 totalPendingWithdrawals6;
+        uint256 totalReservedLiabilities6;
+        uint256 corePaymentTokenBalance6;
+    }
+
     function run() external {
         _enforceChainId();
 
@@ -35,6 +48,9 @@ contract PrepareDecommissionSweep is BaseScript {
         _requireContract(decommissionModule, "DecommissionModule");
         _requireContract(restoreVaultModule, "restore LPVaultModule");
         _requireContract(oracleModule, "OracleModule");
+
+        WaivedLiabilities memory waivedLiabilities = _readWaivedLiabilities(coreProxy, core.paymentToken());
+        _logWaivedLiabilities(waivedLiabilities);
 
         bytes memory setDecommissionCalldata = abi.encodeCall(
             SignalsCore.setModules, (tradeModule, lifecycleModule, riskModule, decommissionModule, oracleModule)
@@ -63,7 +79,8 @@ contract PrepareDecommissionSweep is BaseScript {
             setDecommissionCalldata,
             withdrawTreasuryCalldata,
             restoreVaultCalldata,
-            multiSendCalldata
+            multiSendCalldata,
+            waivedLiabilities
         );
 
         string memory releasesDir = string.concat("releases/", envName);
@@ -74,6 +91,10 @@ contract PrepareDecommissionSweep is BaseScript {
 
         string memory copyDir = string.concat(releasesDir, "/decommission-sweep-copy");
         vm.createDir(copyDir, true);
+        vm.writeFile(
+            string.concat(copyDir, "/00-WAIVED-LIABILITIES-READ-BEFORE-SIGNING.txt"),
+            _buildWaivedLiabilitiesCopy(waivedLiabilities)
+        );
         vm.writeFile(string.concat(copyDir, "/01-target.txt"), vm.toString(multiSendAddress));
         vm.writeFile(string.concat(copyDir, "/02-arg-operation.txt"), "1");
         vm.writeFile(string.concat(copyDir, "/03-arg-value.txt"), "0");
@@ -92,6 +113,61 @@ contract PrepareDecommissionSweep is BaseScript {
         console.log("2) Safe -> New Transaction -> Contract Interaction");
         console.log("3) To = MultiSend, Value = 0, Operation = DelegateCall");
         console.log("4) Paste multiSend(bytes) calldata in Data field");
+    }
+
+    function _readWaivedLiabilities(address coreProxy, IERC20 paymentToken)
+        internal
+        view
+        returns (WaivedLiabilities memory liabilities)
+    {
+        liabilities.totalPendingDeposits6 = _readStorageUint(coreProxy, TOTAL_PENDING_DEPOSITS_SLOT);
+        liabilities.totalPayoutReserve6 = _readStorageUint(coreProxy, TOTAL_PAYOUT_RESERVE_SLOT);
+        liabilities.totalPendingWithdrawals6 = _readStorageUint(coreProxy, TOTAL_PENDING_WITHDRAWALS_SLOT);
+        liabilities.totalReservedLiabilities6 =
+            liabilities.totalPendingDeposits6 + liabilities.totalPayoutReserve6 + liabilities.totalPendingWithdrawals6;
+        liabilities.corePaymentTokenBalance6 = paymentToken.balanceOf(coreProxy);
+    }
+
+    function _readStorageUint(address target, uint256 slot) internal view returns (uint256) {
+        return uint256(vm.load(target, bytes32(slot)));
+    }
+
+    function _logWaivedLiabilities(WaivedLiabilities memory liabilities) internal view {
+        console.log("==============================================");
+        console.log("WARNING: DECOMMISSION SWEEP WAIVES RESERVED LIABILITIES");
+        console.log("This sweep intentionally bypasses the reserved-liability counters below.");
+        console.log("Safe signers must explicitly approve this outcome before signing.");
+        console.log("_totalPendingDeposits6 slot 34: %s", liabilities.totalPendingDeposits6);
+        console.log("_totalPayoutReserve6 slot 35: %s", liabilities.totalPayoutReserve6);
+        console.log("_totalPendingWithdrawals6 slot 36: %s", liabilities.totalPendingWithdrawals6);
+        console.log("total reserved liabilities: %s", liabilities.totalReservedLiabilities6);
+        console.log("Core payment-token balance: %s", liabilities.corePaymentTokenBalance6);
+        console.log("==============================================");
+    }
+
+    function _buildWaivedLiabilitiesCopy(WaivedLiabilities memory liabilities) internal view returns (string memory) {
+        return string.concat(
+            "WARNING: DECOMMISSION SWEEP WAIVES RESERVED LIABILITIES\n",
+            "\n",
+            "The SIG-820 sweep intentionally bypasses these Core accounting reserves and transfers the full Core ",
+            "payment-token balance to the owner Safe. Safe signers must explicitly approve this outcome before signing.\n",
+            "\n",
+            "_totalPendingDeposits6 (slot 34): ",
+            vm.toString(liabilities.totalPendingDeposits6),
+            "\n",
+            "_totalPayoutReserve6 (slot 35): ",
+            vm.toString(liabilities.totalPayoutReserve6),
+            "\n",
+            "_totalPendingWithdrawals6 (slot 36): ",
+            vm.toString(liabilities.totalPendingWithdrawals6),
+            "\n",
+            "totalReservedLiabilities6: ",
+            vm.toString(liabilities.totalReservedLiabilities6),
+            "\n",
+            "corePaymentTokenBalance6: ",
+            vm.toString(liabilities.corePaymentTokenBalance6),
+            "\n"
+        );
     }
 
     function _multiSendAddress() internal view returns (address) {
@@ -124,7 +200,8 @@ contract PrepareDecommissionSweep is BaseScript {
         bytes memory setDecommissionCalldata,
         bytes memory withdrawTreasuryCalldata,
         bytes memory restoreVaultCalldata,
-        bytes memory multiSendCalldata
+        bytes memory multiSendCalldata,
+        WaivedLiabilities memory waivedLiabilities
     ) internal returns (string memory) {
         string memory deployed = vm.serializeAddress("deployed", "DecommissionModule", decommissionModule);
 
@@ -165,6 +242,25 @@ contract PrepareDecommissionSweep is BaseScript {
         safe = vm.serializeString("safe", "method", "multiSend(bytes)");
         safe = vm.serializeString("safe", "calldata", vm.toString(multiSendCalldata));
 
+        string memory liabilities =
+            vm.serializeUint("waived_liabilities", "totalPendingDeposits6", waivedLiabilities.totalPendingDeposits6);
+        liabilities =
+            vm.serializeUint("waived_liabilities", "totalPayoutReserve6", waivedLiabilities.totalPayoutReserve6);
+        liabilities = vm.serializeUint(
+            "waived_liabilities", "totalPendingWithdrawals6", waivedLiabilities.totalPendingWithdrawals6
+        );
+        liabilities = vm.serializeUint(
+            "waived_liabilities", "totalReservedLiabilities6", waivedLiabilities.totalReservedLiabilities6
+        );
+        liabilities = vm.serializeUint(
+            "waived_liabilities", "corePaymentTokenBalance6", waivedLiabilities.corePaymentTokenBalance6
+        );
+        liabilities = vm.serializeString(
+            "waived_liabilities",
+            "warning",
+            "The SIG-820 sweep intentionally bypasses these reserved liabilities and transfers the full Core payment-token balance to the owner Safe."
+        );
+
         string memory root = vm.serializeString("plan", "network", envName);
         root = vm.serializeUint("plan", "chainId", block.chainid);
         root = vm.serializeAddress("plan", "coreProxy", coreProxy);
@@ -174,6 +270,7 @@ contract PrepareDecommissionSweep is BaseScript {
         root = vm.serializeString("plan", "sub_transactions", subTxs);
         root = vm.serializeString("plan", "safe_args", safeArgs);
         root = vm.serializeString("plan", "safe", safe);
+        root = vm.serializeString("plan", "waivedLiabilities", liabilities);
 
         return root;
     }
