@@ -242,6 +242,19 @@ function main() {
           },
         ]
       : []),
+    ...(envData.contracts.DecommissionModule
+      ? [
+          {
+            name: 'DecommissionModule',
+            address: envData.contracts.DecommissionModule,
+            contract:
+              'contracts/modules/DecommissionModule.sol:DecommissionModule',
+            constructorArgs: paymentTokenAddress
+              ? [paymentTokenAddress]
+              : undefined,
+          },
+        ]
+      : []),
     ...(envData.contracts.FeePolicyNull
       ? [
           {
