@@ -38,7 +38,7 @@
     "post-fund-check:dev": "ENV=dev forge script script/actions/PostFundCheck.s.sol --rpc-url dev",
     "prepare-safe-upgrade:dev": "ENV=dev forge script script/actions/PrepareSafeUpgrade.s.sol --rpc-url dev --broadcast",
     "prepare-safe-upgrade:prod": "ENV=prod forge script script/actions/PrepareSafeUpgrade.s.sol --rpc-url prod --broadcast",
-    "deploy-decommission-module:prod": "ENV=prod forge script script/actions/DeployDecommissionModule.s.sol --rpc-url prod --broadcast",
+    "deploy-decommission-module:prod": "ENV=prod forge script script/actions/DeployDecommissionModule.s.sol --rpc-url prod --broadcast && tsx scripts/utils/post-deploy.ts prod deploy-decommission-module",
     "prepare-decommission-sweep:prod": "ENV=prod forge script script/actions/PrepareDecommissionSweep.s.sol --rpc-url prod",
     "validate-decommission-sweep:prod": "DECOMMISSION_SWEEP_PLAN=releases/prod/decommission-sweep-plan.json FORK_SKIP_V2_UPGRADE=true FOUNDRY_PROFILE=fork FORK_ENV=prod forge test --match-path 'test/foundry/fork/live/DecommissionSweepMultiSend.t.sol' -vvv",
     "propose-decommission-sweep:prod": "tsx scripts/ops/safe.ts prod propose-upgrade --plan releases/prod/decommission-sweep-plan.json",

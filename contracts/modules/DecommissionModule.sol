@@ -26,11 +26,15 @@ contract DecommissionModule {
         self = address(this);
     }
 
+    /// @notice Sweeps up to `maxBalance` of the Core payment token to `to`, capping at the signed amount.
+    /// @dev Transfers `min(balanceOf(Core), maxBalance)`: a claim that lowers the balance still fully drains
+    ///      Core, while any unsolicited excess (dust or an unreviewed deposit) beyond the signed cap is left
+    ///      behind rather than reverting, so a dust transfer cannot grief the signed sweep.
     function withdrawTreasury(uint256 maxBalance, address to) external onlyDelegated {
         if (to == address(0)) revert SE.ZeroAddress();
         uint256 balance = paymentToken.balanceOf(address(this));
-        if (balance > maxBalance) revert SE.SweepBalanceExceedsMax(balance, maxBalance);
-        paymentToken.safeTransfer(to, balance);
-        emit DecommissionSweep(to, balance);
+        uint256 amount = balance > maxBalance ? maxBalance : balance;
+        paymentToken.safeTransfer(to, amount);
+        emit DecommissionSweep(to, amount);
     }
 }

@@ -150,9 +150,9 @@ contract ModuleSwapSimulationTest is ForkBaseTest {
         decommission.withdrawTreasury(0, ownerSafe);
     }
 
-    function test_decommission_module_reverts_when_balance_exceeds_max() public {
-        uint256 staleMax = ctUSD.balanceOf(address(core));
-        if (staleMax == 0) return;
+    function test_decommission_module_caps_sweep_at_max_and_leaves_excess() public {
+        uint256 signedMax = ctUSD.balanceOf(address(core));
+        if (signedMax == 0) return;
 
         DecommissionModule decommission = new DecommissionModule(paymentToken);
 
@@ -161,14 +161,19 @@ contract ModuleSwapSimulationTest is ForkBaseTest {
         address risk = core.riskModule();
         address originalVault = core.vaultModule();
         address oracle = core.oracleModule();
+        uint256 safeBefore = ctUSD.balanceOf(ownerSafe);
 
         vm.prank(ownerSafe);
         core.setModules(trade, lifecycle, risk, address(decommission), oracle);
-        deal(paymentToken, address(core), staleMax + 1);
+        // A dust transfer after signing pushes the live balance above the signed cap.
+        deal(paymentToken, address(core), signedMax + 1);
 
-        vm.expectRevert(abi.encodeWithSelector(SignalsErrors.SweepBalanceExceedsMax.selector, staleMax + 1, staleMax));
         vm.prank(ownerSafe);
-        core.withdrawTreasury(staleMax);
+        core.withdrawTreasury(signedMax);
+
+        // Sweep is not griefed: exactly the signed cap moves to the Safe and the 1-wei excess stays behind.
+        assertEq(ctUSD.balanceOf(ownerSafe) - safeBefore, signedMax, "safe did not receive signed cap");
+        assertEq(ctUSD.balanceOf(address(core)), 1, "excess above cap should remain in core");
 
         vm.prank(ownerSafe);
         core.setModules(trade, lifecycle, risk, originalVault, oracle);

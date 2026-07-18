@@ -163,7 +163,6 @@ interface SignalsErrors {
     error InsufficientPayoutReserve(uint256 payout, uint256 remaining);
     error InsufficientBackstopBalance(uint256 requested, uint256 available);
     error InsufficientTreasuryBalance(uint256 requested, uint256 available);
-    error SweepBalanceExceedsMax(uint256 balance, uint256 maxBalance);
 
     // ============================================================
     // Trade / Math
