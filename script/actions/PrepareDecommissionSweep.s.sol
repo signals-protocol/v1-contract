@@ -132,7 +132,7 @@ contract PrepareDecommissionSweep is BaseScript {
         return uint256(vm.load(target, bytes32(slot)));
     }
 
-    function _logWaivedLiabilities(WaivedLiabilities memory liabilities) internal view {
+    function _logWaivedLiabilities(WaivedLiabilities memory liabilities) internal pure {
         console.log("==============================================");
         console.log("WARNING: DECOMMISSION SWEEP WAIVES RESERVED LIABILITIES");
         console.log("This sweep intentionally bypasses the reserved-liability counters below.");
@@ -145,7 +145,7 @@ contract PrepareDecommissionSweep is BaseScript {
         console.log("==============================================");
     }
 
-    function _buildWaivedLiabilitiesCopy(WaivedLiabilities memory liabilities) internal view returns (string memory) {
+    function _buildWaivedLiabilitiesCopy(WaivedLiabilities memory liabilities) internal pure returns (string memory) {
         return string.concat(
             "WARNING: DECOMMISSION SWEEP WAIVES RESERVED LIABILITIES\n",
             "\n",

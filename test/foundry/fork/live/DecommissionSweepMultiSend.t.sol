@@ -92,7 +92,12 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
     }
 
     function test_exact_plan_multisend_sweeps_core_and_restores_vault() public {
-        if (!enabled) return;
+        // Manual release gate: reports as SKIPPED (not PASSED) in CI when no plan is provided,
+        // so the baseline suite never masquerades this as real coverage.
+        if (!enabled) {
+            vm.skip(true);
+            return;
+        }
 
         string memory planPath = vm.envString("DECOMMISSION_SWEEP_PLAN");
         string memory plan = vm.readFile(planPath);
@@ -113,14 +118,20 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         _assertMultiSendPayloadShape(multiSendCalldata, decommissionModule, originalModules);
         _assertWaivedLiabilitiesCurrent(plan);
 
+        // The amount signers approve is the balance disclosed in the plan's waiver.
+        uint256 disclosedBalance = _readPlanWaivedLiabilities(plan).corePaymentTokenBalance6;
         uint256 corePre = ctUSD.balanceOf(address(core));
         uint256 safePre = ctUSD.balanceOf(ownerSafe);
         assertGt(corePre, 0, "core has no balance to validate");
+        assertEq(corePre, disclosedBalance, "live core balance differs from disclosed waiver balance");
 
         _execSafeTransaction(multiSend, multiSendCalldata, operation);
 
+        uint256 swept = ctUSD.balanceOf(ownerSafe) - safePre;
         assertEq(ctUSD.balanceOf(address(core)), 0, "core balance not swept");
-        assertEq(ctUSD.balanceOf(ownerSafe) - safePre, corePre, "safe did not receive core balance");
+        assertEq(swept, corePre, "safe did not receive core balance");
+        // Enforce that exactly the disclosed/signed amount was swept, nothing more.
+        assertEq(swept, disclosedBalance, "swept amount differs from the disclosed signed balance");
         _assertModulesRestored(originalModules);
     }
 
