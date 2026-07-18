@@ -150,6 +150,30 @@ contract ModuleSwapSimulationTest is ForkBaseTest {
         decommission.withdrawTreasury(0, ownerSafe);
     }
 
+    function test_decommission_module_reverts_when_balance_exceeds_max() public {
+        uint256 staleMax = ctUSD.balanceOf(address(core));
+        if (staleMax == 0) return;
+
+        DecommissionModule decommission = new DecommissionModule(paymentToken);
+
+        address trade = core.tradeModule();
+        address lifecycle = core.lifecycleModule();
+        address risk = core.riskModule();
+        address originalVault = core.vaultModule();
+        address oracle = core.oracleModule();
+
+        vm.prank(ownerSafe);
+        core.setModules(trade, lifecycle, risk, address(decommission), oracle);
+        deal(paymentToken, address(core), staleMax + 1);
+
+        vm.expectRevert(abi.encodeWithSelector(SignalsErrors.SweepBalanceExceedsMax.selector, staleMax + 1, staleMax));
+        vm.prank(ownerSafe);
+        core.withdrawTreasury(staleMax);
+
+        vm.prank(ownerSafe);
+        core.setModules(trade, lifecycle, risk, originalVault, oracle);
+    }
+
     function test_decommission_sweep_succeeds_while_core_is_paused() public {
         uint256 coreBalance = ctUSD.balanceOf(address(core));
         if (coreBalance == 0) return;
@@ -180,7 +204,7 @@ contract ModuleSwapSimulationTest is ForkBaseTest {
 
         vm.startPrank(ownerSafe);
         core.setModules(trade, lifecycle, risk, address(decommission), oracle);
-        core.withdrawTreasury(1);
+        core.withdrawTreasury(ctUSD.balanceOf(address(core)));
         core.setModules(trade, lifecycle, risk, originalVault, oracle);
         vm.stopPrank();
     }

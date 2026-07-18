@@ -115,11 +115,12 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         assertEq(core.owner(), ownerSafe, "core owner changed");
 
         ModulePointers memory originalModules = _readModules();
-        _assertMultiSendPayloadShape(multiSendCalldata, decommissionModule, originalModules);
+        WaivedLiabilities memory planLiabilities = _readPlanWaivedLiabilities(plan);
+        uint256 disclosedBalance = planLiabilities.corePaymentTokenBalance6;
+        _assertMultiSendPayloadShape(multiSendCalldata, decommissionModule, originalModules, disclosedBalance);
         _assertWaivedLiabilitiesCurrent(plan);
 
         // The amount signers approve is the balance disclosed in the plan's waiver.
-        uint256 disclosedBalance = _readPlanWaivedLiabilities(plan).corePaymentTokenBalance6;
         uint256 corePre = ctUSD.balanceOf(address(core));
         uint256 safePre = ctUSD.balanceOf(ownerSafe);
         assertGt(corePre, 0, "core has no balance to validate");
@@ -275,7 +276,8 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
     function _assertMultiSendPayloadShape(
         bytes memory multiSendCalldata,
         address decommissionModule,
-        ModulePointers memory modules
+        ModulePointers memory modules,
+        uint256 maxBalance
     ) internal view {
         bytes memory packedTransactions = _decodeMultiSendPayload(multiSendCalldata);
         uint256 offset;
@@ -294,7 +296,7 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         MultiSendTx memory withdrawTreasuryTx;
         (withdrawTreasuryTx, offset) = _decodeMultiSendTx(packedTransactions, offset);
         _assertSubTransaction(
-            withdrawTreasuryTx, abi.encodeCall(SignalsCore.withdrawTreasury, (uint256(0))), "withdraw treasury"
+            withdrawTreasuryTx, abi.encodeCall(SignalsCore.withdrawTreasury, (maxBalance)), "withdraw treasury"
         );
 
         MultiSendTx memory restoreVaultTx;

@@ -26,9 +26,10 @@ contract DecommissionModule {
         self = address(this);
     }
 
-    function withdrawTreasury(uint256, address to) external onlyDelegated {
+    function withdrawTreasury(uint256 maxBalance, address to) external onlyDelegated {
         if (to == address(0)) revert SE.ZeroAddress();
         uint256 balance = paymentToken.balanceOf(address(this));
+        if (balance > maxBalance) revert SE.SweepBalanceExceedsMax(balance, maxBalance);
         paymentToken.safeTransfer(to, balance);
         emit DecommissionSweep(to, balance);
     }

@@ -55,7 +55,8 @@ contract PrepareDecommissionSweep is BaseScript {
         bytes memory setDecommissionCalldata = abi.encodeCall(
             SignalsCore.setModules, (tradeModule, lifecycleModule, riskModule, decommissionModule, oracleModule)
         );
-        bytes memory withdrawTreasuryCalldata = abi.encodeCall(SignalsCore.withdrawTreasury, (uint256(0)));
+        bytes memory withdrawTreasuryCalldata =
+            abi.encodeCall(SignalsCore.withdrawTreasury, (waivedLiabilities.corePaymentTokenBalance6));
         bytes memory restoreVaultCalldata = abi.encodeCall(
             SignalsCore.setModules, (tradeModule, lifecycleModule, riskModule, restoreVaultModule, oracleModule)
         );
@@ -109,10 +110,9 @@ contract PrepareDecommissionSweep is BaseScript {
         console.log("==============================================");
         console.log("Safe Manual Execution [OWNER ONLY]");
         console.log("==============================================");
-        console.log("1) Run the exact-calldata fork validation against this plan JSON.");
-        console.log("2) Safe -> New Transaction -> Contract Interaction");
-        console.log("3) To = MultiSend, Value = 0, Operation = DelegateCall");
-        console.log("4) Paste multiSend(bytes) calldata in Data field");
+        console.log("1) Run exact-calldata validation: yarn validate-decommission-sweep:prod");
+        console.log("2) Propose the validated sweep: yarn propose-decommission-sweep:prod");
+        console.log("3) Safe target = MultiSend, Value = 0, Operation = DelegateCall");
     }
 
     function _readWaivedLiabilities(address coreProxy, IERC20 paymentToken)
