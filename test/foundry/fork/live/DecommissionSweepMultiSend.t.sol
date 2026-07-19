@@ -4,7 +4,6 @@ pragma solidity ^0.8.28;
 import "../base/ForkBaseTest.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "forge-std/console.sol";
-import "../../../../contracts/modules/DecommissionModule.sol";
 
 interface IGnosisSafe {
     function getOwners() external view returns (address[] memory);
@@ -122,10 +121,12 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         assertEq(multiSend, _configuredMultiSend(), "plan target is not configured MultiSend");
         assertTrue(multiSend.code.length > 0, "MultiSend has no code");
         assertTrue(decommissionModule.code.length > 0, "DecommissionModule has no code");
-        DecommissionModule referenceModule = new DecommissionModule(paymentToken);
-        assertEq(
-            decommissionModule.codehash, address(referenceModule).codehash, "DecommissionModule runtime hash mismatch"
-        );
+        // Module identity is authenticated by (1) sourcing the address from the trusted env manifest
+        // (not the plan) and asserting the plan's setModules targets it, (2) the post-sweep storage
+        // snapshot proving owner/reserves are untouched, and (3) the ctUSD balance-delta assertion
+        // proving it moves the real payment token. Runtime codehash is intentionally NOT compared: the
+        // module embeds `self = address(this)` as an immutable, so its bytecode is deployment-address
+        // specific and a same-source reference deployed here would never match.
         assertEq(core.owner(), ownerSafe, "core owner changed");
         assertFalse(core.paused(), "core is already paused; pause subtransaction would revert");
 
