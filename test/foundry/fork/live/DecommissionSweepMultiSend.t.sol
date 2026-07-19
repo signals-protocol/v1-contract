@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "../base/ForkBaseTest.sol";
+import "../../../../script/actions/PrepareDecommissionQuiesce.s.sol";
 import "../../../../contracts/modules/DecommissionModule.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "forge-std/console.sol";
@@ -34,6 +35,20 @@ interface IGnosisSafe {
         address payable refundReceiver,
         bytes calldata signatures
     ) external payable returns (bool success);
+}
+
+contract PrepareDecommissionQuiesceHarness is PrepareDecommissionQuiesce {
+    function buildPayload(address coreProxy, SignalsCore core, address[] memory operators)
+        external
+        view
+        returns (QuiescePayload memory)
+    {
+        return _buildQuiescePayload(coreProxy, core, operators);
+    }
+
+    function requireActions(QuiescePayload memory payload) external pure {
+        _requireQuiesceActions(payload);
+    }
 }
 
 /// @title DecommissionSweepMultiSendTest
@@ -123,11 +138,12 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         assertEq(multiSend, _configuredMultiSend(), "plan target is not configured MultiSend");
         assertTrue(multiSend.code.length > 0, "MultiSend has no code");
         assertEq(core.owner(), ownerSafe, "core owner changed");
-        assertFalse(core.paused(), "core is already paused; quiesce plan would revert");
+        bool pausedBefore = core.paused();
+        bool[] memory operatorAllowedBefore = _readOperatorAllowed(operators);
 
         ModulePointers memory originalModules = _readModules();
         CriticalStorageSnapshot memory criticalBefore = _readCriticalStorageSnapshot(operators);
-        _assertQuiesceMultiSendPayloadShape(multiSendCalldata, operators);
+        _assertQuiesceMultiSendPayloadShape(multiSendCalldata, operators, pausedBefore, operatorAllowedBefore);
 
         _execSafeTransaction(multiSend, multiSendCalldata, operation);
 
@@ -163,7 +179,6 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         assertEq(decommissionModule.codehash, address(referenceModule).codehash, "DecommissionModule codehash mismatch");
         assertEq(core.owner(), ownerSafe, "core owner changed");
 
-        _quiesceCore(operators);
         _assertCoreQuiesced(operators);
         ModulePointers memory originalModules = _readModules();
         WaivedLiabilities memory planLiabilities = _readPlanWaivedLiabilities(plan);
@@ -187,6 +202,64 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         assertEq(swept, disclosedBalance, "swept amount differs from the disclosed signed balance");
         _assertModulesRestored(originalModules);
         _assertCriticalStorageAfter(criticalBefore, operators);
+    }
+
+    function test_quiesce_payload_omits_pause_when_already_paused_and_revokes_only_active_operators() public {
+        address[] memory operators = _operatorAllowlist();
+        if (operators.length == 0) {
+            vm.skip(true);
+            return;
+        }
+
+        vm.startPrank(ownerSafe);
+        if (!core.paused()) {
+            core.pause();
+        }
+        core.setOperator(operators[0], true);
+        for (uint256 i = 1; i < operators.length; i++) {
+            core.setOperator(operators[i], false);
+        }
+        vm.stopPrank();
+
+        bool[] memory operatorAllowedBefore = _readOperatorAllowed(operators);
+        PrepareDecommissionQuiesceHarness harness = new PrepareDecommissionQuiesceHarness();
+        PrepareDecommissionQuiesce.QuiescePayload memory payload = harness.buildPayload(address(core), core, operators);
+
+        assertFalse(payload.includePause, "already-paused quiesce payload should omit pause");
+        assertEq(payload.activeOperators.length, 1, "only active operators should be revoked");
+        assertEq(payload.activeOperators[0], operators[0], "unexpected active operator");
+        assertEq(payload.revokeOperatorCalldatas.length, 1, "unexpected revoke calldata count");
+        assertEq(
+            payload.revokeOperatorCalldatas[0],
+            abi.encodeCall(SignalsCore.setOperator, (operators[0], false)),
+            "unexpected active-operator revoke calldata"
+        );
+        _assertQuiesceMultiSendPayloadShape(payload.multiSendCalldata, operators, true, operatorAllowedBefore);
+
+        _execSafeTransaction(_configuredMultiSend(), payload.multiSendCalldata, DELEGATECALL_OPERATION);
+
+        _assertCoreQuiesced(operators);
+    }
+
+    function test_quiesce_payload_rejects_already_fully_quiesced_state() public {
+        address[] memory operators = _operatorAllowlist();
+
+        vm.startPrank(ownerSafe);
+        if (!core.paused()) {
+            core.pause();
+        }
+        for (uint256 i = 0; i < operators.length; i++) {
+            core.setOperator(operators[i], false);
+        }
+        vm.stopPrank();
+
+        PrepareDecommissionQuiesceHarness harness = new PrepareDecommissionQuiesceHarness();
+        PrepareDecommissionQuiesce.QuiescePayload memory payload = harness.buildPayload(address(core), core, operators);
+        assertFalse(payload.includePause, "fully quiesced payload should omit pause");
+        assertEq(payload.activeOperators.length, 0, "fully quiesced payload should have no operator revocations");
+
+        vm.expectRevert("Core already fully quiesced");
+        harness.requireActions(payload);
     }
 
     function _execSafeTransaction(address to, bytes memory data, uint8 operation) internal {
@@ -304,17 +377,6 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         return vm.parseJsonAddressArray(json, path);
     }
 
-    function _quiesceCore(address[] memory operators) internal {
-        vm.startPrank(ownerSafe);
-        if (!core.paused()) {
-            core.pause();
-        }
-        for (uint256 i = 0; i < operators.length; i++) {
-            core.setOperator(operators[i], false);
-        }
-        vm.stopPrank();
-    }
-
     function _assertCoreQuiesced(address[] memory operators) internal view {
         assertTrue(core.paused(), "core must be paused before sweep validation");
         _assertConfiguredOperatorsRevoked(operators);
@@ -323,6 +385,13 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
     function _assertConfiguredOperatorsRevoked(address[] memory operators) internal view {
         for (uint256 i = 0; i < operators.length; i++) {
             assertFalse(core.operators(operators[i]), "operator should be revoked");
+        }
+    }
+
+    function _readOperatorAllowed(address[] memory operators) internal view returns (bool[] memory allowed) {
+        allowed = new bool[](operators.length);
+        for (uint256 i = 0; i < operators.length; i++) {
+            allowed[i] = core.operators(operators[i]);
         }
     }
 
@@ -421,25 +490,35 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         assertEq(offset, packedTransactions.length, "unexpected MultiSend subtransaction count");
     }
 
-    function _assertQuiesceMultiSendPayloadShape(bytes memory multiSendCalldata, address[] memory operators)
-        internal
-        view
-    {
+    function _assertQuiesceMultiSendPayloadShape(
+        bytes memory multiSendCalldata,
+        address[] memory operators,
+        bool pausedBefore,
+        bool[] memory operatorAllowedBefore
+    ) internal view {
+        assertEq(operatorAllowedBefore.length, operators.length, "operator snapshot length mismatch");
         bytes memory packedTransactions = _decodeMultiSendPayload(multiSendCalldata);
         uint256 offset;
+        uint256 expectedSubTxs;
 
-        MultiSendTx memory pauseTx;
-        (pauseTx, offset) = _decodeMultiSendTx(packedTransactions, offset);
-        _assertSubTransaction(pauseTx, abi.encodeCall(SignalsCore.pause, ()), "pause");
+        if (!pausedBefore) {
+            MultiSendTx memory pauseTx;
+            (pauseTx, offset) = _decodeMultiSendTx(packedTransactions, offset);
+            _assertSubTransaction(pauseTx, abi.encodeCall(SignalsCore.pause, ()), "pause");
+            expectedSubTxs++;
+        }
 
         for (uint256 i = 0; i < operators.length; i++) {
+            if (!operatorAllowedBefore[i]) continue;
             MultiSendTx memory revokeOperatorTx;
             (revokeOperatorTx, offset) = _decodeMultiSendTx(packedTransactions, offset);
             _assertSubTransaction(
                 revokeOperatorTx, abi.encodeCall(SignalsCore.setOperator, (operators[i], false)), "revoke operator"
             );
+            expectedSubTxs++;
         }
 
+        assertGt(expectedSubTxs, 0, "quiesce payload has no required action");
         assertEq(offset, packedTransactions.length, "unexpected quiesce MultiSend subtransaction count");
     }
 

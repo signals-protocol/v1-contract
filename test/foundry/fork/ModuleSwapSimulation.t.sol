@@ -154,6 +154,7 @@ contract ModuleSwapSimulationTest is ForkBaseTest {
         address vaultBefore = core.vaultModule();
         bool pausedBefore = core.paused();
 
+        vm.expectRevert();
         decommission.withdrawTreasury(type(uint256).max, recipient);
 
         assertEq(ctUSD.balanceOf(address(decommission)), 0, "module should still hold no tokens");
@@ -162,6 +163,34 @@ contract ModuleSwapSimulationTest is ForkBaseTest {
         assertEq(ctUSD.balanceOf(ownerSafe), safeBefore, "direct call should not touch owner Safe balance");
         assertEq(core.vaultModule(), vaultBefore, "direct call should not touch module wiring");
         assertEq(core.paused(), pausedBefore, "direct call should not touch pause state");
+    }
+
+    function test_decommission_module_reverts_when_core_is_not_paused() public {
+        uint256 signedMax = ctUSD.balanceOf(address(core));
+        if (signedMax == 0) return;
+
+        DecommissionModule decommission = new DecommissionModule(paymentToken);
+
+        address trade = core.tradeModule();
+        address lifecycle = core.lifecycleModule();
+        address risk = core.riskModule();
+        address originalVault = core.vaultModule();
+        address oracle = core.oracleModule();
+
+        if (core.paused()) {
+            vm.prank(ownerSafe);
+            core.unpause();
+        }
+
+        vm.prank(ownerSafe);
+        core.setModules(trade, lifecycle, risk, address(decommission), oracle);
+
+        vm.prank(ownerSafe);
+        vm.expectRevert(DecommissionModule.CoreNotPaused.selector);
+        core.withdrawTreasury(signedMax);
+
+        vm.prank(ownerSafe);
+        core.setModules(trade, lifecycle, risk, originalVault, oracle);
     }
 
     function test_decommission_module_caps_sweep_at_max_and_leaves_excess() public {

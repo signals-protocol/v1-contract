@@ -8,6 +8,15 @@ import {console} from "forge-std/console.sol";
 /// @title PrepareDecommissionQuiesce
 /// @notice Emits the exact Safe MultiSend payload for SIG-820 phase 1: pause Core and revoke configured operators.
 contract PrepareDecommissionQuiesce is BaseScript {
+    struct QuiescePayload {
+        bool includePause;
+        address[] activeOperators;
+        bytes pauseCalldata;
+        bytes[] revokeOperatorCalldatas;
+        bytes packedTransactions;
+        bytes multiSendCalldata;
+    }
+
     function run() external {
         _enforceChainId();
 
@@ -22,21 +31,19 @@ contract PrepareDecommissionQuiesce is BaseScript {
         }
 
         address[] memory operators = _tryConfigAddrArray("operatorAllowlist");
-        require(!core.paused(), "Core already paused; quiesce plan not needed");
-        _requireOperatorsValid(operators);
-
-        bytes memory pauseCalldata = abi.encodeCall(SignalsCore.pause, ());
-        bytes[] memory revokeOperatorCalldatas = new bytes[](operators.length);
-        bytes memory packedTransactions = _encodeMultiSendTx(coreProxy, pauseCalldata);
-        for (uint256 i = 0; i < operators.length; i++) {
-            revokeOperatorCalldatas[i] = abi.encodeCall(SignalsCore.setOperator, (operators[i], false));
-            packedTransactions =
-                bytes.concat(packedTransactions, _encodeMultiSendTx(coreProxy, revokeOperatorCalldatas[i]));
-        }
-        bytes memory multiSendCalldata = abi.encodeWithSignature("multiSend(bytes)", packedTransactions);
+        QuiescePayload memory payload = _buildQuiescePayload(coreProxy, core, operators);
+        _requireQuiesceActions(payload);
 
         string memory plan = _buildPlanJson(
-            multiSendAddress, coreProxy, owner, operators, pauseCalldata, revokeOperatorCalldatas, multiSendCalldata
+            multiSendAddress,
+            coreProxy,
+            owner,
+            operators.length,
+            payload.includePause,
+            payload.activeOperators,
+            payload.pauseCalldata,
+            payload.revokeOperatorCalldatas,
+            payload.multiSendCalldata
         );
 
         string memory releasesDir = string.concat("releases/", envName);
@@ -50,23 +57,37 @@ contract PrepareDecommissionQuiesce is BaseScript {
         vm.writeFile(string.concat(copyDir, "/01-target.txt"), vm.toString(multiSendAddress));
         vm.writeFile(string.concat(copyDir, "/02-arg-operation.txt"), "1");
         vm.writeFile(string.concat(copyDir, "/03-arg-value.txt"), "0");
-        vm.writeFile(string.concat(copyDir, "/04-arg-data-multiSendCalldata.txt"), vm.toString(multiSendCalldata));
-        vm.writeFile(string.concat(copyDir, "/sub-tx-1-pause.txt"), vm.toString(pauseCalldata));
-        uint256 nextSubTx = 2;
-        if (operators.length == 0) {
+        vm.writeFile(
+            string.concat(copyDir, "/04-arg-data-multiSendCalldata.txt"), vm.toString(payload.multiSendCalldata)
+        );
+        uint256 nextSubTx = 1;
+        if (payload.includePause) {
+            vm.writeFile(
+                string.concat(copyDir, "/sub-tx-", vm.toString(nextSubTx), "-pause.txt"),
+                vm.toString(payload.pauseCalldata)
+            );
+            nextSubTx++;
+        } else {
+            vm.writeFile(
+                string.concat(copyDir, "/pause-skipped-already-paused.txt"), "Skipped: Core is already paused.\n"
+            );
+        }
+        if (payload.activeOperators.length == 0) {
             vm.writeFile(
                 string.concat(copyDir, "/operator-revocations-skipped.txt"),
-                "Skipped: config.operatorAllowlist is empty.\n"
+                operators.length == 0
+                    ? "Skipped: config.operatorAllowlist is empty.\n"
+                    : "Skipped: configured operators are already revoked.\n"
             );
         } else {
-            for (uint256 i = 0; i < operators.length; i++) {
+            for (uint256 i = 0; i < payload.activeOperators.length; i++) {
                 vm.writeFile(
                     string.concat(copyDir, "/sub-tx-", vm.toString(nextSubTx), "-setOperator-false.txt"),
                     string.concat(
                         "operator: ",
-                        vm.toString(operators[i]),
+                        vm.toString(payload.activeOperators[i]),
                         "\ncalldata: ",
-                        vm.toString(revokeOperatorCalldatas[i]),
+                        vm.toString(payload.revokeOperatorCalldatas[i]),
                         "\n"
                     )
                 );
@@ -96,6 +117,54 @@ contract PrepareDecommissionQuiesce is BaseScript {
         return multiSend;
     }
 
+    function _buildQuiescePayload(address coreProxy, SignalsCore core, address[] memory operators)
+        internal
+        view
+        returns (QuiescePayload memory payload)
+    {
+        _requireOperatorsValid(operators);
+
+        payload.includePause = !core.paused();
+        payload.activeOperators = _activeOperators(core, operators);
+        payload.pauseCalldata = abi.encodeCall(SignalsCore.pause, ());
+        payload.revokeOperatorCalldatas = new bytes[](payload.activeOperators.length);
+
+        if (payload.includePause) {
+            payload.packedTransactions = _encodeMultiSendTx(coreProxy, payload.pauseCalldata);
+        }
+        for (uint256 i = 0; i < payload.activeOperators.length; i++) {
+            payload.revokeOperatorCalldatas[i] =
+                abi.encodeCall(SignalsCore.setOperator, (payload.activeOperators[i], false));
+            payload.packedTransactions = bytes.concat(
+                payload.packedTransactions, _encodeMultiSendTx(coreProxy, payload.revokeOperatorCalldatas[i])
+            );
+        }
+        payload.multiSendCalldata = abi.encodeWithSignature("multiSend(bytes)", payload.packedTransactions);
+    }
+
+    function _requireQuiesceActions(QuiescePayload memory payload) internal pure {
+        require(payload.includePause || payload.activeOperators.length != 0, "Core already fully quiesced");
+    }
+
+    function _activeOperators(SignalsCore core, address[] memory operators)
+        internal
+        view
+        returns (address[] memory activeOperators)
+    {
+        uint256 activeCount;
+        for (uint256 i = 0; i < operators.length; i++) {
+            if (core.operators(operators[i])) activeCount++;
+        }
+
+        activeOperators = new address[](activeCount);
+        uint256 cursor;
+        for (uint256 i = 0; i < operators.length; i++) {
+            if (!core.operators(operators[i])) continue;
+            activeOperators[cursor] = operators[i];
+            cursor++;
+        }
+    }
+
     function _encodeMultiSendTx(address to, bytes memory data) internal pure returns (bytes memory) {
         return abi.encodePacked(uint8(0), to, uint256(0), uint256(data.length), data);
     }
@@ -117,16 +186,23 @@ contract PrepareDecommissionQuiesce is BaseScript {
         return subTx;
     }
 
-    function _buildOperatorRevocationsJson(address[] memory operators) internal returns (string memory) {
-        string memory operatorRevocations = vm.serializeUint("quiesce_operator_revocations", "count", operators.length);
-        if (operators.length == 0) {
+    function _buildOperatorRevocationsJson(address[] memory activeOperators, uint256 configuredOperatorCount)
+        internal
+        returns (string memory)
+    {
+        string memory operatorRevocations =
+            vm.serializeUint("quiesce_operator_revocations", "count", activeOperators.length);
+        if (configuredOperatorCount == 0) {
             operatorRevocations =
                 vm.serializeString("quiesce_operator_revocations", "status", "skipped_no_operator_allowlist");
+        } else if (activeOperators.length == 0) {
+            operatorRevocations =
+                vm.serializeString("quiesce_operator_revocations", "status", "skipped_already_revoked");
         } else {
-            operatorRevocations = vm.serializeString("quiesce_operator_revocations", "status", "included");
-            for (uint256 i = 0; i < operators.length; i++) {
+            operatorRevocations = vm.serializeString("quiesce_operator_revocations", "status", "included_active_only");
+            for (uint256 i = 0; i < activeOperators.length; i++) {
                 operatorRevocations = vm.serializeAddress(
-                    "quiesce_operator_revocations", string.concat("operator", vm.toString(i + 1)), operators[i]
+                    "quiesce_operator_revocations", string.concat("operator", vm.toString(i + 1)), activeOperators[i]
                 );
             }
         }
@@ -137,35 +213,36 @@ contract PrepareDecommissionQuiesce is BaseScript {
         address multiSendAddress,
         address coreProxy,
         address owner,
-        address[] memory operators,
+        uint256 configuredOperatorCount,
+        bool includePause,
+        address[] memory activeOperators,
         bytes memory pauseCalldata,
         bytes[] memory revokeOperatorCalldatas,
         bytes memory multiSendCalldata
     ) internal returns (string memory) {
-        string memory subTxs = vm.serializeString(
-            "quiesce_sub_transactions",
-            "pause",
-            _serializeSubTransaction("quiesce_sub_tx_pause", coreProxy, pauseCalldata)
-        );
-        if (operators.length == 0) {
-            string memory skipped =
-                vm.serializeString("quiesce_sub_tx_operator_revocations", "status", "skipped_no_operator_allowlist");
-            subTxs = vm.serializeString("quiesce_sub_transactions", "operatorRevocations", skipped);
-        } else {
-            for (uint256 i = 0; i < operators.length; i++) {
-                subTxs = vm.serializeString(
-                    "quiesce_sub_transactions",
-                    string.concat("setOperatorFalse", vm.toString(i + 1)),
-                    _serializeSubTransaction(
-                        string.concat("quiesce_sub_tx_operator_", vm.toString(i + 1)),
-                        coreProxy,
-                        revokeOperatorCalldatas[i]
-                    )
-                );
-            }
+        string memory subTxs;
+        bool subTxsInitialized;
+        if (includePause) {
+            subTxs = vm.serializeString(
+                "quiesce_sub_transactions",
+                "pause",
+                _serializeSubTransaction("quiesce_sub_tx_pause", coreProxy, pauseCalldata)
+            );
+            subTxsInitialized = true;
         }
+        for (uint256 i = 0; i < activeOperators.length; i++) {
+            subTxs = vm.serializeString(
+                "quiesce_sub_transactions",
+                string.concat("setOperatorFalse", vm.toString(i + 1)),
+                _serializeSubTransaction(
+                    string.concat("quiesce_sub_tx_operator_", vm.toString(i + 1)), coreProxy, revokeOperatorCalldatas[i]
+                )
+            );
+            subTxsInitialized = true;
+        }
+        require(subTxsInitialized, "Core already fully quiesced");
 
-        string memory operatorRevocations = _buildOperatorRevocationsJson(operators);
+        string memory operatorRevocations = _buildOperatorRevocationsJson(activeOperators, configuredOperatorCount);
 
         string memory safeArgs = vm.serializeAddress("quiesce_safe_args", "to", multiSendAddress);
         safeArgs = vm.serializeString("quiesce_safe_args", "value", "0");

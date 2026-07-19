@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {SignalsErrors as SE} from "../errors/SignalsErrors.sol";
+import {ISignalsCorePause} from "../interfaces/ISignalsCorePause.sol";
 
 /// @title DecommissionModule
 /// @notice One-shot vault module used to sweep the full Core payment-token balance during protocol shutdown.
@@ -13,6 +14,7 @@ contract DecommissionModule {
     IERC20 private immutable paymentToken;
 
     event DecommissionSweep(address indexed to, uint256 amount);
+    error CoreNotPaused();
 
     constructor(address paymentToken_) {
         if (paymentToken_ == address(0)) revert SE.ZeroAddress();
@@ -25,6 +27,7 @@ contract DecommissionModule {
     ///      behind rather than reverting, so a dust transfer cannot grief the signed sweep.
     function withdrawTreasury(uint256 maxBalance, address to) external {
         if (to == address(0)) revert SE.ZeroAddress();
+        if (!ISignalsCorePause(address(this)).paused()) revert CoreNotPaused();
         uint256 balance = paymentToken.balanceOf(address(this));
         uint256 amount = balance > maxBalance ? maxBalance : balance;
         paymentToken.safeTransfer(to, amount);
