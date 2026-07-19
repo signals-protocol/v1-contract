@@ -137,6 +137,8 @@ contract ModuleSwapSimulationTest is ForkBaseTest {
         assertEq(ctUSD.balanceOf(address(core)), 0, "core balance not swept");
         assertEq(ctUSD.balanceOf(ownerSafe) - safeBefore, coreBalance, "safe did not receive full core balance");
         assertEq(core.vaultModule(), originalVault, "vault module not restored");
+        assertTrue(core.paused(), "core should be paused after decommission");
+        _assertConfiguredOperatorsRevoked();
         if (hasMarket) {
             _assertMarketSnapshot(1, marketBefore);
         }
@@ -195,6 +197,7 @@ contract ModuleSwapSimulationTest is ForkBaseTest {
         _swapSweepRestore(decommission);
 
         assertTrue(core.paused(), "core should still be paused");
+        _assertConfiguredOperatorsRevoked();
         assertEq(ctUSD.balanceOf(address(core)), 0, "paused core balance not swept");
         assertEq(ctUSD.balanceOf(ownerSafe) - safeBefore, coreBalance, "safe did not receive paused sweep");
         assertEq(core.vaultModule(), originalVault, "vault module not restored after paused sweep");
@@ -206,12 +209,33 @@ contract ModuleSwapSimulationTest is ForkBaseTest {
         address risk = core.riskModule();
         address originalVault = core.vaultModule();
         address oracle = core.oracleModule();
+        address[] memory operators = _operatorAllowlist();
 
         vm.startPrank(ownerSafe);
+        if (!core.paused()) {
+            core.pause();
+        }
+        for (uint256 i = 0; i < operators.length; i++) {
+            core.setOperator(operators[i], false);
+        }
         core.setModules(trade, lifecycle, risk, address(decommission), oracle);
         core.withdrawTreasury(ctUSD.balanceOf(address(core)));
         core.setModules(trade, lifecycle, risk, originalVault, oracle);
         vm.stopPrank();
+    }
+
+    function _assertConfiguredOperatorsRevoked() internal view {
+        address[] memory operators = _operatorAllowlist();
+        for (uint256 i = 0; i < operators.length; i++) {
+            assertFalse(core.operators(operators[i]), "operator should be revoked after decommission");
+        }
+    }
+
+    function _operatorAllowlist() internal view returns (address[] memory) {
+        string memory json = _loadEnvJson();
+        string memory path = ".config.operatorAllowlist";
+        if (!vm.keyExistsJson(json, path)) return new address[](0);
+        return vm.parseJsonAddressArray(json, path);
     }
 
     function _readPositionSnapshot() internal view returns (PositionSnapshot memory snap) {

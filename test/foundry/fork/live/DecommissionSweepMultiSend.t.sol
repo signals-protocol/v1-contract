@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "../base/ForkBaseTest.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "forge-std/console.sol";
+import "../../../../contracts/modules/DecommissionModule.sol";
 
 interface IGnosisSafe {
     function getOwners() external view returns (address[] memory);
@@ -74,6 +75,14 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         uint256 corePaymentTokenBalance6;
     }
 
+    struct CriticalStorageSnapshot {
+        address owner;
+        bool[] operatorAllowed;
+        uint256 totalPendingDeposits6;
+        uint256 totalPayoutReserve6;
+        uint256 totalPendingWithdrawals6;
+    }
+
     function setUp() public override {
         envName = vm.envOr("FORK_ENV", string("prod"));
         envJsonPath = string.concat("scripts/environments/", envName, ".json");
@@ -105,19 +114,27 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         bytes memory multiSendCalldata = _readSafeCalldata(plan);
         uint8 operation = uint8(_readSafeOperation(plan));
         string memory value = _readSafeValue(plan);
-        address decommissionModule = _readDecommissionModule(plan);
+        address decommissionModule = _contractAddr("DecommissionModule");
+        address[] memory operators = _operatorAllowlist();
 
         assertEq(operation, DELEGATECALL_OPERATION, "plan must delegatecall MultiSend");
         assertEq(keccak256(bytes(value)), keccak256(bytes("0")), "plan value must be zero");
         assertEq(multiSend, _configuredMultiSend(), "plan target is not configured MultiSend");
         assertTrue(multiSend.code.length > 0, "MultiSend has no code");
         assertTrue(decommissionModule.code.length > 0, "DecommissionModule has no code");
+        DecommissionModule referenceModule = new DecommissionModule(paymentToken);
+        assertEq(
+            decommissionModule.codehash, address(referenceModule).codehash, "DecommissionModule runtime hash mismatch"
+        );
         assertEq(core.owner(), ownerSafe, "core owner changed");
+        assertFalse(core.paused(), "core is already paused; pause subtransaction would revert");
 
         ModulePointers memory originalModules = _readModules();
         WaivedLiabilities memory planLiabilities = _readPlanWaivedLiabilities(plan);
         uint256 disclosedBalance = planLiabilities.corePaymentTokenBalance6;
-        _assertMultiSendPayloadShape(multiSendCalldata, decommissionModule, originalModules, disclosedBalance);
+        _assertMultiSendPayloadShape(
+            multiSendCalldata, decommissionModule, originalModules, disclosedBalance, operators
+        );
         _assertWaivedLiabilitiesCurrent(plan);
 
         // The amount signers approve is the balance disclosed in the plan's waiver.
@@ -125,6 +142,7 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         uint256 safePre = ctUSD.balanceOf(ownerSafe);
         assertGt(corePre, 0, "core has no balance to validate");
         assertEq(corePre, disclosedBalance, "live core balance differs from disclosed waiver balance");
+        CriticalStorageSnapshot memory criticalBefore = _readCriticalStorageSnapshot(operators);
 
         _execSafeTransaction(multiSend, multiSendCalldata, operation);
 
@@ -134,6 +152,7 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         // Enforce that exactly the disclosed/signed amount was swept, nothing more.
         assertEq(swept, disclosedBalance, "swept amount differs from the disclosed signed balance");
         _assertModulesRestored(originalModules);
+        _assertCriticalStorageAfter(criticalBefore, operators);
     }
 
     function _execSafeTransaction(address to, bytes memory data, uint8 operation) internal {
@@ -238,23 +257,17 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
             : vm.parseJsonString(plan, ".safe.value");
     }
 
-    function _readDecommissionModule(string memory plan) internal view returns (address) {
-        bool hasDeployed = vm.keyExistsJson(plan, ".deployed.DecommissionModule");
-        bool hasModule = vm.keyExistsJson(plan, ".modules.DecommissionModule");
-        require(hasDeployed || hasModule, "plan missing DecommissionModule");
-
-        address deployed = hasDeployed ? vm.parseJsonAddress(plan, ".deployed.DecommissionModule") : address(0);
-        address module = hasModule ? vm.parseJsonAddress(plan, ".modules.DecommissionModule") : address(0);
-        if (hasDeployed && hasModule) {
-            assertEq(deployed, module, "DecommissionModule plan metadata mismatch");
-        }
-        return hasDeployed ? deployed : module;
-    }
-
     function _configuredMultiSend() internal view returns (address) {
         string memory configPath = string.concat("script/config/deploy-", envName, ".json");
         string memory json = vm.readFile(configPath);
         return vm.parseJsonAddress(json, ".safe.multiSendAddress");
+    }
+
+    function _operatorAllowlist() internal view returns (address[] memory) {
+        string memory json = _loadEnvJson();
+        string memory path = ".config.operatorAllowlist";
+        if (!vm.keyExistsJson(json, path)) return new address[](0);
+        return vm.parseJsonAddressArray(json, path);
     }
 
     function _readModules() internal view returns (ModulePointers memory modules) {
@@ -273,14 +286,67 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         assertEq(core.oracleModule(), expected.oracle, "oracle module not restored");
     }
 
+    function _readCriticalStorageSnapshot(address[] memory operators)
+        internal
+        view
+        returns (CriticalStorageSnapshot memory snapshot)
+    {
+        snapshot.owner = core.owner();
+        snapshot.operatorAllowed = new bool[](operators.length);
+        for (uint256 i = 0; i < operators.length; i++) {
+            snapshot.operatorAllowed[i] = core.operators(operators[i]);
+        }
+        snapshot.totalPendingDeposits6 = _readStorageUint(TOTAL_PENDING_DEPOSITS_SLOT);
+        snapshot.totalPayoutReserve6 = _readStorageUint(TOTAL_PAYOUT_RESERVE_SLOT);
+        snapshot.totalPendingWithdrawals6 = _readStorageUint(TOTAL_PENDING_WITHDRAWALS_SLOT);
+    }
+
+    function _assertCriticalStorageAfter(CriticalStorageSnapshot memory expected, address[] memory operators)
+        internal
+        view
+    {
+        assertEq(core.owner(), expected.owner, "core owner changed during sweep");
+        assertEq(expected.operatorAllowed.length, operators.length, "operator snapshot length changed");
+        assertEq(
+            _readStorageUint(TOTAL_PENDING_DEPOSITS_SLOT),
+            expected.totalPendingDeposits6,
+            "pending deposits slot changed"
+        );
+        assertEq(
+            _readStorageUint(TOTAL_PAYOUT_RESERVE_SLOT), expected.totalPayoutReserve6, "payout reserve slot changed"
+        );
+        assertEq(
+            _readStorageUint(TOTAL_PENDING_WITHDRAWALS_SLOT),
+            expected.totalPendingWithdrawals6,
+            "pending withdrawals slot changed"
+        );
+        assertTrue(core.paused(), "core should be paused after sweep");
+        for (uint256 i = 0; i < operators.length; i++) {
+            assertFalse(core.operators(operators[i]), "operator should be revoked after sweep");
+        }
+    }
+
     function _assertMultiSendPayloadShape(
         bytes memory multiSendCalldata,
         address decommissionModule,
         ModulePointers memory modules,
-        uint256 maxBalance
+        uint256 maxBalance,
+        address[] memory operators
     ) internal view {
         bytes memory packedTransactions = _decodeMultiSendPayload(multiSendCalldata);
         uint256 offset;
+
+        MultiSendTx memory pauseTx;
+        (pauseTx, offset) = _decodeMultiSendTx(packedTransactions, offset);
+        _assertSubTransaction(pauseTx, abi.encodeCall(SignalsCore.pause, ()), "pause");
+
+        for (uint256 i = 0; i < operators.length; i++) {
+            MultiSendTx memory revokeOperatorTx;
+            (revokeOperatorTx, offset) = _decodeMultiSendTx(packedTransactions, offset);
+            _assertSubTransaction(
+                revokeOperatorTx, abi.encodeCall(SignalsCore.setOperator, (operators[i], false)), "revoke operator"
+            );
+        }
 
         MultiSendTx memory setDecommissionTx;
         (setDecommissionTx, offset) = _decodeMultiSendTx(packedTransactions, offset);
@@ -309,7 +375,7 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
             "restore vault"
         );
 
-        assertEq(offset, packedTransactions.length, "expected exactly three MultiSend subtransactions");
+        assertEq(offset, packedTransactions.length, "unexpected MultiSend subtransaction count");
     }
 
     function _assertSubTransaction(MultiSendTx memory transaction, bytes memory expectedData, string memory label)
