@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "../base/ForkBaseTest.sol";
+import "../../../../contracts/modules/DecommissionModule.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "forge-std/console.sol";
 
@@ -49,7 +50,8 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
 
     IERC20 internal ctUSD;
     IGnosisSafe internal safe;
-    bool internal enabled;
+    bool internal sweepEnabled;
+    bool internal quiesceEnabled;
 
     struct ModulePointers {
         address trade;
@@ -96,13 +98,49 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         ctUSD = IERC20(paymentToken);
         safe = IGnosisSafe(ownerSafe);
 
-        enabled = bytes(vm.envOr("DECOMMISSION_SWEEP_PLAN", string(""))).length != 0;
+        sweepEnabled = bytes(vm.envOr("DECOMMISSION_SWEEP_PLAN", string(""))).length != 0;
+        quiesceEnabled = bytes(vm.envOr("DECOMMISSION_QUIESCE_PLAN", string(""))).length != 0;
+    }
+
+    function test_exact_quiesce_plan_multisend_pauses_and_revokes_operators() public {
+        // Manual release gate: reports as SKIPPED (not PASSED) in CI when no plan is provided,
+        // so the baseline suite never masquerades this as real coverage.
+        if (!quiesceEnabled) {
+            vm.skip(true);
+            return;
+        }
+
+        string memory planPath = vm.envString("DECOMMISSION_QUIESCE_PLAN");
+        string memory plan = vm.readFile(planPath);
+        address multiSend = _readSafeTarget(plan);
+        bytes memory multiSendCalldata = _readSafeCalldata(plan);
+        uint8 operation = uint8(_readSafeOperation(plan));
+        string memory value = _readSafeValue(plan);
+        address[] memory operators = _operatorAllowlist();
+
+        assertEq(operation, DELEGATECALL_OPERATION, "plan must delegatecall MultiSend");
+        assertEq(keccak256(bytes(value)), keccak256(bytes("0")), "plan value must be zero");
+        assertEq(multiSend, _configuredMultiSend(), "plan target is not configured MultiSend");
+        assertTrue(multiSend.code.length > 0, "MultiSend has no code");
+        assertEq(core.owner(), ownerSafe, "core owner changed");
+        assertFalse(core.paused(), "core is already paused; quiesce plan would revert");
+
+        ModulePointers memory originalModules = _readModules();
+        CriticalStorageSnapshot memory criticalBefore = _readCriticalStorageSnapshot(operators);
+        _assertQuiesceMultiSendPayloadShape(multiSendCalldata, operators);
+
+        _execSafeTransaction(multiSend, multiSendCalldata, operation);
+
+        assertTrue(core.paused(), "core should be paused after quiesce");
+        _assertConfiguredOperatorsRevoked(operators);
+        _assertModulesRestored(originalModules);
+        _assertCriticalStorageAfter(criticalBefore, operators);
     }
 
     function test_exact_plan_multisend_sweeps_core_and_restores_vault() public {
         // Manual release gate: reports as SKIPPED (not PASSED) in CI when no plan is provided,
         // so the baseline suite never masquerades this as real coverage.
-        if (!enabled) {
+        if (!sweepEnabled) {
             vm.skip(true);
             return;
         }
@@ -121,21 +159,16 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         assertEq(multiSend, _configuredMultiSend(), "plan target is not configured MultiSend");
         assertTrue(multiSend.code.length > 0, "MultiSend has no code");
         assertTrue(decommissionModule.code.length > 0, "DecommissionModule has no code");
-        // Module identity is authenticated by (1) sourcing the address from the trusted env manifest
-        // (not the plan) and asserting the plan's setModules targets it, (2) the post-sweep storage
-        // snapshot proving owner/reserves are untouched, and (3) the ctUSD balance-delta assertion
-        // proving it moves the real payment token. Runtime codehash is intentionally NOT compared: the
-        // module embeds `self = address(this)` as an immutable, so its bytecode is deployment-address
-        // specific and a same-source reference deployed here would never match.
+        DecommissionModule referenceModule = new DecommissionModule(paymentToken);
+        assertEq(decommissionModule.codehash, address(referenceModule).codehash, "DecommissionModule codehash mismatch");
         assertEq(core.owner(), ownerSafe, "core owner changed");
-        assertFalse(core.paused(), "core is already paused; pause subtransaction would revert");
 
+        _quiesceCore(operators);
+        _assertCoreQuiesced(operators);
         ModulePointers memory originalModules = _readModules();
         WaivedLiabilities memory planLiabilities = _readPlanWaivedLiabilities(plan);
         uint256 disclosedBalance = planLiabilities.corePaymentTokenBalance6;
-        _assertMultiSendPayloadShape(
-            multiSendCalldata, decommissionModule, originalModules, disclosedBalance, operators
-        );
+        _assertMultiSendPayloadShape(multiSendCalldata, decommissionModule, originalModules, disclosedBalance);
         _assertWaivedLiabilitiesCurrent(plan);
 
         // The amount signers approve is the balance disclosed in the plan's waiver.
@@ -271,6 +304,28 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         return vm.parseJsonAddressArray(json, path);
     }
 
+    function _quiesceCore(address[] memory operators) internal {
+        vm.startPrank(ownerSafe);
+        if (!core.paused()) {
+            core.pause();
+        }
+        for (uint256 i = 0; i < operators.length; i++) {
+            core.setOperator(operators[i], false);
+        }
+        vm.stopPrank();
+    }
+
+    function _assertCoreQuiesced(address[] memory operators) internal view {
+        assertTrue(core.paused(), "core must be paused before sweep validation");
+        _assertConfiguredOperatorsRevoked(operators);
+    }
+
+    function _assertConfiguredOperatorsRevoked(address[] memory operators) internal view {
+        for (uint256 i = 0; i < operators.length; i++) {
+            assertFalse(core.operators(operators[i]), "operator should be revoked");
+        }
+    }
+
     function _readModules() internal view returns (ModulePointers memory modules) {
         modules.trade = core.tradeModule();
         modules.lifecycle = core.lifecycleModule();
@@ -331,23 +386,10 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         bytes memory multiSendCalldata,
         address decommissionModule,
         ModulePointers memory modules,
-        uint256 maxBalance,
-        address[] memory operators
+        uint256 maxBalance
     ) internal view {
         bytes memory packedTransactions = _decodeMultiSendPayload(multiSendCalldata);
         uint256 offset;
-
-        MultiSendTx memory pauseTx;
-        (pauseTx, offset) = _decodeMultiSendTx(packedTransactions, offset);
-        _assertSubTransaction(pauseTx, abi.encodeCall(SignalsCore.pause, ()), "pause");
-
-        for (uint256 i = 0; i < operators.length; i++) {
-            MultiSendTx memory revokeOperatorTx;
-            (revokeOperatorTx, offset) = _decodeMultiSendTx(packedTransactions, offset);
-            _assertSubTransaction(
-                revokeOperatorTx, abi.encodeCall(SignalsCore.setOperator, (operators[i], false)), "revoke operator"
-            );
-        }
 
         MultiSendTx memory setDecommissionTx;
         (setDecommissionTx, offset) = _decodeMultiSendTx(packedTransactions, offset);
@@ -377,6 +419,28 @@ contract DecommissionSweepMultiSendTest is ForkBaseTest {
         );
 
         assertEq(offset, packedTransactions.length, "unexpected MultiSend subtransaction count");
+    }
+
+    function _assertQuiesceMultiSendPayloadShape(bytes memory multiSendCalldata, address[] memory operators)
+        internal
+        view
+    {
+        bytes memory packedTransactions = _decodeMultiSendPayload(multiSendCalldata);
+        uint256 offset;
+
+        MultiSendTx memory pauseTx;
+        (pauseTx, offset) = _decodeMultiSendTx(packedTransactions, offset);
+        _assertSubTransaction(pauseTx, abi.encodeCall(SignalsCore.pause, ()), "pause");
+
+        for (uint256 i = 0; i < operators.length; i++) {
+            MultiSendTx memory revokeOperatorTx;
+            (revokeOperatorTx, offset) = _decodeMultiSendTx(packedTransactions, offset);
+            _assertSubTransaction(
+                revokeOperatorTx, abi.encodeCall(SignalsCore.setOperator, (operators[i], false)), "revoke operator"
+            );
+        }
+
+        assertEq(offset, packedTransactions.length, "unexpected quiesce MultiSend subtransaction count");
     }
 
     function _assertSubTransaction(MultiSendTx memory transaction, bytes memory expectedData, string memory label)

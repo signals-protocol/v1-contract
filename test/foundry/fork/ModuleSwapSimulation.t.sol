@@ -8,7 +8,6 @@ import "../../../contracts/modules/MarketLifecycleModule.sol";
 import "../../../contracts/modules/LPVaultModule.sol";
 import "../../../contracts/modules/DecommissionModule.sol";
 import "../../../contracts/interfaces/ISignalsPosition.sol";
-import "../../../contracts/errors/SignalsErrors.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title ModuleSwapSimulation
@@ -132,6 +131,7 @@ contract ModuleSwapSimulationTest is ForkBaseTest {
         address originalVault = core.vaultModule();
         uint256 safeBefore = ctUSD.balanceOf(ownerSafe);
 
+        _quiesceCore();
         _swapSweepRestore(decommission);
 
         assertEq(ctUSD.balanceOf(address(core)), 0, "core balance not swept");
@@ -145,11 +145,23 @@ contract ModuleSwapSimulationTest is ForkBaseTest {
         _assertPositionSnapshot(positionBefore);
     }
 
-    function test_decommission_module_direct_call_reverts() public {
+    function test_decommission_module_direct_call_is_inert() public {
         DecommissionModule decommission = new DecommissionModule(paymentToken);
+        address recipient = makeAddr("direct recipient");
+        uint256 coreBefore = ctUSD.balanceOf(address(core));
+        uint256 safeBefore = ctUSD.balanceOf(ownerSafe);
+        uint256 recipientBefore = ctUSD.balanceOf(recipient);
+        address vaultBefore = core.vaultModule();
+        bool pausedBefore = core.paused();
 
-        vm.expectRevert(SignalsErrors.NotDelegated.selector);
-        decommission.withdrawTreasury(0, ownerSafe);
+        decommission.withdrawTreasury(type(uint256).max, recipient);
+
+        assertEq(ctUSD.balanceOf(address(decommission)), 0, "module should still hold no tokens");
+        assertEq(ctUSD.balanceOf(recipient), recipientBefore, "direct call should transfer nothing");
+        assertEq(ctUSD.balanceOf(address(core)), coreBefore, "direct call should not touch core balance");
+        assertEq(ctUSD.balanceOf(ownerSafe), safeBefore, "direct call should not touch owner Safe balance");
+        assertEq(core.vaultModule(), vaultBefore, "direct call should not touch module wiring");
+        assertEq(core.paused(), pausedBefore, "direct call should not touch pause state");
     }
 
     function test_decommission_module_caps_sweep_at_max_and_leaves_excess() public {
@@ -165,6 +177,7 @@ contract ModuleSwapSimulationTest is ForkBaseTest {
         address oracle = core.oracleModule();
         uint256 safeBefore = ctUSD.balanceOf(ownerSafe);
 
+        _quiesceCore();
         vm.prank(ownerSafe);
         core.setModules(trade, lifecycle, risk, address(decommission), oracle);
         // A dust transfer after signing pushes the live balance above the signed cap.
@@ -189,11 +202,7 @@ contract ModuleSwapSimulationTest is ForkBaseTest {
         address originalVault = core.vaultModule();
         uint256 safeBefore = ctUSD.balanceOf(ownerSafe);
 
-        if (!core.paused()) {
-            vm.prank(ownerSafe);
-            core.pause();
-        }
-
+        _quiesceCore();
         _swapSweepRestore(decommission);
 
         assertTrue(core.paused(), "core should still be paused");
@@ -203,12 +212,7 @@ contract ModuleSwapSimulationTest is ForkBaseTest {
         assertEq(core.vaultModule(), originalVault, "vault module not restored after paused sweep");
     }
 
-    function _swapSweepRestore(DecommissionModule decommission) internal {
-        address trade = core.tradeModule();
-        address lifecycle = core.lifecycleModule();
-        address risk = core.riskModule();
-        address originalVault = core.vaultModule();
-        address oracle = core.oracleModule();
+    function _quiesceCore() internal {
         address[] memory operators = _operatorAllowlist();
 
         vm.startPrank(ownerSafe);
@@ -218,6 +222,23 @@ contract ModuleSwapSimulationTest is ForkBaseTest {
         for (uint256 i = 0; i < operators.length; i++) {
             core.setOperator(operators[i], false);
         }
+        vm.stopPrank();
+
+        assertTrue(core.paused(), "core should be paused before sweep");
+        _assertConfiguredOperatorsRevoked();
+    }
+
+    function _swapSweepRestore(DecommissionModule decommission) internal {
+        address trade = core.tradeModule();
+        address lifecycle = core.lifecycleModule();
+        address risk = core.riskModule();
+        address originalVault = core.vaultModule();
+        address oracle = core.oracleModule();
+
+        assertTrue(core.paused(), "core must be quiesced before sweep");
+        _assertConfiguredOperatorsRevoked();
+
+        vm.startPrank(ownerSafe);
         core.setModules(trade, lifecycle, risk, address(decommission), oracle);
         core.withdrawTreasury(ctUSD.balanceOf(address(core)));
         core.setModules(trade, lifecycle, risk, originalVault, oracle);

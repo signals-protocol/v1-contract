@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {console} from "forge-std/console.sol";
 
 /// @title PrepareDecommissionSweep
-/// @notice Emits the exact Safe MultiSend payload for SIG-820: pause, revoke operators, swap, sweep, restore.
+/// @notice Emits the exact Safe MultiSend payload for SIG-820: swap, sweep, restore.
 /// @dev Reads live module addresses from Core. The only module address sourced from env JSON is DecommissionModule.
 contract PrepareDecommissionSweep is BaseScript {
     uint256 internal constant TOTAL_PENDING_DEPOSITS_SLOT = 34;
@@ -43,8 +43,6 @@ contract PrepareDecommissionSweep is BaseScript {
         address oracleModule = core.oracleModule();
         address[] memory operators = _tryConfigAddrArray("operatorAllowlist");
 
-        require(!core.paused(), "Core already paused; generated pause() would revert");
-
         _requireContract(tradeModule, "TradeModule");
         _requireContract(lifecycleModule, "MarketLifecycleModule");
         _requireContract(riskModule, "RiskModule");
@@ -52,12 +50,11 @@ contract PrepareDecommissionSweep is BaseScript {
         _requireContract(restoreVaultModule, "restore LPVaultModule");
         _requireContract(oracleModule, "OracleModule");
         _requireOperatorsValid(operators);
+        _requireCoreQuiesced(core, operators);
 
         WaivedLiabilities memory waivedLiabilities = _readWaivedLiabilities(coreProxy, core.paymentToken());
         _logWaivedLiabilities(waivedLiabilities);
 
-        bytes memory pauseCalldata = abi.encodeCall(SignalsCore.pause, ());
-        bytes[] memory revokeOperatorCalldatas = new bytes[](operators.length);
         bytes memory setDecommissionCalldata = abi.encodeCall(
             SignalsCore.setModules, (tradeModule, lifecycleModule, riskModule, decommissionModule, oracleModule)
         );
@@ -66,14 +63,7 @@ contract PrepareDecommissionSweep is BaseScript {
         bytes memory restoreVaultCalldata = abi.encodeCall(
             SignalsCore.setModules, (tradeModule, lifecycleModule, riskModule, restoreVaultModule, oracleModule)
         );
-        bytes memory packedTransactions = _encodeMultiSendTx(coreProxy, pauseCalldata);
-        for (uint256 i = 0; i < operators.length; i++) {
-            revokeOperatorCalldatas[i] = abi.encodeCall(SignalsCore.setOperator, (operators[i], false));
-            packedTransactions =
-                bytes.concat(packedTransactions, _encodeMultiSendTx(coreProxy, revokeOperatorCalldatas[i]));
-        }
-        packedTransactions = bytes.concat(
-            packedTransactions,
+        bytes memory packedTransactions = bytes.concat(
             _encodeMultiSendTx(coreProxy, setDecommissionCalldata),
             _encodeMultiSendTx(coreProxy, withdrawTreasuryCalldata),
             _encodeMultiSendTx(coreProxy, restoreVaultCalldata)
@@ -91,8 +81,6 @@ contract PrepareDecommissionSweep is BaseScript {
             restoreVaultModule,
             oracleModule,
             operators,
-            pauseCalldata,
-            revokeOperatorCalldatas,
             setDecommissionCalldata,
             withdrawTreasuryCalldata,
             restoreVaultCalldata,
@@ -116,50 +104,24 @@ contract PrepareDecommissionSweep is BaseScript {
         vm.writeFile(string.concat(copyDir, "/02-arg-operation.txt"), "1");
         vm.writeFile(string.concat(copyDir, "/03-arg-value.txt"), "0");
         vm.writeFile(string.concat(copyDir, "/04-arg-data-multiSendCalldata.txt"), vm.toString(multiSendCalldata));
-        vm.writeFile(string.concat(copyDir, "/sub-tx-1-pause.txt"), vm.toString(pauseCalldata));
-        uint256 nextSubTx = 2;
-        if (operators.length == 0) {
-            vm.writeFile(
-                string.concat(copyDir, "/operator-revocations-skipped.txt"),
-                "Skipped: config.operatorAllowlist is empty.\n"
-            );
-        } else {
-            for (uint256 i = 0; i < operators.length; i++) {
-                vm.writeFile(
-                    string.concat(copyDir, "/sub-tx-", vm.toString(nextSubTx), "-setOperator-false.txt"),
-                    string.concat(
-                        "operator: ",
-                        vm.toString(operators[i]),
-                        "\ncalldata: ",
-                        vm.toString(revokeOperatorCalldatas[i]),
-                        "\n"
-                    )
-                );
-                nextSubTx++;
-            }
-        }
         vm.writeFile(
-            string.concat(copyDir, "/sub-tx-", vm.toString(nextSubTx), "-setModules-decommission.txt"),
-            vm.toString(setDecommissionCalldata)
+            string.concat(copyDir, "/sub-tx-1-setModules-decommission.txt"), vm.toString(setDecommissionCalldata)
         );
-        nextSubTx++;
-        vm.writeFile(
-            string.concat(copyDir, "/sub-tx-", vm.toString(nextSubTx), "-withdrawTreasury.txt"),
-            vm.toString(withdrawTreasuryCalldata)
-        );
-        nextSubTx++;
-        vm.writeFile(
-            string.concat(copyDir, "/sub-tx-", vm.toString(nextSubTx), "-setModules-restore.txt"),
-            vm.toString(restoreVaultCalldata)
-        );
+        vm.writeFile(string.concat(copyDir, "/sub-tx-2-withdrawTreasury.txt"), vm.toString(withdrawTreasuryCalldata));
+        vm.writeFile(string.concat(copyDir, "/sub-tx-3-setModules-restore.txt"), vm.toString(restoreVaultCalldata));
         console.log("[prepare-decommission-sweep] copy files: %s", copyDir);
 
         console.log("==============================================");
         console.log("Safe Manual Execution [OWNER ONLY]");
         console.log("==============================================");
-        console.log("1) Run exact-calldata validation: yarn validate-decommission-sweep:prod");
-        console.log("2) Propose the validated pause/revoke/sweep batch: yarn propose-decommission-sweep:prod");
-        console.log("3) Safe target = MultiSend, Value = 0, Operation = DelegateCall");
+        console.log("Required order:");
+        console.log("1) Prepare quiesce: yarn prepare-decommission-quiesce:prod");
+        console.log("2) Validate quiesce: yarn validate-decommission-quiesce:prod");
+        console.log("3) Propose and execute quiesce: yarn propose-decommission-quiesce:prod");
+        console.log("4) Prepare sweep: yarn prepare-decommission-sweep:prod");
+        console.log("5) Validate sweep: yarn validate-decommission-sweep:prod");
+        console.log("6) Propose sweep: yarn propose-decommission-sweep:prod");
+        console.log("Safe target = MultiSend, Value = 0, Operation = DelegateCall");
     }
 
     function _readWaivedLiabilities(address coreProxy, IERC20 paymentToken)
@@ -240,6 +202,13 @@ contract PrepareDecommissionSweep is BaseScript {
         }
     }
 
+    function _requireCoreQuiesced(SignalsCore core, address[] memory operators) internal view {
+        require(core.paused(), "Core must be paused before sweep plan generation");
+        for (uint256 i = 0; i < operators.length; i++) {
+            require(!core.operators(operators[i]), "operatorAllowlist operator still allowed");
+        }
+    }
+
     function _serializeSubTransaction(string memory key, address to, bytes memory data)
         internal
         returns (string memory)
@@ -256,7 +225,7 @@ contract PrepareDecommissionSweep is BaseScript {
         if (operators.length == 0) {
             operatorRevocations = vm.serializeString("operator_revocations", "status", "skipped_no_operator_allowlist");
         } else {
-            operatorRevocations = vm.serializeString("operator_revocations", "status", "included");
+            operatorRevocations = vm.serializeString("operator_revocations", "status", "already_revoked_precondition");
             for (uint256 i = 0; i < operators.length; i++) {
                 operatorRevocations = vm.serializeAddress(
                     "operator_revocations", string.concat("operator", vm.toString(i + 1)), operators[i]
@@ -277,8 +246,6 @@ contract PrepareDecommissionSweep is BaseScript {
         address restoreVaultModule,
         address oracleModule,
         address[] memory operators,
-        bytes memory pauseCalldata,
-        bytes[] memory revokeOperatorCalldatas,
         bytes memory setDecommissionCalldata,
         bytes memory withdrawTreasuryCalldata,
         bytes memory restoreVaultCalldata,
@@ -294,24 +261,7 @@ contract PrepareDecommissionSweep is BaseScript {
         modules = vm.serializeAddress("modules", "RestoreVaultModule", restoreVaultModule);
         modules = vm.serializeAddress("modules", "OracleModule", oracleModule);
 
-        string memory subTxs = vm.serializeString(
-            "sub_transactions", "pause", _serializeSubTransaction("sub_tx_pause", coreProxy, pauseCalldata)
-        );
-        if (operators.length == 0) {
-            string memory skipped =
-                vm.serializeString("sub_tx_operator_revocations", "status", "skipped_no_operator_allowlist");
-            subTxs = vm.serializeString("sub_transactions", "operatorRevocations", skipped);
-        } else {
-            for (uint256 i = 0; i < operators.length; i++) {
-                subTxs = vm.serializeString(
-                    "sub_transactions",
-                    string.concat("setOperatorFalse", vm.toString(i + 1)),
-                    _serializeSubTransaction(
-                        string.concat("sub_tx_operator_", vm.toString(i + 1)), coreProxy, revokeOperatorCalldatas[i]
-                    )
-                );
-            }
-        }
+        string memory subTxs;
         subTxs = vm.serializeString(
             "sub_transactions",
             "setModulesToDecommission",
@@ -361,6 +311,7 @@ contract PrepareDecommissionSweep is BaseScript {
         );
 
         string memory root = vm.serializeString("plan", "network", envName);
+        root = vm.serializeString("plan", "phase", "sweep");
         root = vm.serializeUint("plan", "chainId", block.chainid);
         root = vm.serializeAddress("plan", "coreProxy", coreProxy);
         root = vm.serializeAddress("plan", "ownerSafe", owner);

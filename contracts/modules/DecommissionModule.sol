@@ -11,26 +11,19 @@ contract DecommissionModule {
     using SafeERC20 for IERC20;
 
     IERC20 private immutable paymentToken;
-    address private immutable self;
 
     event DecommissionSweep(address indexed to, uint256 amount);
-
-    modifier onlyDelegated() {
-        if (address(this) == self) revert SE.NotDelegated();
-        _;
-    }
 
     constructor(address paymentToken_) {
         if (paymentToken_ == address(0)) revert SE.ZeroAddress();
         paymentToken = IERC20(paymentToken_);
-        self = address(this);
     }
 
     /// @notice Sweeps up to `maxBalance` of the Core payment token to `to`, capping at the signed amount.
     /// @dev Transfers `min(balanceOf(Core), maxBalance)`: a claim that lowers the balance still fully drains
     ///      Core, while any unsolicited excess (dust or an unreviewed deposit) beyond the signed cap is left
     ///      behind rather than reverting, so a dust transfer cannot grief the signed sweep.
-    function withdrawTreasury(uint256 maxBalance, address to) external onlyDelegated {
+    function withdrawTreasury(uint256 maxBalance, address to) external {
         if (to == address(0)) revert SE.ZeroAddress();
         uint256 balance = paymentToken.balanceOf(address(this));
         uint256 amount = balance > maxBalance ? maxBalance : balance;
